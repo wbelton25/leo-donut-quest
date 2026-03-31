@@ -27,9 +27,10 @@ const config = {
 
   backgroundColor: '#1a1a2e',
 
-  // Pixel-perfect scaling: fills the window while keeping integer scale factors
+  // Pixel-perfect scaling: INTEGER_FIT only uses whole-number scale factors (1×, 2×, 3×…)
+  // This prevents sub-pixel blurring that FIT causes on non-integer screen sizes.
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: Phaser.Scale.INTEGER_FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
 
@@ -48,15 +49,15 @@ const config = {
     antialias: false,
   },
 
-  // Scene order: Boot loads first, then Preload, then Title.
-  // HudScene and NeighborhoodScene are started manually from within other scenes.
+  // Scene render order matters: Phaser draws scenes in array order (index 0 = bottom).
+  // Gameplay scenes go first; HudScene and DialogueScene go last so they render on top.
   scene: [
     BootScene,
     PreloadScene,
     TitleScene,
-    HudScene,
-    DialogueScene,
     NeighborhoodScene,
+    HudScene,      // renders above NeighborhoodScene
+    DialogueScene, // renders above HudScene
   ],
 };
 

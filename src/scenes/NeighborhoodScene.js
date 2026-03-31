@@ -58,9 +58,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
       }
     }
 
-    // Road strip (Anchorage Lane / Tega Cay Drive placeholder)
-    this.add.rectangle(worldWidth / 2, 9 * TILE_SIZE, worldWidth, 2 * TILE_SIZE, 0x555555).setDepth(-1);
-    this.add.rectangle(20 * TILE_SIZE, worldHeight / 2, 2 * TILE_SIZE, worldHeight, 0x555555).setDepth(-1);
+    // Road strips drawn after ground tiles so they appear on top (no depth override needed)
+    this.add.rectangle(worldWidth / 2, 9 * TILE_SIZE, worldWidth, 2 * TILE_SIZE, 0x555555);
+    this.add.rectangle(20 * TILE_SIZE, worldHeight / 2, 2 * TILE_SIZE, worldHeight, 0x555555);
 
     // ── Static walls ──────────────────────────────────────────────────────────
     this._walls = this.physics.add.staticGroup();
