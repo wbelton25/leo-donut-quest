@@ -207,16 +207,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
       for (let i = 0; i < n; i++) {
         const hc = col + i * stepCol;
         const hr = row + i * stepRow;
-        this.add.rectangle(
-          hc * TILE_SIZE + 2 * TILE_SIZE,
-          hr * TILE_SIZE + 1.5 * TILE_SIZE,
-          4 * TILE_SIZE, 3 * TILE_SIZE, color
-        );
-        this.add.rectangle(
-          hc * TILE_SIZE + 2 * TILE_SIZE,
-          hr * TILE_SIZE + 0.5 * TILE_SIZE,
-          4 * TILE_SIZE, TILE_SIZE, darken(color)
-        );
+        const hw = 4 * TILE_SIZE, hh = 3 * TILE_SIZE;
+        const hx = hc * TILE_SIZE + 2 * TILE_SIZE;
+        const hy = hr * TILE_SIZE + 1.5 * TILE_SIZE;
+        this.add.rectangle(hx, hy, hw, hh, color);
+        this.add.rectangle(hx, hr * TILE_SIZE + 0.5 * TILE_SIZE, hw, TILE_SIZE, darken(color));
+        // Solid collision body for house footprint
+        this._addBody(hx, hy, hw, hh);
       }
     });
 
@@ -227,14 +224,12 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     // ── Trees ─────────────────────────────────────────────────────────────────
     this._generateTrees().forEach(([tc, tr]) => {
-      this.add.circle(
-        tc * TILE_SIZE + TILE_SIZE / 2, tr * TILE_SIZE + TILE_SIZE / 2,
-        TILE_SIZE * 0.7, 0x1a5c1a
-      );
-      this.add.circle(
-        tc * TILE_SIZE + TILE_SIZE / 2, tr * TILE_SIZE + TILE_SIZE / 2,
-        TILE_SIZE * 0.4, 0x228b22
-      );
+      const tx = tc * TILE_SIZE + TILE_SIZE / 2;
+      const ty = tr * TILE_SIZE + TILE_SIZE / 2;
+      this.add.circle(tx, ty, TILE_SIZE * 0.7, 0x1a5c1a);
+      this.add.circle(tx, ty, TILE_SIZE * 0.4, 0x228b22);
+      // Trunk-sized collision (slightly smaller than visual so gaps feel fair)
+      this._addBody(tx, ty, TILE_SIZE, TILE_SIZE);
     });
 
     // ── Boat docks on lake shore ──────────────────────────────────────────────
@@ -245,6 +240,12 @@ export default class NeighborhoodScene extends Phaser.Scene {
         TILE_SIZE * 2, TILE_SIZE * 4, 0x8b6914
       );
     });
+
+    // ── Water collision — lake and west arm ───────────────────────────────────
+    // Main lake body starts at row 132 (just below sandy shore)
+    this._addWall(0, 132, MAP_COLS, MAP_ROWS - 132, false);
+    // West lake arm
+    this._addWall(0, 100, 15, 32, false);
 
     // ── World border walls ────────────────────────────────────────────────────
     this._addWall(0, 0, MAP_COLS, 1, false);
@@ -321,6 +322,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
     [25, 36, 50, 65, 80].forEach(col => {
       this.add.rectangle(col * T, 130 * T, T / 2, T, 0x5a3a0a);
     });
+  }
+
+  // Add invisible static collision body at world-pixel coordinates.
+  _addBody(x, y, w, h) {
+    const rect = this.add.rectangle(x, y, w, h, 0x000000).setAlpha(0);
+    this.physics.add.existing(rect, true);
+    this._walls.add(rect);
   }
 
   _addWall(col, row, w, h, visible = true) {
