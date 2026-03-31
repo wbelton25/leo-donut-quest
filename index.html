@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Leo's Donut Quest</title>
+    <!-- Press Start 2P: a pixel-perfect 8-bit font designed for games like this one -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=block" rel="stylesheet" />
     <style>
       * {
         margin: 0;
@@ -21,6 +25,8 @@
       canvas {
         image-rendering: pixelated;
         image-rendering: crisp-edges;
+        /* Fallback for older browsers */
+        -ms-interpolation-mode: nearest-neighbor;
       }
     </style>
   </head>

@@ -1,4 +1,4 @@
-import { SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, BASE_WIDTH, BASE_HEIGHT, TILE_SIZE } from '../constants.js';
+import { SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, txt } from '../constants.js';
 import Player from '../entities/Player.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
@@ -92,8 +92,8 @@ export default class NeighborhoodScene extends Phaser.Scene {
       [28, 5, "MJ"], [8, 24, "CARSEN"], [30, 18, "JUSTIN"],
     ];
     labels.forEach(([col, row, name]) => {
-      this.add.text(col * TILE_SIZE + 2, row * TILE_SIZE - 6, name, {
-        fontFamily: 'monospace', fontSize: '5px', color: '#ffff88',
+      txt(this, col * TILE_SIZE + 2, row * TILE_SIZE - 7, name, {
+        fontSize: '5px', color: '#ffff88',
       });
     });
 
@@ -118,13 +118,12 @@ export default class NeighborhoodScene extends Phaser.Scene {
       });
     });
 
-    // HUD label
-    this.add.text(4, 20, 'ACT 1 - NEIGHBORHOOD', {
-      fontFamily: 'monospace', fontSize: '6px', color: '#ffffff',
+    txt(this, 4, 21, 'ACT 1 - NEIGHBORHOOD', {
+      fontSize: '6px', color: '#ffffff',
     }).setScrollFactor(0);
 
-    this.add.text(4, 30, 'WASD/ARROWS: Move  F: Fart  D: Dialogue', {
-      fontFamily: 'monospace', fontSize: '5px', color: '#aaaaaa',
+    txt(this, 4, 31, 'MOVE:WASD  FART:F  TALK:D', {
+      fontSize: '5px', color: '#aaaaaa',
     }).setScrollFactor(0);
 
     // Emit initial resource/party state so HUD populates on load

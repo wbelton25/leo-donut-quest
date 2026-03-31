@@ -4,6 +4,25 @@ export const BASE_WIDTH = 320;
 export const BASE_HEIGHT = 240;
 export const SCALE = 3; // canvas is displayed at 3x (960x720 on screen)
 
+// ─── Font ─────────────────────────────────────────────────────────────────────
+// Press Start 2P is a pixel-perfect 8-bit font (Google Fonts).
+// TEXT_RES: Phaser renders text to an internal canvas at this multiplier before
+// using it as a texture. Higher = crisper text when scaled up. 3 is a good balance.
+export const PIXEL_FONT = '"Press Start 2P", monospace';
+export const TEXT_RES   = 3;
+
+// Convenience wrapper — use this instead of scene.add.text() everywhere.
+// Automatically applies the right font, resolution, and sane defaults.
+// Usage: txt(this, x, y, 'Hello', { fontSize: '8px', color: '#ffffff' })
+export function txt(scene, x, y, content, style = {}) {
+  return scene.add.text(x, y, content, {
+    fontFamily: PIXEL_FONT,
+    fontSize: '8px',
+    color: '#ffffff',
+    ...style,
+  }).setResolution(TEXT_RES);
+}
+
 // ─── Physics ──────────────────────────────────────────────────────────────────
 export const PLAYER_SPEED = 120;
 
