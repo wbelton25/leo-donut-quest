@@ -9,28 +9,39 @@ import AbilitySystem from '../systems/AbilitySystem.js';
 import SaveSystem from '../systems/SaveSystem.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// REAL-WORLD MAP DATA
-// Origin: Leo's house (35.0288°N, -81.0343°W) → tile (40, 115)
+// REAL-WORLD MAP — derived from Google Maps screenshot of Tega Cay, SC
+//
+// Origin: Leo's house (Topsail Cir) → tile (40, 115)
 // Scale:  1 tile = 8 meters
-//         lat:  13,893 tiles / degree
-//         lon:  11,378 tiles / degree
+//         lat:  13,893 tiles/degree   lon: 11,378 tiles/degree
 //
 // GPS → tile:
-//   col = 40 + (lon_deg + 81.0343) × 11378
-//   row = 115 − (lat_deg − 35.0288) × 13893
+//   col = 40 + (lon + 81.0343) × 11378
+//   row = 115 - (lat - 35.0288) × 13893
 //
-// Key landmarks:
-//   Leo's house      35.0288, -81.0343  →  (40,  115)
-//   Warren's house   35.0337, -81.0248  →  (148,  47)
-//   Runde Park ctr   ~35.0310, -81.0316  →  (62,   87)
-//   Lake Wylie       begins ~row 130 southward (Leo is ~120m from shore)
-//   Golf Club        35.0365, -81.0204  →  (198,   8)
+// Key confirmed locations (image-calibrated):
+//   Leo's house       Topsail Cir          (40,  115)
+//   Warren's house    Tara Tea Dr corner   (152,  47)
+//   Runde Park        W of Woodhaven Dr    cols 57-78,  rows 28-51
+//   Golf Club                              cols 165-235, rows 0-30
+//
+// Main route: Topsail Cir → Point Clear Dr → Windward Dr (diagonal) →
+//             connector road → Tega Cay Dr → Tara Tea Dr → Warren's
+//
+// Roads visible in map image:
+//   Windward Dr     — main N-S arterial, runs NE diagonally, col 73→88 rows 22→110
+//   Point Clear Dr  — E-W connector from Topsail to Windward roundabout
+//   Catamaran Dr    — goes NW toward marina/lake, west side
+//   Woodhaven Dr    — short N-S road just east of Runde Park
+//   Tega Cay Dr     — diagonal road on east side of neighborhood
+//   Tara Tea Dr     — E-W road from Tega Cay Dr to Warren's area
+//   Mariana Ln      — E-W road below Tara Tea Dr
+//   Marquesas Ave   — short E-W below Mariana Ln
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const MAP_COLS = 280;
 const MAP_ROWS = 160;
 
-// Roof darkener — avoid Phaser.Display.Color API which may not have darken()
 function darken(hex) {
   const r = Math.floor((hex >> 16 & 0xff) * 0.58);
   const g = Math.floor((hex >> 8  & 0xff) * 0.58);
@@ -40,67 +51,86 @@ function darken(hex) {
 
 // ── Road segments [col, row, width, height, label] ────────────────────────────
 const ROADS = [
-  // ── Topsail Circle — cul-de-sac loop near Lake Wylie ──────────────────────
-  [37, 97, 4, 19, 'Topsail Cir'],   // approach south from Anchorage Ln
-  [30, 114, 4, 14, null],           // west arm of loop
-  [41, 114, 4, 14, null],           // east arm of loop
-  [30, 126, 15, 4, null],           // south bar (terminates near lake shore)
+  // ── Topsail Cir — Leo's cul-de-sac near Lake Wylie ────────────────────────
+  [38, 106, 4, 10, 'Topsail Cir'],   // N approach up to Point Clear Dr
+  [30, 114, 4, 13, null],             // W arm of loop
+  [42, 114, 4, 13, null],             // E arm of loop
+  [30, 125, 16, 4, null],             // S close (near lake)
 
-  // ── Anchorage Lane — main E-W artery out of The Anchorage ─────────────────
-  [17, 96, 72, 4, 'Anchorage Ln'],
+  // ── Point Clear Dr — E-W from Topsail to Windward Dr ─────────────────────
+  [38, 106, 36, 4, 'Point Clear Dr'],
+  [72, 102, 5, 8,  null],             // N jog into Windward roundabout
 
-  // ── Marina Drive — N-S connector ──────────────────────────────────────────
-  [46, 58, 4, 40, 'Marina Dr'],
+  // ── Windward Dr — main N-S artery (diagonal, stairstepped NE) ─────────────
+  // Southern section: col 72-77, rows 74-110
+  [72, 74, 5, 36, 'Windward Dr'],
+  [72, 74, 10, 4,  null],             // E-step connector at row 74
+  // Mid section: col 78-83, rows 50-78
+  [78, 50, 5, 28,  null],
+  [78, 50, 10, 4,  null],             // E-step connector at row 50
+  // Upper section: col 83-88, rows 20-54
+  [83, 20, 5, 34,  null],
 
-  // ── Cross road (E-W) connecting Marina Dr east ────────────────────────────
-  [46, 56, 45, 4, null],
+  // ── Woodhaven Dr — N-S road just east of Runde Park ──────────────────────
+  [79, 20, 4, 24, 'Woodhaven Dr'],    // col 79-83, rows 20-44
+  [79, 20, 8, 4,  null],              // E-W top connector to Windward
 
-  // ── Catamaran Drive — curves north toward golf course ─────────────────────
-  [85, 38, 4, 20, 'Catamaran Dr'],
+  // ── Catamaran Dr — NW from Woodhaven area toward marina ──────────────────
+  [53, 8,  4, 16,  'Catamaran Dr'],   // N-S section near marina (col 53-57)
+  [53, 8,  28, 4,  null],             // E-W to Woodhaven/Windward area
 
-  // ── Windward Drive — runs NE past area ────────────────────────────────────
-  [85, 36, 36, 4, 'Windward Dr'],
+  // ── Cross connector: upper Windward Dr to Tega Cay Dr ─────────────────────
+  [83, 26, 20, 4,  null],             // col 83-103, row 26-30
 
-  // ── Suwarrow Circle — east to Warren's house ──────────────────────────────
-  [85, 44, 70, 4, 'Suwarrow Cir'],
+  // ── Tega Cay Dr — diagonal road on east side ─────────────────────────────
+  // North section: col 100-104, rows 8-30
+  [100, 8,  4, 24, 'Tega Cay Dr'],
+  // Step SE:
+  [100, 30, 8, 4,  null],
+  // South section: col 104-108, rows 28-75
+  [104, 28, 4, 48, null],
 
-  // ── Tega Cay Drive ────────────────────────────────────────────────────────
-  [70, 52, 4, 47, 'Tega Cay Dr'],
-  [70, 52, 30, 4, null],           // E arm to Windward
+  // ── Tara Tea Dr — E-W from Tega Cay Dr to Warren's house ─────────────────
+  [100, 44, 58, 4, 'Tara Tea Dr'],    // col 100-158, row 44-48
 
-  // ── Tara Tea Dr — Warren's corner ─────────────────────────────────────────
-  [148, 32, 4, 20, 'Tara Tea Dr'],
+  // ── Mariana Ln — E-W below Tara Tea Dr ───────────────────────────────────
+  [83, 65, 26, 4,  'Mariana Ln'],     // col 83-109, row 65-69
+
+  // ── Marquesas Ave — short E-W below Mariana ──────────────────────────────
+  [76, 88, 18, 4,  'Marquesas Ave'],
 ];
 
-// ── Park constants ────────────────────────────────────────────────────────────
-// Runde Park — moved to central position between Leo and Warren
-const PARK_C = 52, PARK_R = 65, PARK_W = 26, PARK_H = 24;
+// ── Runde Park bounds ─────────────────────────────────────────────────────────
+// Located west of Woodhaven Dr, east of Catamaran Dr, south of Catamaran E-W
+const PARK_C = 57, PARK_R = 26, PARK_W = 22, PARK_H = 24;
 
 // ── House clusters ────────────────────────────────────────────────────────────
 const HOUSE_GROUPS = [
-  // The Anchorage — Leo's neighborhood (both sides of Anchorage Lane)
-  { col: 22, row: 100, n: 5, stepCol: 7, stepRow: 0, color: 0x7a6b52 },  // south side
-  { col: 22, row: 91,  n: 5, stepCol: 7, stepRow: 0, color: 0x8b7355 },  // north side
-  // Leo's own house
-  { col: 34, row: 110, n: 1, stepCol: 0, stepRow: 0, color: 0x9b8765 },
+  // ── Topsail Circle neighborhood (Leo's area) ──────────────────────────────
+  { col: 22, row: 99,  n: 4, stepCol: 7, stepRow: 0, color: 0x7a6b52 },
+  { col: 22, row: 107, n: 4, stepCol: 7, stepRow: 0, color: 0x8b7355 },
+  { col: 34, row: 111, n: 1, stepCol: 0, stepRow: 0, color: 0x9b8765 },  // Leo's house
 
-  // Waterfront homes — south of Anchorage Lane, backing up to lake
-  { col: 20, row: 101, n: 4, stepCol: 8, stepRow: 0, color: 0x6b8ca5 },  // lake-facing
-  { col: 56, row: 101, n: 3, stepCol: 8, stepRow: 0, color: 0x7a9bb5 },  // lake-facing east
+  // ── Waterfront homes south of Topsail (backing up to Lake Wylie) ──────────
+  { col: 20, row: 118, n: 4, stepCol: 8, stepRow: 0, color: 0x6b8ca5 },
 
-  // Along Marina Drive
-  { col: 38, row: 61,  n: 4, stepCol: 0, stepRow: 8, color: 0x7a6b52 },
-  { col: 52, row: 61,  n: 4, stepCol: 0, stepRow: 8, color: 0x856b52 },
+  // ── Along Point Clear Dr ──────────────────────────────────────────────────
+  { col: 48, row: 99,  n: 3, stepCol: 7, stepRow: 0, color: 0x7a6b52 },
+  { col: 48, row: 111, n: 3, stepCol: 7, stepRow: 0, color: 0x856b52 },
 
-  // Around Runde Park area
-  { col: 82, row: 28,  n: 5, stepCol: 7, stepRow: 0, color: 0x8b7b55 },  // north of park
-  { col: 82, row: 50,  n: 4, stepCol: 7, stepRow: 0, color: 0x7a6b52 },  // south of park
+  // ── Catamaran Dr / Woodhaven area (north of Runde Park) ───────────────────
+  { col: 54, row: 14,  n: 5, stepCol: 6, stepRow: 0, color: 0x8b7b55 },
+  { col: 84, row: 14,  n: 4, stepCol: 6, stepRow: 0, color: 0x7a6b52 },
 
-  // Suwarrow Circle area — Warren's neighborhood
-  { col: 118, row: 37, n: 6, stepCol: 6, stepRow: 0, color: 0x8b7b55 },
+  // ── Windward Dr residential (west side) ───────────────────────────────────
+  { col: 62, row: 51,  n: 3, stepCol: 0, stepRow: 8, color: 0x7a8b52 },
+  { col: 68, row: 76,  n: 3, stepCol: 0, stepRow: 8, color: 0x7a7b52 },
+
+  // ── Suwarrow / Tara Tea Dr area east of Tega Cay Dr ──────────────────────
+  { col: 118, row: 36, n: 5, stepCol: 6, stepRow: 0, color: 0x8b7b55 },
   { col: 118, row: 50, n: 5, stepCol: 6, stepRow: 0, color: 0x9b8060 },
 
-  // Warren's house (red)
+  // ── Warren's house (red) ──────────────────────────────────────────────────
   { col: 152, row: 41, n: 1, stepCol: 0, stepRow: 0, color: 0x992222 },
 ];
 
@@ -158,12 +188,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
       const py = r * TILE_SIZE + (h * TILE_SIZE) / 2;
       const pw = w * TILE_SIZE;
       const ph = h * TILE_SIZE;
-
       this.add.rectangle(px, py, pw, ph, 0x4a4a55);
-      if (w > h) {
-        this.add.rectangle(px, py, pw, 1, 0xffff88, 0.3);
+      if (w >= h) {
+        this.add.rectangle(px, py, pw, 1, 0xffff88, 0.25);
       } else {
-        this.add.rectangle(px, py, 1, ph, 0xffff88, 0.3);
+        this.add.rectangle(px, py, 1, ph, 0xffff88, 0.25);
       }
       if (label) {
         txt(this, c * TILE_SIZE + 2, r * TILE_SIZE + 2, label, {
@@ -181,12 +210,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, PARK_C * TILE_SIZE + 8, PARK_R * TILE_SIZE + 8, 'RUNDE\nPARK', {
       fontSize: '8px', color: '#88ff88',
     });
-    // Crossing paths
     this.add.rectangle(parkPx, parkPy, PARK_W * TILE_SIZE, 2, 0x4a7a2a);
     this.add.rectangle(parkPx, parkPy, 2, PARK_H * TILE_SIZE, 0x4a7a2a);
 
-    // ── Golf course ───────────────────────────────────────────────────────────
-    const GC_C = 190, GC_R = 5, GC_W = 70, GC_H = 35;
+    // ── Golf course (upper right, north of Warren's area) ─────────────────────
+    const GC_C = 165, GC_R = 0, GC_W = 68, GC_H = 30;
     const gcPx = GC_C * TILE_SIZE + (GC_W * TILE_SIZE) / 2;
     const gcPy = GC_R * TILE_SIZE + (GC_H * TILE_SIZE) / 2;
     this.add.rectangle(gcPx, gcPy, GC_W * TILE_SIZE, GC_H * TILE_SIZE, 0x1a6b1a);
@@ -194,11 +222,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x22aa22);
     for (let i = 0; i < 4; i++) {
       this.add.rectangle(
-        (GC_C + 4 + i * 15) * TILE_SIZE, gcPy,
+        (GC_C + 5 + i * 15) * TILE_SIZE, gcPy,
         10 * TILE_SIZE, (GC_H - 4) * TILE_SIZE, 0x1f7a1f
       );
     }
-    txt(this, GC_C * TILE_SIZE + 8, GC_R * TILE_SIZE + 4, 'TEGA CAY\nGOLF CLUB', {
+    txt(this, GC_C * TILE_SIZE + 8, 4, 'TEGA CAY\nGOLF CLUB', {
       fontSize: '8px', color: '#88ff88',
     });
 
@@ -212,13 +240,12 @@ export default class NeighborhoodScene extends Phaser.Scene {
         const hy = hr * TILE_SIZE + 1.5 * TILE_SIZE;
         this.add.rectangle(hx, hy, hw, hh, color);
         this.add.rectangle(hx, hr * TILE_SIZE + 0.5 * TILE_SIZE, hw, TILE_SIZE, darken(color));
-        // Solid collision body for house footprint
         this._addBody(hx, hy, hw, hh);
       }
     });
 
-    // Warren's house label
-    txt(this, 152 * TILE_SIZE, 39 * TILE_SIZE, "WARREN'S", {
+    // Warren's label
+    txt(this, 152 * TILE_SIZE, 38 * TILE_SIZE, "WARREN'S", {
       fontSize: '8px', color: '#ff8888',
     });
 
@@ -228,24 +255,20 @@ export default class NeighborhoodScene extends Phaser.Scene {
       const ty = tr * TILE_SIZE + TILE_SIZE / 2;
       this.add.circle(tx, ty, TILE_SIZE * 0.7, 0x1a5c1a);
       this.add.circle(tx, ty, TILE_SIZE * 0.4, 0x228b22);
-      // Trunk-sized collision (slightly smaller than visual so gaps feel fair)
       this._addBody(tx, ty, TILE_SIZE, TILE_SIZE);
     });
 
-    // ── Boat docks on lake shore ──────────────────────────────────────────────
+    // ── Boat docks along south shore ──────────────────────────────────────────
     [[28, 132], [44, 133], [62, 132], [76, 133]].forEach(([dc, dr]) => {
-      // dock plank extending into lake
       this.add.rectangle(
         dc * TILE_SIZE + TILE_SIZE, dr * TILE_SIZE + TILE_SIZE * 2,
         TILE_SIZE * 2, TILE_SIZE * 4, 0x8b6914
       );
     });
 
-    // ── Water collision — lake and west arm ───────────────────────────────────
-    // Main lake body starts at row 132 (just below sandy shore)
-    this._addWall(0, 132, MAP_COLS, MAP_ROWS - 132, false);
-    // West lake arm
-    this._addWall(0, 100, 15, 32, false);
+    // ── Water collision ───────────────────────────────────────────────────────
+    this._addWall(0, 132, MAP_COLS, MAP_ROWS - 132, false);  // main lake
+    this._addWall(0, 100, 15, 32, false);                    // west arm
 
     // ── World border walls ────────────────────────────────────────────────────
     this._addWall(0, 0, MAP_COLS, 1, false);
@@ -253,11 +276,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._addWall(0, 0, 1, MAP_ROWS, false);
     this._addWall(MAP_COLS - 1, 0, 1, MAP_ROWS, false);
 
-    // ── Player (starts at Leo's house) ────────────────────────────────────────
+    // ── Player ────────────────────────────────────────────────────────────────
     this._player = new Player(this, 40 * TILE_SIZE, 110 * TILE_SIZE);
     this.physics.add.collider(this._player, this._walls);
 
-    // ── Keys ──────────────────────────────────────────────────────────────────
+    // ── Input ─────────────────────────────────────────────────────────────────
     this._fartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
       .once('down', () => this.scene.get(SCENE_DIALOGUE).showScript('intro', () => {}));
@@ -267,7 +290,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.cameras.main.startFollow(this._player, true, 0.08, 0.08);
     this.cameras.main.setDeadzone(80, 60);
 
-    // ── Controls hint (bottom of screen, below HUD now at top) ───────────────
+    // ── Controls hint (bottom of screen) ─────────────────────────────────────
     txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   D: TALK', {
       fontSize: '8px', color: '#778899',
     }).setScrollFactor(0).setDepth(10);
@@ -275,7 +298,6 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Minimap ───────────────────────────────────────────────────────────────
     this._buildMinimap(worldW, worldH);
 
-    // Emit initial state to HUD
     this._resources.applyChanges({});
     this._party._emit();
   }
@@ -297,34 +319,23 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _buildLake() {
     const T = TILE_SIZE;
     const W = MAP_COLS * T;
-
-    // Sandy shoreline strip (north edge of lake)
+    // Sandy shoreline
     this.add.rectangle(W / 2, 129 * T, W, 3 * T, 0xc8a870);
-
     // Shallow water
-    this.add.rectangle(W / 2, 132.5 * T, W, 3 * T, 0x2980b9);
-
-    // Main lake body (fills to bottom of map)
-    this.add.rectangle(W / 2, 140 * T, W, 20 * T, 0x1a5f8a);
-
-    // Western lake arm — Lake Wylie wraps the west side of Tega Cay peninsula
+    this.add.rectangle(W / 2, 132 * T, W, 4 * T, 0x2980b9);
+    // Deep lake
+    this.add.rectangle(W / 2, 141 * T, W, 20 * T, 0x1a5f8a);
+    // West arm (peninsula effect)
     this.add.rectangle(6 * T, 105 * T, 12 * T, 30 * T, 0x1a5f8a);
-    // West shore edge
-    this.add.rectangle(12 * T + T / 2, 105 * T, 3 * T, 30 * T, 0x2980b9);
-    this.add.rectangle(15 * T + T / 2, 105 * T, 2 * T, 30 * T, 0xc8a870);
-
-    // Lake label
-    txt(this, 90 * T, 137 * T, 'LAKE WYLIE', {
-      fontSize: '8px', color: '#7cc8e8',
-    });
-
-    // Dock pilings on the main shoreline
-    [25, 36, 50, 65, 80].forEach(col => {
-      this.add.rectangle(col * T, 130 * T, T / 2, T, 0x5a3a0a);
-    });
+    this.add.rectangle(13 * T, 105 * T, 3 * T, 30 * T, 0x2980b9);
+    this.add.rectangle(16 * T, 105 * T, 2 * T, 30 * T, 0xc8a870);
+    // Labels
+    txt(this, 90 * T, 137 * T, 'LAKE WYLIE', { fontSize: '8px', color: '#7cc8e8' });
+    txt(this, 2 * T, 105 * T, 'LAKE\nWYLIE', { fontSize: '8px', color: '#7cc8e8' });
+    // Marina callout
+    txt(this, 35 * T, 12 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
   }
 
-  // Add invisible static collision body at world-pixel coordinates.
   _addBody(x, y, w, h) {
     const rect = this.add.rectangle(x, y, w, h, 0x000000).setAlpha(0);
     this.physics.add.existing(rect, true);
@@ -343,19 +354,56 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   _generateTrees() {
+    // Returns tile positions for trees, avoiding roads, parks, water, buildings
     const onRoad = (c, r) => {
-      if (r >= 128) return true;                                              // lake shore / water
-      if (c <= 15 && r >= 100) return true;                                  // west lake arm
-      if (r >= 96 && r <= 101 && c >= 17 && c <= 89) return true;           // Anchorage Lane
-      if (c >= 46 && c <= 50 && r >= 56 && r <= 98)  return true;           // Marina Dr
-      if (r >= 55 && r <= 61 && c >= 46 && c <= 92)  return true;           // cross road
-      if (c >= 83 && c <= 91 && r >= 36 && r <= 60)  return true;           // Catamaran/Windward
-      if (r >= 43 && r <= 49 && c >= 83 && c <= 158) return true;           // Suwarrow Cir
-      if (c >= 68 && c <= 74 && r >= 52 && r <= 100) return true;           // Tega Cay Dr
-      if (c >= 37 && c <= 46 && r >= 97 && r <= 130) return true;           // Topsail Circle
-      if (c >= 30 && c <= 46 && r >= 114 && r <= 130) return true;          // Topsail loop arms
-      if (c >= PARK_C && c <= PARK_C + PARK_W && r >= PARK_R && r <= PARK_R + PARK_H) return true; // Runde Park
-      if (c >= 190 && c <= 260 && r >= 5 && r <= 40) return true;           // golf course
+      if (r >= 128) return true;                                              // lake
+      if (c <= 14 && r >= 100) return true;                                  // west arm
+
+      // Topsail Cir loop
+      if (c >= 30 && c <= 46 && r >= 106 && r <= 130) return true;
+
+      // Point Clear Dr (E-W) + N jog
+      if (r >= 106 && r <= 110 && c >= 38 && c <= 77) return true;
+      if (c >= 72 && c <= 77 && r >= 102 && r <= 110) return true;
+
+      // Windward Dr — all three stairstepped segments
+      if (c >= 72 && c <= 77 && r >= 74 && r <= 110) return true;
+      if (r >= 74 && r <= 78 && c >= 72 && c <= 88) return true;  // E-step
+      if (c >= 78 && c <= 83 && r >= 50 && r <= 78) return true;
+      if (r >= 50 && r <= 54 && c >= 78 && c <= 88) return true;  // E-step
+      if (c >= 83 && c <= 88 && r >= 20 && r <= 54) return true;
+
+      // Woodhaven Dr
+      if (c >= 79 && c <= 83 && r >= 20 && r <= 44) return true;
+      if (r >= 20 && r <= 24 && c >= 79 && c <= 91) return true;
+
+      // Catamaran Dr
+      if (c >= 53 && c <= 57 && r >= 8 && r <= 24) return true;
+      if (r >= 8 && r <= 12 && c >= 53 && c <= 81) return true;
+
+      // Cross connector to Tega Cay Dr
+      if (r >= 26 && r <= 30 && c >= 83 && c <= 103) return true;
+
+      // Tega Cay Dr
+      if (c >= 100 && c <= 104 && r >= 8 && r <= 32) return true;
+      if (r >= 30 && r <= 34 && c >= 100 && c <= 112) return true;
+      if (c >= 104 && c <= 108 && r >= 28 && r <= 76) return true;
+
+      // Tara Tea Dr
+      if (r >= 44 && r <= 48 && c >= 100 && c <= 158) return true;
+
+      // Mariana Ln
+      if (r >= 65 && r <= 69 && c >= 83 && c <= 109) return true;
+
+      // Marquesas Ave
+      if (r >= 88 && r <= 92 && c >= 76 && c <= 94) return true;
+
+      // Runde Park
+      if (c >= PARK_C && c <= PARK_C + PARK_W && r >= PARK_R && r <= PARK_R + PARK_H) return true;
+
+      // Golf course
+      if (c >= 165 && r <= 30) return true;
+
       return false;
     };
 
@@ -376,35 +424,34 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _buildMinimap(worldW, worldH) {
     const MM_W = 90, MM_H = 55;
     const MM_X = BASE_WIDTH - MM_W - 4;
-    // Position minimap below the HUD strip (HUD is 28px tall at top)
-    const MM_Y = 32;
+    const MM_Y = 32;  // below HUD strip
     const sx = MM_W / worldW, sy = MM_H / worldH;
 
-    this.add.rectangle(MM_X + MM_W / 2, MM_Y + MM_H / 2, MM_W, MM_H, 0x000000, 0.8)
+    // Background
+    this.add.rectangle(MM_X + MM_W / 2, MM_Y + MM_H / 2, MM_W, MM_H, 0x000000, 0.85)
       .setScrollFactor(0).setDepth(50);
     this.add.rectangle(MM_X + MM_W / 2, MM_Y + MM_H / 2, MM_W, MM_H, 0, 0)
       .setStrokeStyle(1, 0x334455).setScrollFactor(0).setDepth(50);
 
-    // Lake on minimap (bottom strip)
+    // Lake (bottom strip + west arm)
     this.add.rectangle(
-      MM_X + MM_W / 2, MM_Y + 130 * TILE_SIZE * sy + (30 * TILE_SIZE * sy) / 2,
-      MM_W, 30 * TILE_SIZE * sy, 0x1a5f8a
+      MM_X + MM_W / 2,
+      MM_Y + 131 * TILE_SIZE * sy + (29 * TILE_SIZE * sy) / 2,
+      MM_W, 29 * TILE_SIZE * sy, 0x1a5f8a
     ).setScrollFactor(0).setDepth(51);
-
-    // West lake arm on minimap
     this.add.rectangle(
-      MM_X + 4 * TILE_SIZE * sx, MM_Y + 108 * TILE_SIZE * sy,
+      MM_X + 5 * TILE_SIZE * sx, MM_Y + 105 * TILE_SIZE * sy,
       10 * TILE_SIZE * sx, 30 * TILE_SIZE * sy, 0x1a5f8a
     ).setScrollFactor(0).setDepth(51);
 
-    // Runde Park on minimap
+    // Runde Park
     this.add.rectangle(
       MM_X + PARK_C * TILE_SIZE * sx + (PARK_W * TILE_SIZE * sx) / 2,
       MM_Y + PARK_R * TILE_SIZE * sy + (PARK_H * TILE_SIZE * sy) / 2,
       PARK_W * TILE_SIZE * sx, PARK_H * TILE_SIZE * sy, 0x1e7a1e
     ).setScrollFactor(0).setDepth(51);
 
-    // Roads on minimap
+    // Roads
     ROADS.forEach(([c, r, w, h]) => {
       this.add.rectangle(
         MM_X + c * TILE_SIZE * sx + (w * TILE_SIZE * sx) / 2,
@@ -414,14 +461,12 @@ export default class NeighborhoodScene extends Phaser.Scene {
       ).setScrollFactor(0).setDepth(51);
     });
 
-    // Warren's house (red dot)
+    // Leo (blue) + Warren (red)
+    this.add.rectangle(
+      MM_X + 40 * TILE_SIZE * sx, MM_Y + 113 * TILE_SIZE * sy, 3, 3, 0x4488ff
+    ).setScrollFactor(0).setDepth(51);
     this.add.rectangle(
       MM_X + 152 * TILE_SIZE * sx, MM_Y + 43 * TILE_SIZE * sy, 3, 3, 0xff4444
-    ).setScrollFactor(0).setDepth(51);
-
-    // Leo's house (blue dot)
-    this.add.rectangle(
-      MM_X + 40 * TILE_SIZE * sx, MM_Y + 112 * TILE_SIZE * sy, 3, 3, 0x4488ff
     ).setScrollFactor(0).setDepth(51);
 
     this._minimapDot = this.add.circle(0, 0, 2, 0xffffff).setScrollFactor(0).setDepth(52);
