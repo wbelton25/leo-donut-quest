@@ -1,10 +1,15 @@
 import {
   SCENE_HUD,
   EVT_RESOURCE_UPDATE, EVT_PARTY_UPDATE, EVT_ABILITY_USED,
-  BASE_WIDTH, txt,
+  BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
 
-const BAR_W = 60; // wider bars now that we have 480px
+// HudScene: persistent parallel scene, always on top.
+// All text is 8px minimum — Press Start 2P is an 8px-grid font, smaller sizes blur.
+// Layout: thin resource bar strip across the bottom edge of the screen.
+
+const HUD_H  = 28;
+const HUD_Y  = BASE_HEIGHT - HUD_H; // anchored to bottom
 
 export default class HudScene extends Phaser.Scene {
   constructor() {
@@ -12,65 +17,73 @@ export default class HudScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.rectangle(0, 0, BASE_WIDTH, 22, 0x000000, 0.8).setOrigin(0, 0);
+    // ── Background strip ──────────────────────────────────────────────────────
+    this.add.rectangle(0, HUD_Y, BASE_WIDTH, HUD_H, 0x000000, 0.85).setOrigin(0, 0);
+    // Top border line
+    this.add.rectangle(0, HUD_Y, BASE_WIDTH, 1, 0x334455, 1).setOrigin(0, 0);
 
-    // Resource bars — spread across the wider 480px HUD
-    this._timeFill   = this._makeBar(2,   2, BAR_W, 0x4fc3f7, 'TIME');
-    this._bikeFill   = this._makeBar(72,  2, BAR_W, 0xef5350, 'BIKE');
-    this._energyFill = this._makeBar(142, 2, BAR_W, 0x66bb6a, 'NRG');
+    const y = HUD_Y + 5; // top of text/bars inside the strip
 
-    this._snackText = txt(this, 212, 2, 'S:5', { fontSize: '6px', color: '#f5e642' });
-    this._moneyText = txt(this, 248, 2, '$20', { fontSize: '6px', color: '#f5a623' });
+    // ── Resource bars with 8px labels ────────────────────────────────────────
+    // TIME bar
+    txt(this, 4, y, 'TIME', { fontSize: '8px', color: '#4fc3f7' });
+    this.add.rectangle(40, y + 10, 60, 6, 0x1a3a4a).setOrigin(0, 0.5);
+    this._timeFill = this.add.rectangle(40, y + 10, 58, 4, 0x4fc3f7).setOrigin(0, 0.5);
 
-    // Party icons
+    // BIKE bar
+    txt(this, 108, y, 'BIKE', { fontSize: '8px', color: '#ef5350' });
+    this.add.rectangle(144, y + 10, 60, 6, 0x4a1a1a).setOrigin(0, 0.5);
+    this._bikeFill = this.add.rectangle(144, y + 10, 58, 4, 0xef5350).setOrigin(0, 0.5);
+
+    // NRG bar
+    txt(this, 212, y, 'NRG', { fontSize: '8px', color: '#66bb6a' });
+    this.add.rectangle(248, y + 10, 60, 6, 0x1a3a1a).setOrigin(0, 0.5);
+    this._energyFill = this.add.rectangle(248, y + 10, 58, 4, 0x66bb6a).setOrigin(0, 0.5);
+
+    // ── Snacks & money counters (8px) ─────────────────────────────────────────
+    this._snackText = txt(this, 316, y, 'S:5', { fontSize: '8px', color: '#f5e642' });
+    this._moneyText = txt(this, 356, y, '$20', { fontSize: '8px', color: '#f5a623' });
+
+    // ── Party member dots ─────────────────────────────────────────────────────
+    // Four circles near the right edge — light up when that member joins
     this._partyIcons = [];
     const members = [
-      { id: 'warren',  label: 'W', color: 0xe74c3c },
-      { id: 'mj',      label: 'M', color: 0x2ecc71 },
-      { id: 'carsen',  label: 'C', color: 0x9b59b6 },
-      { id: 'justin',  label: 'J', color: 0xf39c12 },
+      { id: 'warren', color: 0xe74c3c },
+      { id: 'mj',     color: 0x2ecc71 },
+      { id: 'carsen', color: 0x9b59b6 },
+      { id: 'justin', color: 0xf39c12 },
     ];
     members.forEach((m, i) => {
-      const x = BASE_WIDTH - 10 - (members.length - i) * 20;
-      const dot = this.add.circle(x, 11, 6, 0x333333);
-      const t   = txt(this, x, 11, m.label, { fontSize: '6px', color: '#555555' }).setOrigin(0.5);
-      this._partyIcons.push({ dot, t, color: m.color });
+      const x = BASE_WIDTH - 12 - (members.length - 1 - i) * 16;
+      const dot = this.add.circle(x, HUD_Y + HUD_H / 2, 5, 0x222222);
+      this._partyIcons.push({ dot, color: m.color, id: m.id });
     });
 
+    // ── Event listeners ───────────────────────────────────────────────────────
     this.game.events.on(EVT_RESOURCE_UPDATE, this._onResourceUpdate, this);
     this.game.events.on(EVT_PARTY_UPDATE,    this._onPartyUpdate,    this);
     this.game.events.on(EVT_ABILITY_USED,    this._onAbilityUsed,    this);
   }
 
-  _onResourceUpdate(resources) {
-    this._timeFill.scaleX   = resources.time          / 100;
-    this._bikeFill.scaleX   = resources.bikeCondition / 100;
-    this._energyFill.scaleX = resources.energy        / 100;
-    this._snackText.setText('S:' + resources.snacks);
-    this._moneyText.setText('$' + resources.money);
-    this._timeFill.setFillStyle(resources.time < 20          ? 0xff2222 : 0x4fc3f7);
-    this._bikeFill.setFillStyle(resources.bikeCondition < 20 ? 0xff2222 : 0xef5350);
+  _onResourceUpdate(r) {
+    const clamp01 = v => Math.max(0, Math.min(1, v / 100));
+    this._timeFill.scaleX   = clamp01(r.time);
+    this._bikeFill.scaleX   = clamp01(r.bikeCondition);
+    this._energyFill.scaleX = clamp01(r.energy);
+    this._snackText.setText('S:' + r.snacks);
+    this._moneyText.setText('$' + r.money);
+    this._timeFill.setFillStyle(r.time < 25          ? 0xff3333 : 0x4fc3f7);
+    this._bikeFill.setFillStyle(r.bikeCondition < 25 ? 0xff3333 : 0xef5350);
   }
 
   _onPartyUpdate(party) {
-    const order = ['warren', 'mj', 'carsen', 'justin'];
-    order.forEach((id, i) => {
-      const icon = this._partyIcons[i];
-      const active = party.includes(id);
-      icon.dot.setFillStyle(active ? icon.color : 0x333333);
-      icon.t.setColor(active ? '#ffffff' : '#555555');
+    this._partyIcons.forEach(icon => {
+      icon.dot.setFillStyle(party.includes(icon.id) ? icon.color : 0x222222);
     });
   }
 
   _onAbilityUsed({ abilityId }) {
-    // Phase 7: animate cooldown indicator
-    console.log(`[Hud] ability: ${abilityId}`);
-  }
-
-  _makeBar(x, y, width, color, label) {
-    txt(this, x, y, label, { fontSize: '5px', color: '#999999' });
-    this.add.rectangle(x, y + 9, width, 4, 0x333333).setOrigin(0, 0.5);
-    return this.add.rectangle(x, y + 9, width, 4, color).setOrigin(0, 0.5);
+    console.log(`[Hud] ability used: ${abilityId}`);
   }
 
   shutdown() {

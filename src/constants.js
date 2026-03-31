@@ -9,23 +9,34 @@ export const BASE_HEIGHT = 270;  // (1080 ÷ 270 = 4.0 — perfect integer, no s
 export const METERS_PER_TILE = 8;
 
 // ─── Font ─────────────────────────────────────────────────────────────────────
-// Press Start 2P: pixel-perfect 8-bit font (Google Fonts).
-// TEXT_RES: render the text canvas at this multiplier before using it as a texture.
-// At 480×270 with 4× INTEGER_FIT on 1080p, TEXT_RES=4 means the text canvas matches
-// screen resolution exactly — no upscaling artifact at all.
+// Press Start 2P: a pixel-grid font designed on an 8px baseline.
+// IMPORTANT: only use fontSize values that are multiples of 8 (8px, 16px).
+// Any smaller size (5px, 6px) breaks the grid and always looks grainy.
 export const PIXEL_FONT = '"Press Start 2P", monospace';
-export const TEXT_RES   = 4;
+
+// TEXT_RES must match the actual INTEGER_FIT scale factor for the user's screen.
+// If the scale is 4× but TEXT_RES is only 3×, text upscales 1.33× → blur.
+// Math.ceil ensures we're always at or above the scale factor.
+export const TEXT_RES = Math.max(4, Math.ceil(window.screen.height / BASE_HEIGHT));
 
 // Convenience wrapper — use this instead of scene.add.text() everywhere.
-// Automatically applies the right font, resolution, and sane defaults.
-// Usage: txt(this, x, y, 'Hello', { fontSize: '8px', color: '#ffffff' })
+// Disables CSS font smoothing on the text canvas to minimise anti-aliasing.
+// ALWAYS use 8px or 16px for fontSize — Press Start 2P is an 8px-grid font.
 export function txt(scene, x, y, content, style = {}) {
-  return scene.add.text(x, y, content, {
+  const obj = scene.add.text(x, y, content, {
     fontFamily: PIXEL_FONT,
     fontSize: '8px',
     color: '#ffffff',
     ...style,
-  }).setResolution(TEXT_RES);
+  });
+  obj.setResolution(TEXT_RES);
+  // Ask the browser not to smooth the font glyphs on this canvas element.
+  // These are non-standard in places but widely supported in Chrome/Edge/Firefox.
+  obj.canvas.style.fontSmooth          = 'never';
+  obj.canvas.style.webkitFontSmoothing = 'none';
+  obj.canvas.style.mozOsxFontSmoothing = 'unset';
+  obj.updateText();
+  return obj;
 }
 
 // ─── Physics ──────────────────────────────────────────────────────────────────
