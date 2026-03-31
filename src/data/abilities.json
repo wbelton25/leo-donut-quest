@@ -1,0 +1,54 @@
+{
+  "lightning_fart": {
+    "id": "lightning_fart",
+    "name": "Lightning Fart",
+    "owner": "leo",
+    "cooldown": 5000,
+    "damage": 25,
+    "radius": 40,
+    "description": "Leo unleashes a shockwave fart that clears nearby enemies and obstacles."
+  },
+  "slingshot": {
+    "id": "slingshot",
+    "name": "Slingshot",
+    "owner": "warren",
+    "cooldown": 1500,
+    "damage": 15,
+    "range": 150,
+    "description": "Warren fires a rock that can hit enemies from a distance."
+  },
+  "super_strength": {
+    "id": "super_strength",
+    "name": "Super Strength",
+    "owner": "mj",
+    "cooldown": 8000,
+    "description": "MJ destroys or shoves a nearby obstacle out of the way."
+  },
+  "stealth": {
+    "id": "stealth",
+    "name": "Stealth",
+    "owner": "carsen",
+    "cooldown": 10000,
+    "duration": 3000,
+    "description": "The party becomes invisible to enemies and obstacles for a short time."
+  },
+  "speed_boost": {
+    "id": "speed_boost",
+    "name": "Speed Boost",
+    "owner": "justin",
+    "cooldown": 7000,
+    "duration": 4000,
+    "multiplier": 1.8,
+    "description": "Justin pushes the pace - everyone moves faster for a few seconds."
+  },
+  "team_boost": {
+    "id": "team_boost",
+    "name": "Team Boost",
+    "owner": "team",
+    "requiresFullParty": true,
+    "cooldown": 30000,
+    "duration": 6000,
+    "multiplier": 2.5,
+    "description": "The whole crew goes all out - massive speed increase. Requires all members."
+  }
+}

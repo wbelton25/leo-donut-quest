@@ -1,0 +1,182 @@
+{
+  "events": [
+    {
+      "id": "flat_tire",
+      "weight": 10,
+      "title": "Flat Tire!",
+      "description": "One of the bikes has a flat. You can try to fix it or push through.",
+      "choices": [
+        { "text": "Stop and patch it", "effects": { "time": -10, "bikeCondition": 15 } },
+        { "text": "Ride through it", "effects": { "bikeCondition": -20, "energy": -5 } }
+      ]
+    },
+    {
+      "id": "broken_chain",
+      "weight": 8,
+      "title": "Broken Chain",
+      "description": "A chain snapped. Not ideal.",
+      "choices": [
+        { "text": "Borrow someone's spare link", "effects": { "time": -8, "bikeCondition": 10 } },
+        { "text": "Keep going (slower)", "effects": { "time": -15, "energy": -10 } }
+      ]
+    },
+    {
+      "id": "deer_chase",
+      "weight": 8,
+      "title": "Deer Chase!",
+      "description": "A deer started chasing you down the road. Run!",
+      "choices": [
+        { "text": "Sprint away", "effects": { "energy": -15, "time": -5 } },
+        {
+          "text": "Carsen uses stealth",
+          "effects": { "energy": 0, "time": 0 },
+          "requiresPartyMember": "carsen"
+        }
+      ]
+    },
+    {
+      "id": "shortcut_found",
+      "weight": 7,
+      "title": "Shortcut!",
+      "description": "Justin spots a shortcut through the park.",
+      "choices": [
+        {
+          "text": "Take it",
+          "effects": { "time": 20 },
+          "requiresPartyMember": "justin"
+        },
+        { "text": "Stay on the main road", "effects": {} }
+      ]
+    },
+    {
+      "id": "rainstorm",
+      "weight": 9,
+      "title": "Rainstorm",
+      "description": "Dark clouds roll in and it starts pouring.",
+      "choices": [
+        { "text": "Push through", "effects": { "bikeCondition": -10, "energy": -10 } },
+        { "text": "Wait it out", "effects": { "time": -20 } }
+      ]
+    },
+    {
+      "id": "police_slowdown",
+      "weight": 6,
+      "title": "Officer on Patrol",
+      "description": "A police officer waves you down. No riding on the sidewalk.",
+      "choices": [
+        { "text": "Apologize and detour", "effects": { "time": -12 } },
+        {
+          "text": "Carsen sneaks through",
+          "effects": { "time": -3 },
+          "requiresPartyMember": "carsen"
+        }
+      ]
+    },
+    {
+      "id": "construction_detour",
+      "weight": 8,
+      "title": "Construction Zone",
+      "description": "The road ahead is torn up. Detour required.",
+      "choices": [
+        { "text": "Take the long way", "effects": { "time": -15 } },
+        {
+          "text": "MJ clears a path",
+          "effects": { "time": -5 },
+          "requiresPartyMember": "mj"
+        }
+      ]
+    },
+    {
+      "id": "parent_call",
+      "weight": 6,
+      "title": "Parent Call",
+      "description": "Someone's mom is calling. If they don't answer, they're grounded.",
+      "choices": [
+        { "text": "Answer and make excuses", "effects": { "time": -8 } },
+        { "text": "Ignore it (risky)", "effects": { "partyLossRisk": 0.3 } }
+      ]
+    },
+    {
+      "id": "squirrel_steals_snacks",
+      "weight": 7,
+      "title": "Squirrel Attack!",
+      "description": "A squirrel ran off with someone's snack bag.",
+      "choices": [
+        { "text": "Chase it", "effects": { "time": -5, "snacks": 1 } },
+        { "text": "Let it go", "effects": { "snacks": -2 } }
+      ]
+    },
+    {
+      "id": "found_money",
+      "weight": 5,
+      "title": "Lucky Find!",
+      "description": "You spot a crumpled bill on the side of the road.",
+      "choices": [
+        { "text": "Grab it", "effects": { "money": 5, "time": -2 } },
+        { "text": "Leave it", "effects": {} }
+      ]
+    },
+    {
+      "id": "someone_crashes",
+      "weight": 7,
+      "title": "Crash!",
+      "description": "Someone hit a pothole and went down hard.",
+      "choices": [
+        { "text": "Stop and help", "effects": { "time": -10, "energy": 10 } },
+        { "text": "Keep moving (ouch)", "effects": { "energy": -20 } }
+      ]
+    },
+    {
+      "id": "energy_snack_break",
+      "weight": 5,
+      "title": "Snack Break",
+      "description": "Everyone's getting tired. A snack would help.",
+      "choices": [
+        { "text": "Eat a snack", "effects": { "snacks": -1, "energy": 20 } },
+        { "text": "Power through", "effects": { "energy": -5 } }
+      ]
+    },
+    {
+      "id": "dog_chase",
+      "weight": 8,
+      "title": "Dog Chase!",
+      "description": "A big dog is chasing the group down the sidewalk.",
+      "choices": [
+        { "text": "Pedal hard", "effects": { "energy": -15 } },
+        {
+          "text": "Justin outruns it easily",
+          "effects": { "energy": -5 },
+          "requiresPartyMember": "justin"
+        }
+      ]
+    },
+    {
+      "id": "wrong_turn",
+      "weight": 5,
+      "title": "Wrong Turn",
+      "description": "You ended up on the wrong street. Oops.",
+      "choices": [
+        { "text": "Backtrack", "effects": { "time": -10 } },
+        {
+          "text": "Warren slingshots a path marker",
+          "effects": { "time": -3 },
+          "requiresPartyMember": "warren"
+        }
+      ]
+    },
+    {
+      "id": "bike_part_falls_off",
+      "weight": 6,
+      "title": "Part Down!",
+      "description": "A piece fell off one of the bikes. That's not good.",
+      "choices": [
+        { "text": "Improvise a fix", "effects": { "time": -8, "bikeCondition": -15 } },
+        {
+          "text": "MJ holds it together",
+          "effects": { "bikeCondition": -5 },
+          "requiresPartyMember": "mj"
+        }
+      ]
+    }
+  ]
+}

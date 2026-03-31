@@ -1,0 +1,69 @@
+{
+  "grace": {
+    "id": "grace",
+    "name": "Grace",
+    "theme": "Pool",
+    "hp": 80,
+    "phases": 2,
+    "attacks": ["pool_noodle_swing", "floatie_toss", "water_splash", "treehouse_drop"],
+    "weaknesses": ["slingshot"],
+    "sprite": "sprite-boss-grace",
+    "arenaMap": "map-boss-arena"
+  },
+  "max_football": {
+    "id": "max_football",
+    "name": "Max",
+    "theme": "Football",
+    "hp": 100,
+    "phases": 2,
+    "attacks": ["football_throw", "tackle_charge", "blitz_rush"],
+    "weaknesses": ["lightning_fart", "slingshot"],
+    "sprite": "sprite-boss-max-football",
+    "arenaMap": "map-boss-arena"
+  },
+  "nora": {
+    "id": "nora",
+    "name": "Nora",
+    "theme": "Soccer + Cabinets",
+    "hp": 90,
+    "phases": 2,
+    "attacks": ["soccer_kick", "slide_tackle", "cabinet_ambush"],
+    "weaknesses": ["stealth", "super_strength"],
+    "sprite": "sprite-boss-nora",
+    "arenaMap": "map-boss-arena"
+  },
+  "max_baseball": {
+    "id": "max_baseball",
+    "name": "Max",
+    "theme": "Baseball + Electric",
+    "hp": 110,
+    "phases": 3,
+    "attacks": ["fastball_pitch", "bat_swing", "electric_shock", "power_surge"],
+    "weaknesses": ["speed_boost", "slingshot"],
+    "sprite": "sprite-boss-max-baseball",
+    "arenaMap": "map-boss-arena"
+  },
+  "donut_boss": {
+    "id": "donut_boss",
+    "name": "The Donut Boss",
+    "theme": "Donuts",
+    "hp": 120,
+    "phases": 2,
+    "attacks": ["donut_throw", "rolling_donut", "sticky_glaze_splash", "sprinkle_barrage"],
+    "weaknesses": ["lightning_fart", "super_strength"],
+    "sprite": "sprite-boss-donut",
+    "arenaMap": "map-donut-shop"
+  },
+  "edie": {
+    "id": "edie",
+    "name": "Edie",
+    "theme": "Softball + Dance",
+    "hp": 200,
+    "phases": 3,
+    "attacks": ["softball_pitch", "spin_attack", "ribbon_whip", "summon_siblings", "grand_finale"],
+    "weaknesses": ["team_boost"],
+    "sprite": "sprite-boss-edie",
+    "arenaMap": "map-final-boss-arena",
+    "note": "Phase 3 summons all previously defeated siblings. Requires Team Boost to finish."
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "warren": {
+    "id": "warren",
+    "name": "Warren",
+    "ability": "slingshot",
+    "house": "warren_house",
+    "bossId": "grace",
+    "passiveBonus": {
+      "type": "ranged_damage",
+      "value": 10
+    },
+    "sprite": "sprite-warren",
+    "color": "#e74c3c"
+  },
+  "mj": {
+    "id": "mj",
+    "name": "MJ",
+    "ability": "super_strength",
+    "house": "mj_house",
+    "bossId": "max_football",
+    "passiveBonus": {
+      "type": "obstacle_resistance",
+      "value": 20
+    },
+    "sprite": "sprite-mj",
+    "color": "#2ecc71"
+  },
+  "carsen": {
+    "id": "carsen",
+    "name": "Carsen",
+    "ability": "stealth",
+    "house": "carsen_house",
+    "bossId": "nora",
+    "passiveBonus": {
+      "type": "event_options",
+      "value": "stealth_choice"
+    },
+    "sprite": "sprite-carsen",
+    "color": "#9b59b6"
+  },
+  "justin": {
+    "id": "justin",
+    "name": "Justin",
+    "ability": "speed_boost",
+    "house": "justin_house",
+    "bossId": "max_baseball",
+    "passiveBonus": {
+      "type": "movement_speed",
+      "value": 15
+    },
+    "sprite": "sprite-justin",
+    "color": "#f39c12"
+  }
+}

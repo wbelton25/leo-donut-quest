@@ -1,0 +1,44 @@
+{
+  "intro": [
+    { "speaker": "Leo", "text": "Today's the day. Donut House closes at 5pm.", "portrait": "leo" },
+    { "speaker": "Leo", "text": "I need to get Warren, MJ, Carsen, and Justin first.", "portrait": "leo" },
+    { "speaker": "Leo", "text": "Let's ride!", "portrait": "leo" }
+  ],
+  "warren_meet": [
+    { "speaker": "Warren", "text": "Leo! I heard you were going to Donut House!", "portrait": "warren" },
+    { "speaker": "Warren", "text": "I'm in. But Grace is out front and she's got a pool noodle...", "portrait": "warren" },
+    { "speaker": "Leo", "text": "We'll handle it. Together.", "portrait": "leo" }
+  ],
+  "warren_join": [
+    { "speaker": "Warren", "text": "That's what I'm talking about! Let's go get those donuts.", "portrait": "warren" },
+    { "speaker": "Warren", "text": "I've got my slingshot. Nobody's stopping us now.", "portrait": "warren" }
+  ],
+  "mj_meet": [
+    { "speaker": "MJ", "text": "Donut run?! Say no more. I'm so in.", "portrait": "mj" },
+    { "speaker": "MJ", "text": "My brother Max has been blocking the driveway all morning.", "portrait": "mj" },
+    { "speaker": "Leo", "text": "Guess we're going through him.", "portrait": "leo" }
+  ],
+  "mj_join": [
+    { "speaker": "MJ", "text": "Ha! He never learns.", "portrait": "mj" },
+    { "speaker": "MJ", "text": "I'll push anything out of our way. Let's ride.", "portrait": "mj" }
+  ],
+  "carsen_meet": [
+    { "speaker": "Carsen", "text": "I saw you coming from two blocks away.", "portrait": "carsen" },
+    { "speaker": "Carsen", "text": "Donut House. I knew it. I'm ready.", "portrait": "carsen" },
+    { "speaker": "Carsen", "text": "Nora's around back though. She's in a mood.", "portrait": "carsen" }
+  ],
+  "carsen_join": [
+    { "speaker": "Carsen", "text": "Didn't even see it coming. That's my whole thing.", "portrait": "carsen" },
+    { "speaker": "Carsen", "text": "Stay close and stay quiet. I know the shortcuts.", "portrait": "carsen" }
+  ],
+  "justin_meet": [
+    { "speaker": "Justin", "text": "BRO. I've been waiting all week for a donut run.", "portrait": "justin" },
+    { "speaker": "Justin", "text": "Max is guarding the street with a bat. AND he's somehow electric?", "portrait": "justin" },
+    { "speaker": "Leo", "text": "That doesn't even make sense.", "portrait": "leo" },
+    { "speaker": "Justin", "text": "I know. Doesn't matter. Let's go.", "portrait": "justin" }
+  ],
+  "justin_join": [
+    { "speaker": "Justin", "text": "YEAH! Full crew! Nobody's faster than us.", "portrait": "justin" },
+    { "speaker": "Justin", "text": "I'll get us there in no time. Follow me!", "portrait": "justin" }
+  ]
+}
