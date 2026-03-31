@@ -9,7 +9,7 @@ import {
 // Layout: thin resource bar strip across the bottom edge of the screen.
 
 const HUD_H  = 28;
-const HUD_Y  = BASE_HEIGHT - HUD_H; // anchored to bottom
+const HUD_Y  = 0; // anchored to top
 
 export default class HudScene extends Phaser.Scene {
   constructor() {
@@ -19,8 +19,8 @@ export default class HudScene extends Phaser.Scene {
   create() {
     // ── Background strip ──────────────────────────────────────────────────────
     this.add.rectangle(0, HUD_Y, BASE_WIDTH, HUD_H, 0x000000, 0.85).setOrigin(0, 0);
-    // Top border line
-    this.add.rectangle(0, HUD_Y, BASE_WIDTH, 1, 0x334455, 1).setOrigin(0, 0);
+    // Bottom border line
+    this.add.rectangle(0, HUD_Y + HUD_H - 1, BASE_WIDTH, 1, 0x334455, 1).setOrigin(0, 0);
 
     const y = HUD_Y + 5; // top of text/bars inside the strip
 

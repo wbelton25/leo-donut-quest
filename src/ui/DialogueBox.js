@@ -1,6 +1,6 @@
 import { BASE_WIDTH, BASE_HEIGHT, txt } from '../constants.js';
 
-const BOX_HEIGHT = 64;
+const BOX_HEIGHT = 72;
 const BOX_Y = BASE_HEIGHT - BOX_HEIGHT - 4;
 const PADDING = 8;
 const CHARS_PER_SECOND = 35;
@@ -48,7 +48,7 @@ export default class DialogueBox {
         .setScrollFactor(0).setDepth(101).setOrigin(0.5).setInteractive({ cursor: 'pointer' });
 
       const label = txt(this._scene, x + 90, y, choice.text, {
-        fontSize: '6px',
+        fontSize: '8px',
       }).setScrollFactor(0).setDepth(101).setOrigin(0.5);
 
       bg.on('pointerover', () => bg.setFillStyle(0x5555aa));
@@ -90,18 +90,18 @@ export default class DialogueBox {
 
     // Speaker name in accent color, body text in white — both using txt() for crispness
     this._speakerText = txt(this._scene, PADDING + 30, BOX_Y + PADDING, '', {
-      fontSize: '7px', color: '#f5a623',
+      fontSize: '8px', color: '#f5a623',
     });
 
-    this._bodyText = txt(this._scene, PADDING + 30, BOX_Y + PADDING + 14, '', {
-      fontSize: '7px', color: '#ffffff',
+    this._bodyText = txt(this._scene, PADDING + 30, BOX_Y + PADDING + 16, '', {
+      fontSize: '8px', color: '#ffffff',
       wordWrap: { width: BASE_WIDTH - PADDING * 2 - 36 },
       lineSpacing: 5,
     });
 
     this._continueIndicator = txt(
-      this._scene, BASE_WIDTH - 10, BOX_Y + BOX_HEIGHT - 10, '>', {
-        fontSize: '6px', color: '#888888',
+      this._scene, BASE_WIDTH - 10, BOX_Y + BOX_HEIGHT - 12, '>', {
+        fontSize: '8px', color: '#888888',
       }
     ).setOrigin(1, 0);
 
