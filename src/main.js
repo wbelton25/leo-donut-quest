@@ -7,13 +7,14 @@ import TitleScene from './scenes/TitleScene.js';
 import HudScene from './scenes/HudScene.js';
 import NeighborhoodScene from './scenes/NeighborhoodScene.js';
 
-// Remaining scenes will be imported as they are built in later phases
+import DialogueScene from './scenes/DialogueScene.js';
+
+// Remaining scenes added in later phases:
 // import FriendHouseScene from './scenes/FriendHouseScene.js';
 // import BossScene from './scenes/BossScene.js';
 // import OregonTrailScene from './scenes/OregonTrailScene.js';
 // import DonutShopScene from './scenes/DonutShopScene.js';
 // import FinalBossScene from './scenes/FinalBossScene.js';
-// import DialogueScene from './scenes/DialogueScene.js';
 // import GameOverScene from './scenes/GameOverScene.js';
 // import CreditsScene from './scenes/CreditsScene.js';
 
@@ -54,6 +55,7 @@ const config = {
     PreloadScene,
     TitleScene,
     HudScene,
+    DialogueScene,
     NeighborhoodScene,
   ],
 };
