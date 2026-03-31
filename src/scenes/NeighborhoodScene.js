@@ -1,14 +1,50 @@
-import { SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, txt } from '../constants.js';
+import {
+  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE,
+  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
+} from '../constants.js';
 import Player from '../entities/Player.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
 import SaveSystem from '../systems/SaveSystem.js';
 
-// NeighborhoodScene: the open-world hub for Act 1.
-// Phase 1: placeholder tile grid + player movement + camera.
-// Phase 2: systems initialized here, dialogue tested.
-// Phase 3: replace with real Tiled tilemap and friend house interactables.
+// ─── Real-world map layout ─────────────────────────────────────────────────────
+// Each tile = 8 meters. World = 250×160 tiles = 2000m × 1280m (~1.25mi × 0.8mi)
+//
+// GPS reference points → tile coordinates:
+//   Leo's house   (35.0288, -81.0343)  →  tile (18, 130)  [bottom-left area]
+//   Warren's house(35.0337, -81.0245)  →  tile (210, 95)  [northeast, ~200 tiles E, ~35 N]
+//   Golf Club     (35.0365, -81.0204)  →  tile (235, 81)  [further NE past Warren]
+//   School        (35.0521, -81.0063)  →  tile (350, 20)  [far north, Act 1 obstacle zone]
+//
+// Route: Topsail Circle → Anchorage Lane (east) → Tega Cay Drive (NE) → Suwarrow Circle
+// ──────────────────────────────────────────────────────────────────────────────
+
+const MAP_COLS = 250;
+const MAP_ROWS = 160;
+
+// Leo's starting tile position
+const LEO_START_COL = 18;
+const LEO_START_ROW = 130;
+
+// House tile positions [col, row, widthTiles, heightTiles, label, color]
+const HOUSES = [
+  [15,  127, 6, 5, "LEO'S HOUSE",  0x8b7355],
+  [207,  92, 5, 4, 'WARREN',       0xe74c3c],
+  // MJ, Carsen, Justin added in Phase 3 with real addresses
+];
+
+// Road definitions [col, row, widthTiles, heightTiles, isHorizontal]
+// Anchorage Lane runs east from Leo's neighborhood (~row 128, col 20–90)
+// Tega Cay Drive runs NE — approximated as two segments
+const ROADS = [
+  // Anchorage Lane — east from Leo's neighborhood to Tega Cay Drive junction
+  { x: 0,   y: 128, w: MAP_COLS, h: 2, color: 0x555566 },  // main horizontal road
+  // Tega Cay Drive — angled NE; approximated with a vertical road segment
+  { x: 90,  y: 0,   w: 2, h: MAP_ROWS, color: 0x555566 },  // north-south connector
+  // Suwarrow Circle area road
+  { x: 200, y: 88,  w: 25, h: 2, color: 0x555566 },
+];
 
 export default class NeighborhoodScene extends Phaser.Scene {
   constructor() {
@@ -16,117 +52,114 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   create() {
-    // ── Initialize core systems ───────────────────────────────────────────────
-    // Systems are created here and stored on game.registry so other scenes
-    // can retrieve them without tight coupling.
+    // ── Systems ───────────────────────────────────────────────────────────────
     this._resources = new ResourceSystem(this.game);
     this._party     = new PartySystem(this.game);
     this._abilities = new AbilitySystem(this.game, this._party);
 
-    // Restore state if continuing a saved game
     const gameState = this.game.registry.get('gameState');
     if (gameState) {
       this._resources.restoreFromSave(gameState.resources);
       this._party.restoreFromSave(gameState);
     }
 
-    // Store systems on registry so BossScene, OregonTrailScene etc. can access them
     this.game.registry.set('resources', this._resources);
     this.game.registry.set('party',     this._party);
     this.game.registry.set('abilities', this._abilities);
 
-    // Register Leo's Lightning Fart ability handler
     this._abilities.register('lightning_fart', (scene, player) => {
       this._fireLightningFart(scene, player);
     });
 
-    // ── Placeholder world ─────────────────────────────────────────────────────
-    const MAP_COLS = 40;
-    const MAP_ROWS = 30;
-    const worldWidth  = MAP_COLS * TILE_SIZE;
-    const worldHeight = MAP_ROWS * TILE_SIZE;
+    // ── World dimensions ──────────────────────────────────────────────────────
+    const worldW = MAP_COLS * TILE_SIZE;
+    const worldH = MAP_ROWS * TILE_SIZE;
 
-    // Checkerboard grass ground
-    for (let row = 0; row < MAP_ROWS; row++) {
-      for (let col = 0; col < MAP_COLS; col++) {
-        const color = (row + col) % 2 === 0 ? 0x2d5a1b : 0x336b20;
+    // ── Ground ────────────────────────────────────────────────────────────────
+    // Draw in 8×8 tile chunks for performance (fewer objects than 1-per-tile)
+    const CHUNK = 8;
+    for (let row = 0; row < MAP_ROWS; row += CHUNK) {
+      for (let col = 0; col < MAP_COLS; col += CHUNK) {
+        const color = ((row / CHUNK) + (col / CHUNK)) % 2 === 0 ? 0x2d5a1b : 0x336b20;
         this.add.rectangle(
-          col * TILE_SIZE + TILE_SIZE / 2,
-          row * TILE_SIZE + TILE_SIZE / 2,
-          TILE_SIZE - 1, TILE_SIZE - 1, color
+          col * TILE_SIZE + (CHUNK * TILE_SIZE) / 2,
+          row * TILE_SIZE + (CHUNK * TILE_SIZE) / 2,
+          CHUNK * TILE_SIZE, CHUNK * TILE_SIZE, color
         );
       }
     }
 
-    // Road strips drawn after ground tiles so they appear on top (no depth override needed)
-    this.add.rectangle(worldWidth / 2, 9 * TILE_SIZE, worldWidth, 2 * TILE_SIZE, 0x555555);
-    this.add.rectangle(20 * TILE_SIZE, worldHeight / 2, 2 * TILE_SIZE, worldHeight, 0x555555);
-
-    // ── Static walls ──────────────────────────────────────────────────────────
-    this._walls = this.physics.add.staticGroup();
-    const wallDefs = [
-      [0, 0, MAP_COLS, 1],            // top border
-      [0, MAP_ROWS - 1, MAP_COLS, 1], // bottom border
-      [0, 0, 1, MAP_ROWS],            // left border
-      [MAP_COLS - 1, 0, 1, MAP_ROWS], // right border
-      [3, 20, 5, 4],   // Leo's house
-      [5, 3, 4, 3],    // Warren's house placeholder (northeast)
-      [28, 5, 4, 3],   // MJ's house placeholder
-      [8, 24, 4, 3],   // Carsen's house placeholder
-      [30, 18, 4, 3],  // Justin's house placeholder
-    ];
-
-    wallDefs.forEach(([col, row, w, h]) => {
-      const rect = this.add.rectangle(
-        col * TILE_SIZE + (w * TILE_SIZE) / 2,
-        row * TILE_SIZE + (h * TILE_SIZE) / 2,
-        w * TILE_SIZE, h * TILE_SIZE, 0x8b7355
+    // ── Roads ─────────────────────────────────────────────────────────────────
+    ROADS.forEach(r => {
+      this.add.rectangle(
+        r.x * TILE_SIZE + (r.w * TILE_SIZE) / 2,
+        r.y * TILE_SIZE + (r.h * TILE_SIZE) / 2,
+        r.w * TILE_SIZE, r.h * TILE_SIZE, r.color
       );
-      this.physics.add.existing(rect, true);
-      this._walls.add(rect);
+      // Road centre line (dashed feel via lighter strip)
+      this.add.rectangle(
+        r.x * TILE_SIZE + (r.w * TILE_SIZE) / 2,
+        r.y * TILE_SIZE + (r.h * TILE_SIZE) / 2,
+        r.w * TILE_SIZE, 1, 0x888899
+      );
     });
 
-    // House labels
-    const labels = [
-      [3, 20, "LEO'S HOUSE"], [5, 3, "WARREN"],
-      [28, 5, "MJ"], [8, 24, "CARSEN"], [30, 18, "JUSTIN"],
-    ];
-    labels.forEach(([col, row, name]) => {
-      txt(this, col * TILE_SIZE + 2, row * TILE_SIZE - 7, name, {
-        fontSize: '5px', color: '#ffff88',
+    // ── Walls / Buildings ─────────────────────────────────────────────────────
+    this._walls = this.physics.add.staticGroup();
+
+    // World border walls (invisible, just collision)
+    this._addWall(0, 0, MAP_COLS, 1, 0x1a1a2e, false);
+    this._addWall(0, MAP_ROWS - 1, MAP_COLS, 1, 0x1a1a2e, false);
+    this._addWall(0, 0, 1, MAP_ROWS, 0x1a1a2e, false);
+    this._addWall(MAP_COLS - 1, 0, 1, MAP_ROWS, 0x1a1a2e, false);
+
+    // Houses
+    HOUSES.forEach(([col, row, w, h, label, color]) => {
+      this._addWall(col, row, w, h, color, true);
+      txt(this, col * TILE_SIZE + 2, row * TILE_SIZE - 9, label, {
+        fontSize: '6px', color: '#ffff88',
       });
+    });
+
+    // Golf course outline (large green rectangle, walkable - just visual)
+    this.add.rectangle(
+      238 * TILE_SIZE, 75 * TILE_SIZE,
+      30 * TILE_SIZE, 20 * TILE_SIZE,
+      0x1a6b1a, 0.6
+    );
+    txt(this, 228 * TILE_SIZE, 65 * TILE_SIZE, 'GOLF COURSE', {
+      fontSize: '6px', color: '#88ff88',
     });
 
     // ── Player ────────────────────────────────────────────────────────────────
-    this._player = new Player(this, 5 * TILE_SIZE, 23 * TILE_SIZE);
+    this._player = new Player(this, LEO_START_COL * TILE_SIZE, LEO_START_ROW * TILE_SIZE);
     this.physics.add.collider(this._player, this._walls);
 
-    // ── Ability key bindings ──────────────────────────────────────────────────
+    // ── Keys ──────────────────────────────────────────────────────────────────
     this._fartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
-    // ── Camera ────────────────────────────────────────────────────────────────
-    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
-    this.cameras.main.startFollow(this._player, true, 0.1, 0.1);
-    this.cameras.main.setDeadzone(40, 30);
-
-    // ── Phase 2 test: press D to test dialogue, E to test a random event ──────
     const dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     dKey.once('down', () => {
-      const dialogueScene = this.scene.get(SCENE_DIALOGUE);
-      dialogueScene.showScript('intro', () => {
-        console.log('[Phase2Test] Intro dialogue complete.');
-      });
+      this.scene.get(SCENE_DIALOGUE).showScript('intro', () => {});
     });
 
-    txt(this, 4, 21, 'ACT 1 - NEIGHBORHOOD', {
+    // ── Camera ────────────────────────────────────────────────────────────────
+    this.cameras.main.setBounds(0, 0, worldW, worldH);
+    this.cameras.main.startFollow(this._player, true, 0.08, 0.08);
+    this.cameras.main.setDeadzone(60, 40);
+
+    // ── On-screen hint (fixed to camera) ─────────────────────────────────────
+    txt(this, 6, BASE_HEIGHT - 22, 'MOVE: WASD / ARROWS', {
       fontSize: '6px', color: '#ffffff',
     }).setScrollFactor(0);
-
-    txt(this, 4, 31, 'MOVE:WASD  FART:F  TALK:D', {
-      fontSize: '5px', color: '#aaaaaa',
+    txt(this, 6, BASE_HEIGHT - 12, 'FART: F    TALK: D', {
+      fontSize: '6px', color: '#aaaaaa',
     }).setScrollFactor(0);
 
-    // Emit initial resource/party state so HUD populates on load
+    // ── Minimap ───────────────────────────────────────────────────────────────
+    this._buildMinimap(worldW, worldH);
+
+    // Initial state emit so HUD populates
     this._resources.applyChanges({});
     this._party._emit();
   }
@@ -134,30 +167,90 @@ export default class NeighborhoodScene extends Phaser.Scene {
   update() {
     this._player.update();
 
-    // F key fires Lightning Fart
     if (Phaser.Input.Keyboard.JustDown(this._fartKey)) {
       this._abilities.execute('lightning_fart', this, this._player);
     }
 
-    // Autosave checkpoint every 30 seconds
+    this._updateMinimap();
+
     if (!this._lastSave || Date.now() - this._lastSave > 30000) {
       this._autosave();
       this._lastSave = Date.now();
     }
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  _addWall(col, row, w, h, color, visible = true) {
+    const rect = this.add.rectangle(
+      col * TILE_SIZE + (w * TILE_SIZE) / 2,
+      row * TILE_SIZE + (h * TILE_SIZE) / 2,
+      w * TILE_SIZE, h * TILE_SIZE, color
+    );
+    if (!visible) rect.setAlpha(0);
+    this.physics.add.existing(rect, true);
+    this._walls.add(rect);
+  }
+
   _fireLightningFart(scene, player) {
-    // Visual: expanding ring from the player's position
-    const ring = scene.add.circle(player.x, player.y, 5, 0xf5e642, 0.8);
+    const ring = scene.add.circle(player.x, player.y, 8, 0xf5e642, 0.8);
     scene.tweens.add({
-      targets: ring,
-      radius: 40,
-      alpha: 0,
-      duration: 400,
+      targets: ring, radius: 48, alpha: 0, duration: 400,
       onComplete: () => ring.destroy(),
     });
-    // In Phase 4 this will also damage bosses in range
-    console.log('[Ability] Lightning Fart!');
+  }
+
+  _buildMinimap(worldW, worldH) {
+    // Tiny minimap in top-right corner, fixed to screen
+    const MM_W = 80;
+    const MM_H = 50;
+    const MM_X = BASE_WIDTH - MM_W - 4;
+    const MM_Y = 24;
+
+    const scaleX = MM_W / worldW;
+    const scaleY = MM_H / worldH;
+
+    // Background
+    this.add.rectangle(MM_X + MM_W / 2, MM_Y + MM_H / 2, MM_W, MM_H, 0x000000, 0.7)
+      .setScrollFactor(0).setDepth(50);
+
+    // Road dots on minimap
+    ROADS.forEach(r => {
+      this.add.rectangle(
+        MM_X + r.x * TILE_SIZE * scaleX + (r.w * TILE_SIZE * scaleX) / 2,
+        MM_Y + r.y * TILE_SIZE * scaleY + (r.h * TILE_SIZE * scaleY) / 2,
+        Math.max(1, r.w * TILE_SIZE * scaleX),
+        Math.max(1, r.h * TILE_SIZE * scaleY),
+        0x888899
+      ).setScrollFactor(0).setDepth(51);
+    });
+
+    // House dots
+    HOUSES.forEach(([col, row,, , label, color]) => {
+      this.add.rectangle(
+        MM_X + col * TILE_SIZE * scaleX,
+        MM_Y + row * TILE_SIZE * scaleY,
+        3, 3, color
+      ).setScrollFactor(0).setDepth(51);
+    });
+
+    // Player dot (updated each frame)
+    this._minimapDot = this.add.rectangle(0, 0, 3, 3, 0xffffff)
+      .setScrollFactor(0).setDepth(52);
+
+    this._minimapX = MM_X;
+    this._minimapY = MM_Y;
+    this._minimapScaleX = scaleX;
+    this._minimapScaleY = scaleY;
+    this._minimapW = worldW;
+    this._minimapH = worldH;
+  }
+
+  _updateMinimap() {
+    this._minimapDot.setPosition(
+      this._minimapX + this._player.x * this._minimapScaleX,
+      this._minimapY + this._player.y * this._minimapScaleY
+    );
   }
 
   _autosave() {

@@ -1,15 +1,20 @@
 // ─── Tile & Resolution ────────────────────────────────────────────────────────
-export const TILE_SIZE = 16;
-export const BASE_WIDTH = 320;
-export const BASE_HEIGHT = 240;
-export const SCALE = 3; // canvas is displayed at 3x (960x720 on screen)
+export const TILE_SIZE   = 16;
+export const BASE_WIDTH  = 480;  // 480×270 is 16:9; INTEGER_FIT gives exactly 4× on 1080p
+export const BASE_HEIGHT = 270;  // (1080 ÷ 270 = 4.0 — perfect integer, no sub-pixel blur)
+
+// ─── Map scale ────────────────────────────────────────────────────────────────
+// Each tile represents 8 real-world meters.
+// Leo→Warren is ~1 mile (1600m) = ~200 tiles. World is 250×160 tiles = 4000×2560px.
+export const METERS_PER_TILE = 8;
 
 // ─── Font ─────────────────────────────────────────────────────────────────────
-// Press Start 2P is a pixel-perfect 8-bit font (Google Fonts).
-// TEXT_RES: Phaser renders text to an internal canvas at this multiplier before
-// using it as a texture. Higher = crisper text when scaled up. 3 is a good balance.
+// Press Start 2P: pixel-perfect 8-bit font (Google Fonts).
+// TEXT_RES: render the text canvas at this multiplier before using it as a texture.
+// At 480×270 with 4× INTEGER_FIT on 1080p, TEXT_RES=4 means the text canvas matches
+// screen resolution exactly — no upscaling artifact at all.
 export const PIXEL_FONT = '"Press Start 2P", monospace';
-export const TEXT_RES   = 3;
+export const TEXT_RES   = 4;
 
 // Convenience wrapper — use this instead of scene.add.text() everywhere.
 // Automatically applies the right font, resolution, and sane defaults.
@@ -24,7 +29,8 @@ export function txt(scene, x, y, content, style = {}) {
 }
 
 // ─── Physics ──────────────────────────────────────────────────────────────────
-export const PLAYER_SPEED = 120;
+// Faster speed to feel right on the larger map (~1 mile journey)
+export const PLAYER_SPEED = 180;
 
 // ─── Asset Keys ───────────────────────────────────────────────────────────────
 // Sprites

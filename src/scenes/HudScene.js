@@ -4,7 +4,7 @@ import {
   BASE_WIDTH, txt,
 } from '../constants.js';
 
-const BAR_W = 44;
+const BAR_W = 60; // wider bars now that we have 480px
 
 export default class HudScene extends Phaser.Scene {
   constructor() {
@@ -12,15 +12,15 @@ export default class HudScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.rectangle(0, 0, BASE_WIDTH, 20, 0x000000, 0.8).setOrigin(0, 0);
+    this.add.rectangle(0, 0, BASE_WIDTH, 22, 0x000000, 0.8).setOrigin(0, 0);
 
-    // Resource bars
-    this._timeFill   = this._makeBar(2,  2, BAR_W, 0x4fc3f7, 'TIME');
-    this._bikeFill   = this._makeBar(52, 2, BAR_W, 0xef5350, 'BIKE');
-    this._energyFill = this._makeBar(102, 2, BAR_W, 0x66bb6a, 'NRG');
+    // Resource bars — spread across the wider 480px HUD
+    this._timeFill   = this._makeBar(2,   2, BAR_W, 0x4fc3f7, 'TIME');
+    this._bikeFill   = this._makeBar(72,  2, BAR_W, 0xef5350, 'BIKE');
+    this._energyFill = this._makeBar(142, 2, BAR_W, 0x66bb6a, 'NRG');
 
-    this._snackText = txt(this, 152, 2, 'S:5', { fontSize: '6px', color: '#f5e642' });
-    this._moneyText = txt(this, 178, 2, '$20', { fontSize: '6px', color: '#f5a623' });
+    this._snackText = txt(this, 212, 2, 'S:5', { fontSize: '6px', color: '#f5e642' });
+    this._moneyText = txt(this, 248, 2, '$20', { fontSize: '6px', color: '#f5a623' });
 
     // Party icons
     this._partyIcons = [];
@@ -31,9 +31,9 @@ export default class HudScene extends Phaser.Scene {
       { id: 'justin',  label: 'J', color: 0xf39c12 },
     ];
     members.forEach((m, i) => {
-      const x = BASE_WIDTH - 8 - (members.length - i) * 16;
-      const dot  = this.add.circle(x, 10, 5, 0x333333);
-      const t    = txt(this, x, 10, m.label, { fontSize: '5px', color: '#555555' }).setOrigin(0.5);
+      const x = BASE_WIDTH - 10 - (members.length - i) * 20;
+      const dot = this.add.circle(x, 11, 6, 0x333333);
+      const t   = txt(this, x, 11, m.label, { fontSize: '6px', color: '#555555' }).setOrigin(0.5);
       this._partyIcons.push({ dot, t, color: m.color });
     });
 

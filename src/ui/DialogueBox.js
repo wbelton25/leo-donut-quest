@@ -94,9 +94,9 @@ export default class DialogueBox {
     });
 
     this._bodyText = txt(this._scene, PADDING + 30, BOX_Y + PADDING + 14, '', {
-      fontSize: '6px', color: '#ffffff',
+      fontSize: '7px', color: '#ffffff',
       wordWrap: { width: BASE_WIDTH - PADDING * 2 - 36 },
-      lineSpacing: 4,
+      lineSpacing: 5,
     });
 
     this._continueIndicator = txt(
