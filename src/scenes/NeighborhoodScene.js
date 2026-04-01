@@ -1,8 +1,10 @@
 import {
   SCENE_NEIGHBORHOOD, SCENE_DIALOGUE,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
+  PARTY_WARREN,
 } from '../constants.js';
 import Player from '../entities/Player.js';
+import Follower, { PositionBuffer } from '../entities/Follower.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -137,6 +139,22 @@ const HOUSE_GROUPS = [
   { col: 152, row: 36, n: 1, stepCol: 0, stepRow: 0, color: 0x992222 },
 ];
 
+// ── Friend house interaction zones ────────────────────────────────────────────
+// Each zone: { id, col, row, radius, meetScript, joinScript, color }
+// radius in pixels — player must be within this to see the prompt
+const FRIEND_ZONES = [
+  {
+    id:         PARTY_WARREN,
+    col:        154, row: 38,   // tile pos of Warren's house door
+    radius:     48,
+    meetScript: 'warren_meet',
+    joinScript: 'warren_join',
+    color:      0xe74c3c,
+    label:      'WARREN',
+  },
+  // MJ, Carsen, Justin zones will be added once their locations are confirmed
+];
+
 export default class NeighborhoodScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_NEIGHBORHOOD });
@@ -261,14 +279,28 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this.add.rectangle(dc * T + T, dr * T + T * 2, T * 2, T * 4, 0x8b6914);
     });
 
-    // ── Player (starts on Topsail Cir approach road) ──────────────────────────
+    // ── Player ────────────────────────────────────────────────────────────────
     this._player = new Player(this, 40 * T, 109 * T);
     this.physics.add.collider(this._player, this._walls);
-    this._prevX = this._player.x;
-    this._prevY = this._player.y;
+
+    // ── Position buffer + followers ───────────────────────────────────────────
+    this._posBuffer  = new PositionBuffer(this, this._player);
+    this._followers  = [];   // Follower instances in join order
+
+    // ── Friend interaction zones ──────────────────────────────────────────────
+    this._recruited = new Set();  // IDs already recruited this session
+    // Restore from save
+    const gs = this.game.registry.get('gameState');
+    if (gs?.party) gs.party.forEach(id => this._recruited.add(id));
+
+    // Proximity prompt label (shown when near a friend's house)
+    this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
+      fontSize: '8px', color: '#f5e642',
+    }).setScrollFactor(0).setDepth(20).setVisible(false);
 
     // ── Input ─────────────────────────────────────────────────────────────────
-    this._fartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    this._fartKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    this._spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
       .once('down', () => this.scene.get(SCENE_DIALOGUE).showScript('intro', () => {}));
 
@@ -291,9 +323,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   update() {
     this._player.update();
+    this._followers.forEach(f => f.update());
+
     if (Phaser.Input.Keyboard.JustDown(this._fartKey)) {
       this._abilities.execute('lightning_fart', this, this._player);
     }
+
+    this._updateProximityPrompt();
+
     this._updateMinimap();
     if (!this._lastSave || Date.now() - this._lastSave > 30000) {
       this._autosave();
@@ -302,6 +339,53 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────────
+
+  _updateProximityPrompt() {
+    const px = this._player.x, py = this._player.y;
+    let nearZone = null;
+
+    for (const zone of FRIEND_ZONES) {
+      if (this._recruited.has(zone.id)) continue;
+      const dx = px - zone.col * T;
+      const dy = py - zone.row * T;
+      if (dx * dx + dy * dy < zone.radius * zone.radius) {
+        nearZone = zone;
+        break;
+      }
+    }
+
+    if (nearZone) {
+      // Show prompt anchored just above the player in screen space
+      const cam = this.cameras.main;
+      const sx = (px - cam.scrollX) * cam.zoom;
+      const sy = (py - cam.scrollY) * cam.zoom - 28;
+      this._proximityPrompt.setPosition(sx - 40, sy).setVisible(true);
+
+      if (Phaser.Input.Keyboard.JustDown(this._spaceKey)) {
+        this._startRecruitment(nearZone);
+      }
+    } else {
+      this._proximityPrompt.setVisible(false);
+    }
+  }
+
+  _startRecruitment(zone) {
+    const dlg = this.scene.get(SCENE_DIALOGUE);
+    // Show meet dialogue, then immediately show join and recruit
+    dlg.showScript(zone.meetScript, () => {
+      dlg.showScript(zone.joinScript, () => {
+        this._recruited.add(zone.id);
+        this._party.addMember(zone.id);
+        this._spawnFollower(zone);
+      });
+    });
+  }
+
+  _spawnFollower(zone) {
+    const slotIndex = this._followers.length;
+    const follower = new Follower(this, this._posBuffer, slotIndex, zone.color, zone.label);
+    this._followers.push(follower);
+  }
 
   _buildLake() {
     const W = MAP_COLS * T;
