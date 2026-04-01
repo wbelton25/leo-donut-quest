@@ -201,12 +201,15 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Lake Wylie ────────────────────────────────────────────────────────────
     this._buildLake();
 
-    // ── Collision group (roads = only walkable; everything else is wall) ──────
-    // Strategy: cover all off-road areas with invisible static bodies.
-    // We build a tile-resolution bitfield then batch into row-strips for
-    // efficiency (one rectangle per contiguous off-road run per row).
+    // ── Collision group ───────────────────────────────────────────────────────
     this._walls = this.physics.add.staticGroup();
-    this._buildOffRoadWalls();
+    // Water + world edge walls only (off-road wall approach was too expensive)
+    this._addWall(0, 132, MAP_COLS, MAP_ROWS - 132, false);  // main lake
+    this._addWall(0, 100, 15, 32, false);                    // west arm
+    this._addWall(0, 0, MAP_COLS, 1, false);
+    this._addWall(0, MAP_ROWS - 1, MAP_COLS, 1, false);
+    this._addWall(0, 0, 1, MAP_ROWS, false);
+    this._addWall(MAP_COLS - 1, 0, 1, MAP_ROWS, false);
 
     // ── Roads (visual only — collision is handled by off-road walls above) ────
     ROADS.forEach(([c, r, w, h, label]) => {
@@ -285,31 +288,29 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._player = new Player(this, 40 * T, 109 * T);
     this.physics.add.collider(this._player, this._walls);
 
-    // ── Position buffer + followers ───────────────────────────────────────────
-    this._posBuffer  = new PositionBuffer(this, this._player);
-    this._followers  = [];   // Follower instances in join order
+    // ── Recruited set (must init before Grace / deer which read it) ──────────
+    this._recruited = new Set();
+    const gs2 = this.game.registry.get('gameState');
+    if (gs2?.party) gs2.party.forEach(id => this._recruited.add(id));
 
-    // ── Grace boss (blocks Warren's house) ────────────────────────────────────
+    // ── Position buffer + followers ───────────────────────────────────────────
+    this._posBuffer = new PositionBuffer(this, this._player);
+    this._followers = [];
+
+    // ── Grace boss (blocks Warren's house until defeated) ─────────────────────
     this._grace = null;
     if (!this._recruited.has(PARTY_WARREN)) {
       this._grace = new GraceBoss(this, 152, 43, () => this._onGraceDefeated());
     }
 
     // ── Deer obstacles ────────────────────────────────────────────────────────
-    // [col, row, [patrolMinCol, patrolMaxCol]]
     this._deer = [
-      new DeerObstacle(this, 55, 108, [38, 72], () => this._onDeerHit()),   // Anchorage Lane
-      new DeerObstacle(this, 75, 80,  [72, 82], () => this._onDeerHit()),   // Windward Dr S
-      new DeerObstacle(this, 80, 55,  [78, 88], () => this._onDeerHit()),   // Windward Dr Mid
-      new DeerObstacle(this, 85, 30,  [83, 100], () => this._onDeerHit()),  // upper connector
-      new DeerObstacle(this, 120, 43, [100, 148], () => this._onDeerHit()), // Tara Tea Dr
+      new DeerObstacle(this, 55, 108, [38, 72],   () => this._onDeerHit()),  // Anchorage Lane
+      new DeerObstacle(this, 75, 80,  [72, 82],   () => this._onDeerHit()),  // Windward Dr S
+      new DeerObstacle(this, 80, 55,  [78, 88],   () => this._onDeerHit()),  // Windward Dr Mid
+      new DeerObstacle(this, 85, 30,  [83, 100],  () => this._onDeerHit()),  // upper connector
+      new DeerObstacle(this, 120, 43, [100, 148], () => this._onDeerHit()),  // Tara Tea Dr
     ];
-
-    // ── Friend interaction zones ──────────────────────────────────────────────
-    this._recruited = new Set();  // IDs already recruited this session
-    // Restore from save
-    const gs = this.game.registry.get('gameState');
-    if (gs?.party) gs.party.forEach(id => this._recruited.add(id));
 
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
@@ -449,47 +450,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 35 * T, 12 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
   }
 
-  // Returns true if tile (c, r) is part of a drivable road surface.
-  _isRoadTile(c, r) {
-    // Roundabout area
-    const dc = c - RBT_COL, dr = r - RBT_ROW;
-    if (dc * dc + dr * dr <= 16) return true;  // radius ≈ 4 tiles
-
-    for (const [rc, rr, rw, rh] of ROADS) {
-      if (c >= rc && c < rc + rw && r >= rr && r < rr + rh) return true;
-    }
-    return false;
-  }
-
-  // Cover every non-road tile in an invisible physics body.
-  // We scan row by row and merge contiguous off-road runs into single rectangles.
-  _buildOffRoadWalls() {
-    for (let r = 0; r < MAP_ROWS; r++) {
-      let runStart = -1;
-      for (let c = 0; c <= MAP_COLS; c++) {
-        const offRoad = c < MAP_COLS && !this._isRoadTile(c, r);
-        if (offRoad && runStart === -1) {
-          runStart = c;
-        } else if (!offRoad && runStart !== -1) {
-          const runW = c - runStart;
-          const rect = this.add.rectangle(
-            runStart * T + (runW * T) / 2,
-            r * T + T / 2,
-            runW * T, T, 0x000000
-          ).setAlpha(0);
-          this.physics.add.existing(rect, true);
-          this._walls.add(rect);
-          runStart = -1;
-        }
-      }
-    }
-  }
-
   _generateTrees() {
-    // Trees are visual only; collision is handled by off-road walls.
-    // Avoid placing trees on roads (would look odd) or in the park/golf course.
     const onClearArea = (c, r) => {
-      if (this._isRoadTile(c, r)) return true;
+      // Avoid road tiles (visual only — no physics needed)
+      const dc = c - RBT_COL, dr = r - RBT_ROW;
+      if (dc * dc + dr * dr <= 16) return true; // roundabout
+      for (const [rc, rr, rw, rh] of ROADS) {
+        if (c >= rc && c < rc + rw && r >= rr && r < rr + rh) return true;
+      }
       if (c >= PARK_C && c <= PARK_C + PARK_W && r >= PARK_R && r <= PARK_R + PARK_H) return true;
       if (c >= 165 && r <= 30) return true; // golf course
       if (r >= 128) return true;            // lake
