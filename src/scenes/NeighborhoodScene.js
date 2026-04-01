@@ -145,8 +145,8 @@ const HOUSE_GROUPS = [
 const FRIEND_ZONES = [
   {
     id:         PARTY_WARREN,
-    col:        154, row: 38,   // tile pos of Warren's house door
-    radius:     48,
+    col:        154, row: 43,   // on Tara Tea Dr, right in front of Warren's house
+    radius:     52,
     meetScript: 'warren_meet',
     joinScript: 'warren_join',
     color:      0xe74c3c,
@@ -265,7 +265,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
         this.add.rectangle(hx, hr * T + 0.5 * T, hw, T, darken(color));
       }
     });
-    txt(this, 152 * T, 33 * T, "WARREN'S", { fontSize: '8px', color: '#ff8888' });
+    txt(this, 152 * T, 40 * T, "WARREN'S", { fontSize: '8px', color: '#ff8888' });
 
     // ── Trees (visual only — collision comes from off-road walls) ─────────────
     this._generateTrees().forEach(([tc, tr]) => {
