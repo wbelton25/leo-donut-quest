@@ -230,10 +230,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Roundabout at Windward Dr / Anchorage Lane junction ───────────────────
     const rbtX = RBT_COL * T + T / 2;
     const rbtY = RBT_ROW * T + T / 2;
-    this.add.circle(rbtX, rbtY, T * 3.5, 0x4a4a55);        // road surface
-    this.add.circle(rbtX, rbtY, T * 2,   0x2d5a1b);         // grassy center
-    this.add.circle(rbtX, rbtY, T * 2,   0x000000, 0)       // center border
-      .setStrokeStyle(1, 0x22aa44);
+    // Use rectangles — circles (Graphics objects) are expensive
+    this.add.rectangle(rbtX, rbtY, T * 7, T * 7, 0x4a4a55);  // road surface
+    this.add.rectangle(rbtX, rbtY, T * 4, T * 4, 0x2d5a1b);  // grassy center
 
     // ── Runde Park ────────────────────────────────────────────────────────────
     const parkPx = PARK_C * T + (PARK_W * T) / 2;
@@ -272,11 +271,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
     });
     txt(this, 152 * T, 40 * T, "WARREN'S", { fontSize: '8px', color: '#ff8888' });
 
-    // ── Trees (visual only — collision comes from off-road walls) ─────────────
+    // ── Trees (rectangles — circles are too expensive at volume) ─────────────
     this._generateTrees().forEach(([tc, tr]) => {
       const tx = tc * T + T / 2, ty = tr * T + T / 2;
-      this.add.circle(tx, ty, T * 0.7, 0x1a5c1a);
-      this.add.circle(tx, ty, T * 0.4, 0x228b22);
+      this.add.rectangle(tx, ty, T, T, 0x1a5c1a);          // dark outer
+      this.add.rectangle(tx, ty, T * 0.6, T * 0.6, 0x228b22); // lighter inner
     });
 
     // ── Boat docks ────────────────────────────────────────────────────────────
@@ -468,7 +467,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const positions = [];
     let seed = 42;
     const rand = () => { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
-    for (let i = 0; i < 700; i++) {
+    for (let i = 0; i < 200; i++) {
       const c = Math.floor(rand() * (MAP_COLS - 4)) + 2;
       const r = Math.floor(rand() * (MAP_ROWS - 4)) + 2;
       if (!onClearArea(c, r)) positions.push([c, r]);
