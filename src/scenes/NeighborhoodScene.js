@@ -216,9 +216,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     // ── Collision group ───────────────────────────────────────────────────────
     this._walls = this.physics.add.staticGroup();
-    // Water + world edge walls only (off-road wall approach was too expensive)
-    this._addWall(0, 132, MAP_COLS, MAP_ROWS - 132, false);  // main lake
-    this._addWall(0, 100, 15, 32, false);                    // west arm
+    // Scan in 4-tile chunks; merge contiguous off-road runs per row-strip.
+    // 4-tile step → at most 40 row-strips × ~8 runs each ≈ 320 bodies max.
+    this._buildOffRoadWalls();
+    // World edges
     this._addWall(0, 0, MAP_COLS, 1, false);
     this._addWall(0, MAP_ROWS - 1, MAP_COLS, 1, false);
     this._addWall(0, 0, 1, MAP_ROWS, false);
@@ -460,6 +461,45 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 90 * T, 137 * T, 'LAKE WYLIE', { fontSize: '8px', color: '#7cc8e8' });
     txt(this, 2 * T, 108 * T, 'LAKE\nWYLIE', { fontSize: '8px', color: '#7cc8e8' });
     txt(this, 35 * T, 12 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
+  }
+
+  // Returns true if a 4-tile chunk at (c,r) overlaps any road or lake.
+  _isRoadChunk(c, r, step) {
+    // Lake / water — always blocked
+    if (r + step > 132) return false;          // off-road (water)
+    if (c + step <= 15 && r + step > 100) return false; // west arm
+
+    // Roundabout — treat as road
+    const cMid = c + step / 2, rMid = r + step / 2;
+    const dc = cMid - RBT_COL, dr = rMid - RBT_ROW;
+    if (dc * dc + dr * dr <= (step * 2.5) * (step * 2.5)) return true;
+
+    // Road segments
+    for (const [rc, rr, rw, rh] of ROADS) {
+      if (c < rc + rw && c + step > rc && r < rr + rh && r + step > rr) return true;
+    }
+    return false;
+  }
+
+  // Cover all non-road tiles with invisible static bodies.
+  // 4-tile step keeps body count under ~400 even on a 280×160 map.
+  _buildOffRoadWalls() {
+    const STEP = 4;
+    for (let r = 0; r < MAP_ROWS; r += STEP) {
+      let runStart = -1;
+      for (let c = 0; c <= MAP_COLS; c += STEP) {
+        const onRoad = c < MAP_COLS && this._isRoadChunk(c, r, STEP);
+        if (!onRoad && runStart === -1) {
+          runStart = c;
+        } else if (onRoad && runStart !== -1) {
+          this._addWall(runStart, r, c - runStart, STEP, false);
+          runStart = -1;
+        }
+      }
+      if (runStart !== -1) {
+        this._addWall(runStart, r, MAP_COLS - runStart, STEP, false);
+      }
+    }
   }
 
   _addWall(col, row, w, h, visible = true) {
