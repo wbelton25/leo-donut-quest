@@ -5,6 +5,8 @@ import {
 } from '../constants.js';
 import Player from '../entities/Player.js';
 import Follower, { PositionBuffer } from '../entities/Follower.js';
+import DeerObstacle from '../entities/DeerObstacle.js';
+import GraceBoss from '../entities/GraceBoss.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -287,6 +289,22 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._posBuffer  = new PositionBuffer(this, this._player);
     this._followers  = [];   // Follower instances in join order
 
+    // ── Grace boss (blocks Warren's house) ────────────────────────────────────
+    this._grace = null;
+    if (!this._recruited.has(PARTY_WARREN)) {
+      this._grace = new GraceBoss(this, 152, 43, () => this._onGraceDefeated());
+    }
+
+    // ── Deer obstacles ────────────────────────────────────────────────────────
+    // [col, row, [patrolMinCol, patrolMaxCol]]
+    this._deer = [
+      new DeerObstacle(this, 55, 108, [38, 72], () => this._onDeerHit()),   // Anchorage Lane
+      new DeerObstacle(this, 75, 80,  [72, 82], () => this._onDeerHit()),   // Windward Dr S
+      new DeerObstacle(this, 80, 55,  [78, 88], () => this._onDeerHit()),   // Windward Dr Mid
+      new DeerObstacle(this, 85, 30,  [83, 100], () => this._onDeerHit()),  // upper connector
+      new DeerObstacle(this, 120, 43, [100, 148], () => this._onDeerHit()), // Tara Tea Dr
+    ];
+
     // ── Friend interaction zones ──────────────────────────────────────────────
     this._recruited = new Set();  // IDs already recruited this session
     // Restore from save
@@ -325,9 +343,18 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._player.update();
     this._followers.forEach(f => f.update());
 
-    if (Phaser.Input.Keyboard.JustDown(this._fartKey)) {
+    const fartJustDown = Phaser.Input.Keyboard.JustDown(this._fartKey);
+    if (fartJustDown) {
       this._abilities.execute('lightning_fart', this, this._player);
     }
+
+    // Update Grace boss
+    if (this._grace) {
+      this._grace.update(this._player, fartJustDown);
+    }
+
+    // Update deer
+    this._deer.forEach(d => d.update(this._player));
 
     this._updateProximityPrompt();
 
@@ -346,6 +373,8 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     for (const zone of FRIEND_ZONES) {
       if (this._recruited.has(zone.id)) continue;
+      // Warren's zone is blocked until Grace is defeated
+      if (zone.id === PARTY_WARREN && this._grace) continue;
       const dx = px - zone.col * T;
       const dy = py - zone.row * T;
       if (dx * dx + dy * dy < zone.radius * zone.radius) {
@@ -367,6 +396,26 @@ export default class NeighborhoodScene extends Phaser.Scene {
     } else {
       this._proximityPrompt.setVisible(false);
     }
+  }
+
+  _onGraceDefeated() {
+    // Show a brief "she ran off!" message then allow Warren recruitment
+    const dlg = this.scene.get(SCENE_DIALOGUE);
+    dlg.showScript('warren_meet', () => {
+      dlg.showScript('warren_join', () => {
+        this._recruited.add(PARTY_WARREN);
+        this._party.addMember(PARTY_WARREN);
+        this._spawnFollower(FRIEND_ZONES.find(z => z.id === PARTY_WARREN));
+      });
+    });
+    this._grace = null;
+  }
+
+  _onDeerHit() {
+    // Deer collision drains bike condition
+    this._resources.applyChanges({ bikeCondition: -10 });
+    // Brief screen flash
+    this.cameras.main.flash(200, 255, 100, 0);
   }
 
   _startRecruitment(zone) {
