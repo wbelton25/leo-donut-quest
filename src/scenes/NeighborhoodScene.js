@@ -462,6 +462,17 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 35 * T, 12 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
   }
 
+  _addWall(col, row, w, h, visible = true) {
+    const rect = this.add.rectangle(
+      col * T + (w * T) / 2,
+      row * T + (h * T) / 2,
+      w * T, h * T, 0x000000
+    );
+    if (!visible) rect.setAlpha(0);
+    this.physics.add.existing(rect, true);
+    this._walls.add(rect);
+  }
+
   _generateTrees() {
     const onClearArea = (c, r) => {
       // Avoid road tiles (visual only — no physics needed)
