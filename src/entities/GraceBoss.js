@@ -6,18 +6,22 @@ import { TILE_SIZE, txt } from '../constants.js';
 // Leo defeats Grace by hitting F (lightning fart) 3 times.
 // Each hit stuns her briefly. On defeat, callback fires and she disappears.
 
-const MAX_HP       = 3;
-const PATROL_SPEED = 35;
-const CHASE_SPEED  = 70;
-const CHASE_RANGE  = 100;  // pixels — Grace starts chasing within this range
-const STUN_DURATION = 1200; // ms
+const MAX_HP        = 3;
+const PATROL_SPEED  = 35;
+const CHASE_SPEED   = 70;
+const CHASE_RANGE   = 100;   // pixels — Grace starts chasing within this range
+const STUN_DURATION = 1200;  // ms
+const HIT_RANGE     = 24;    // pixels — pool noodle reach
+const HIT_COOLDOWN  = 1500;  // ms between damage ticks on Leo
 
 export default class GraceBoss {
-  constructor(scene, col, row, onDefeated) {
-    this._scene      = scene;
-    this._onDefeated = onDefeated;
-    this._hp         = MAX_HP;
-    this._state      = 'PATROL';
+  constructor(scene, col, row, onDefeated, onHitPlayer) {
+    this._scene       = scene;
+    this._onDefeated  = onDefeated;
+    this._onHitPlayer = onHitPlayer;
+    this._hp          = MAX_HP;
+    this._state       = 'PATROL';
+    this._lastHit     = 0;
 
     this._x = col * TILE_SIZE;
     this._y = row * TILE_SIZE + TILE_SIZE / 2;
@@ -86,7 +90,19 @@ export default class GraceBoss {
       }
     }
 
-    // Check fart hit — must be close and facing Grace
+    // Grace hits Leo with pool noodle when close in CHASE state
+    if (this._state === 'CHASE' && dist < HIT_RANGE) {
+      const now = Date.now();
+      if (now - this._lastHit > HIT_COOLDOWN) {
+        this._lastHit = now;
+        if (this._onHitPlayer) this._onHitPlayer();
+        // Visual feedback — noodle flash orange
+        this._noodle.setFillStyle(0xffffff);
+        this._scene.time.delayedCall(120, () => this._noodle.setFillStyle(0xff8c00));
+      }
+    }
+
+    // Check fart hit — must be close
     if (fartJustPressed && dist < 72) {
       this._hit();
     }

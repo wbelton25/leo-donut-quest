@@ -9,6 +9,11 @@
     { "speaker": "Warren", "text": "I'm in. But Grace is out front and she's got a pool noodle...", "portrait": "warren" },
     { "speaker": "Leo", "text": "We'll handle it. Together.", "portrait": "leo" }
   ],
+  "warren_after_grace": [
+    { "speaker": "Warren", "text": "YES! She's down! I saw the whole thing from the window!", "portrait": "warren" },
+    { "speaker": "Leo", "text": "Your sister hits hard. Come on, let's go.", "portrait": "leo" },
+    { "speaker": "Warren", "text": "I've got my slingshot. Nobody's stopping us now.", "portrait": "warren" }
+  ],
   "warren_join": [
     { "speaker": "Warren", "text": "That's what I'm talking about! Let's go get those donuts.", "portrait": "warren" },
     { "speaker": "Warren", "text": "I've got my slingshot. Nobody's stopping us now.", "portrait": "warren" }

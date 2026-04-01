@@ -313,7 +313,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Grace boss (blocks Warren's house until defeated) ─────────────────────
     this._grace = null;
     if (!this._recruited.has(PARTY_WARREN)) {
-      this._grace = new GraceBoss(this, 152, 43, () => this._onGraceDefeated());
+      this._grace = new GraceBoss(
+        this, 152, 43,
+        () => this._onGraceDefeated(),
+        () => {
+          this._resources.applyChanges({ energy: -15 });
+          this.cameras.main.flash(200, 255, 0, 0);
+        }
+      );
     }
 
     // ── Deer obstacles ────────────────────────────────────────────────────────
@@ -387,8 +394,6 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     for (const zone of FRIEND_ZONES) {
       if (this._recruited.has(zone.id)) continue;
-      // Warren's zone is blocked until Grace is defeated
-      if (zone.id === PARTY_WARREN && this._grace) continue;
       const dx = px - zone.col * T;
       const dy = py - zone.row * T;
       if (dx * dx + dy * dy < zone.radius * zone.radius) {
@@ -398,31 +403,43 @@ export default class NeighborhoodScene extends Phaser.Scene {
     }
 
     if (nearZone) {
-      // Show prompt anchored just above the player in screen space
       const cam = this.cameras.main;
       const sx = (px - cam.scrollX) * cam.zoom;
       const sy = (py - cam.scrollY) * cam.zoom - 28;
-      this._proximityPrompt.setPosition(sx - 40, sy).setVisible(true);
 
-      if (Phaser.Input.Keyboard.JustDown(this._spaceKey)) {
-        this._startRecruitment(nearZone);
+      // Show different prompt depending on whether Grace is still up
+      const promptText = (nearZone.id === PARTY_WARREN && this._grace)
+        ? 'SPACE: Talk to Warren'
+        : 'SPACE: Talk';
+      this._proximityPrompt.setText(promptText).setPosition(sx - 40, sy).setVisible(true);
+
+      if (Phaser.Input.Keyboard.JustDown(this._spaceKey) && !this._dialoguePlayed) {
+        if (nearZone.id === PARTY_WARREN && this._grace && !this._warrenMetDialogueDone) {
+          // First visit: show warren_meet ("Grace is out front!") as a warning
+          this._dialoguePlayed = true;
+          this.scene.get(SCENE_DIALOGUE).showScript('warren_meet', () => {
+            this._warrenMetDialogueDone = true;
+            this._dialoguePlayed = false;
+          });
+        } else if (nearZone.id === PARTY_WARREN && !this._grace) {
+          // Grace defeated: recruit Warren
+          this._startRecruitment(nearZone);
+        }
       }
     } else {
       this._proximityPrompt.setVisible(false);
+      this._dialoguePlayed = false;
     }
   }
 
   _onGraceDefeated() {
-    // Show a brief "she ran off!" message then allow Warren recruitment
-    const dlg = this.scene.get(SCENE_DIALOGUE);
-    dlg.showScript('warren_meet', () => {
-      dlg.showScript('warren_join', () => {
-        this._recruited.add(PARTY_WARREN);
-        this._party.addMember(PARTY_WARREN);
-        this._spawnFollower(FRIEND_ZONES.find(z => z.id === PARTY_WARREN));
-      });
-    });
     this._grace = null;
+    // Immediate reaction dialogue, then Warren joins when player talks to him
+    this.scene.get(SCENE_DIALOGUE).showScript('warren_after_grace', () => {
+      this._recruited.add(PARTY_WARREN);
+      this._party.addMember(PARTY_WARREN);
+      this._spawnFollower(FRIEND_ZONES.find(z => z.id === PARTY_WARREN));
+    });
   }
 
   _onDeerHit() {
@@ -463,7 +480,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 35 * T, 12 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
   }
 
-  // Returns true if a 4-tile chunk at (c,r) overlaps any road or lake.
+  // Returns true if a chunk at (c,r) overlaps any road or roundabout.
   _isRoadChunk(c, r, step) {
     // Lake / water — always blocked
     if (r + step > 132) return false;          // off-road (water)
@@ -482,9 +499,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   // Cover all non-road tiles with invisible static bodies.
-  // 4-tile step keeps body count under ~400 even on a 280×160 map.
+  // 2-tile step → ~1200 bodies max — tight edges, still loads fast.
   _buildOffRoadWalls() {
-    const STEP = 4;
+    const STEP = 2;
     for (let r = 0; r < MAP_ROWS; r += STEP) {
       let runStart = -1;
       for (let c = 0; c <= MAP_COLS; c += STEP) {
