@@ -49,95 +49,98 @@ function darken(hex) {
 // ── Road segments [col, row, width, height, label] ────────────────────────────
 // Each entry is [startCol, startRow, widthTiles, heightTiles, label]
 const ROADS = [
-  // ── Topsail Cir ───────────────────────────────────────────────────────────
-  [38, 107, 4, 10, 'Topsail Cir'],  // approach N to Anchorage Lane
-  [30, 115, 4, 13, null],           // W arm of loop
-  [42, 115, 4, 13, null],           // E arm of loop
-  [30, 126, 16, 4, null],           // S close (near lake)
+  // ── Topsail Cir — compact oval loop, opens north onto Anchorage Lane ────
+  // The loop runs south from Anchorage Lane down toward the lake.
+  // West arm: cols 30-34, rows 109-124
+  [30, 109, 4, 16, 'Topsail Cir'],
+  // East arm: cols 42-46, rows 109-124
+  [42, 109, 4, 16, null],
+  // South close (bottom of oval): cols 30-46, rows 123-127
+  [30, 123, 16, 4, null],
+  // Short north connector into Anchorage Lane: cols 36-40, rows 105-111
+  [36, 105, 4, 6, null],
 
-  // ── Anchorage Lane — E-W from Topsail to Windward roundabout ─────────────
-  [38, 107, 36, 4, 'Anchorage Ln'],
+  // ── Anchorage Lane — E-W from Topsail junction to Windward roundabout ────
+  [17, 105, 60, 4, 'Anchorage Ln'],
 
-  // ── Windward Dr roundabout stub — N approach into roundabout ─────────────
-  [72, 100, 6, 11, null],           // fills into roundabout from south
+  // ── Windward Dr — main diagonal artery ────────────────────────────────────
+  // S section: runs N from roundabout, col 72-78, rows 78-105
+  [72, 78, 6, 27, 'Windward Dr'],
+  // Step NE at row 78: short E jog cols 72-86, rows 74-78
+  [72, 74, 14, 4, null],
+  // Mid section: col 78-84, rows 50-78
+  [78, 50, 6, 28, null],
+  // Step NE at row 50: short E jog cols 78-92, rows 46-50
+  [78, 46, 14, 4, null],
+  // Upper section: col 84-90, rows 18-50
+  [84, 18, 6, 32, null],
 
-  // ── Windward Dr S — col 72-77, rows 72-100 ────────────────────────────────
-  [72, 72, 6, 30, 'Windward Dr'],
-  [72, 72, 14, 4, null],            // E-step connector at row 72
-
-  // ── Windward Dr Mid — col 78-83, rows 48-76 ───────────────────────────────
-  [78, 48, 6, 28, null],
-  [78, 48, 14, 4, null],            // E-step connector at row 48
-
-  // ── Windward Dr Upper — col 83-88, rows 18-52 ─────────────────────────────
-  [83, 18, 6, 34, null],
-
-  // ── Woodhaven Dr — short N-S road east of Runde Park ─────────────────────
-  [79, 18, 4, 26, 'Woodhaven Dr'],
-  [79, 18, 10, 4, null],            // E-W connector to Windward at top
+  // ── Woodhaven Dr — short N-S road just east of Runde Park ────────────────
+  [80, 18, 4, 24, 'Woodhaven Dr'],
+  // Top E-W connector to Windward upper
+  [80, 18, 10, 4, null],
 
   // ── Catamaran Dr — NW toward marina ──────────────────────────────────────
-  [53,  6, 4, 16, 'Catamaran Dr'],  // N-S near marina
-  [53,  6, 30, 4, null],            // E-W connector to Woodhaven area
+  [52, 6, 4, 18, 'Catamaran Dr'],
+  // E-W connector from Catamaran to Woodhaven area (Tidal Way equivalent)
+  [52, 6, 30, 4, null],
 
-  // ── Connector: upper Windward to Tega Cay Dr ──────────────────────────────
-  [83, 24, 20, 4, null],
+  // ── Tara Tea Dr — branches east OFF Windward Dr mid section ──────────────
+  // In the map image, Tara Tea Dr intersects Windward Dr ~row 46 and runs E
+  [84, 42, 74, 4, 'Tara Tea Dr'],
 
-  // ── Tega Cay Dr — diagonal (stairstepped) east side ──────────────────────
-  [100, 6,  4, 24, 'Tega Cay Dr'],
-  [100, 28, 8, 4,  null],           // SE step
-  [104, 26, 4, 50, null],           // south section
+  // ── Tega Cay Dr — diagonal road on east side ─────────────────────────────
+  // Runs roughly N-S on the right side, stairstepped
+  [102, 6,  4, 22, 'Tega Cay Dr'],
+  [102, 26, 10, 4, null],           // SE jog
+  [108, 24, 4, 52, null],           // south section runs past Tara Tea Dr
 
-  // ── Tara Tea Dr — E-W from Tega Cay Dr to Warren's ───────────────────────
-  [100, 42, 58, 4, 'Tara Tea Dr'],
+  // ── Mariana Ln — E-W from Windward Dr east ───────────────────────────────
+  [84, 62, 28, 4, 'Mariana Ln'],
 
-  // ── Mariana Ln ────────────────────────────────────────────────────────────
-  [83, 63, 26, 4, 'Mariana Ln'],
-
-  // ── Marquesas Ave ─────────────────────────────────────────────────────────
-  [76, 86, 18, 4, 'Marquesas Ave'],
+  // ── Marquesas Ave — short E-W south of Mariana ───────────────────────────
+  [76, 84, 20, 4, 'Marquesas Ave'],
 ];
 
-// Roundabout center (tile coords) — where Windward Dr meets Anchorage Lane
-const RBT_COL = 74, RBT_ROW = 107;  // tile at center of roundabout
+// Roundabout center — where Windward Dr S meets Anchorage Lane
+const RBT_COL = 75, RBT_ROW = 105;
 
-// ── Runde Park bounds (west of Woodhaven Dr, east of Catamaran Dr) ────────────
-const PARK_C = 57, PARK_R = 24, PARK_W = 22, PARK_H = 24;
+// ── Runde Park bounds — west of Woodhaven Dr, east of Catamaran ──────────────
+const PARK_C = 56, PARK_R = 22, PARK_W = 24, PARK_H = 26;
 
 // ── House clusters ────────────────────────────────────────────────────────────
 // All positions hand-checked to not overlap any road segment.
 // House footprint: cols hc → hc+4, rows hr → hr+3
 const HOUSE_GROUPS = [
-  // Topsail Cir neighborhood — north of Anchorage Lane
-  { col: 20, row: 101, n: 4, stepCol: 7, stepRow: 0, color: 0x7a6b52 },
-  { col: 20, row: 92,  n: 4, stepCol: 7, stepRow: 0, color: 0x8b7355 },
-  // Leo's own house (inside the Topsail loop, south of Anchorage Lane)
+  // Inside Topsail loop — Leo's house
   { col: 34, row: 112, n: 1, stepCol: 0, stepRow: 0, color: 0x9b8765 },
+  // Around Topsail loop (west arm)
+  { col: 20, row: 110, n: 2, stepCol: 0, stepRow: 8, color: 0x7a6b52 },
+  // Waterfront south of Topsail (backs up to Lake Wylie)
+  { col: 20, row: 122, n: 3, stepCol: 8, stepRow: 0, color: 0x6b8ca5 },
 
-  // Waterfront homes south of Topsail loop (backing up to Lake Wylie)
-  { col: 20, row: 120, n: 4, stepCol: 8, stepRow: 0, color: 0x6b8ca5 },
+  // North of Anchorage Lane (The Anchorage neighborhood)
+  { col: 18, row: 96,  n: 5, stepCol: 7, stepRow: 0, color: 0x8b7355 },
+  { col: 18, row: 88,  n: 5, stepCol: 7, stepRow: 0, color: 0x7a6b52 },
 
-  // North of Anchorage Lane, west of Windward Dr roundabout
-  { col: 48, row: 96,  n: 3, stepCol: 7, stepRow: 0, color: 0x7a6b52 },
-  // South of Anchorage Lane east side
-  { col: 48, row: 112, n: 3, stepCol: 7, stepRow: 0, color: 0x856b52 },
+  // East of Anchorage Lane, west of roundabout
+  { col: 48, row: 110, n: 2, stepCol: 7, stepRow: 0, color: 0x856b52 },
 
-  // North of Catamaran Dr E-W (cols 58-82, east of catamaran N-S)
-  { col: 59, row: 12,  n: 4, stepCol: 6, stepRow: 0, color: 0x8b7b55 },
-  // East of Woodhaven Dr, north of cross connector
-  { col: 85, row: 12,  n: 4, stepCol: 6, stepRow: 0, color: 0x7a6b52 },
+  // North of Catamaran E-W connector
+  { col: 57, row: 11,  n: 4, stepCol: 6, stepRow: 0, color: 0x8b7b55 },
+  { col: 86, row: 11,  n: 3, stepCol: 6, stepRow: 0, color: 0x7a6b52 },
 
-  // West of Windward Dr mid (col 63), between Catamaran and Mariana
-  { col: 63, row: 49,  n: 3, stepCol: 0, stepRow: 9, color: 0x7a8b52 },
-  // West of Windward Dr south (col 63), between Mariana and Marquesas
-  { col: 63, row: 74,  n: 2, stepCol: 0, stepRow: 9, color: 0x7a7b52 },
+  // West of Windward Dr — between Catamaran connector and Mariana
+  { col: 62, row: 50,  n: 3, stepCol: 0, stepRow: 9, color: 0x7a8b52 },
+  // West of Windward Dr — between Mariana and Marquesas
+  { col: 62, row: 68,  n: 2, stepCol: 0, stepRow: 9, color: 0x7a7b52 },
 
-  // North of Tara Tea Dr, east of Tega Cay Dr
-  { col: 109, row: 35, n: 5, stepCol: 7, stepRow: 0, color: 0x8b7b55 },
-  // South of Tara Tea Dr, east of Tega Cay Dr
-  { col: 109, row: 49, n: 5, stepCol: 7, stepRow: 0, color: 0x9b8060 },
+  // North of Tara Tea Dr, east of Windward Dr
+  { col: 91, row: 34,  n: 5, stepCol: 8, stepRow: 0, color: 0x8b7b55 },
+  // South of Tara Tea Dr, east of Windward Dr
+  { col: 91, row: 49,  n: 5, stepCol: 8, stepRow: 0, color: 0x9b8060 },
 
-  // Warren's house (red) — north of Tara Tea Dr at far east end
+  // Warren's house — north of Tara Tea Dr at east end
   { col: 152, row: 36, n: 1, stepCol: 0, stepRow: 0, color: 0x992222 },
 ];
 
@@ -147,7 +150,7 @@ const HOUSE_GROUPS = [
 const FRIEND_ZONES = [
   {
     id:         PARTY_WARREN,
-    col:        154, row: 43,   // on Tara Tea Dr, right in front of Warren's house
+    col:        154, row: 42,   // on Tara Tea Dr, right in front of Warren's house
     radius:     52,
     meetScript: 'warren_meet',
     joinScript: 'warren_join',
@@ -283,7 +286,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
         this.add.rectangle(hx, hr * T + 0.5 * T, hw, T, darken(color));
       }
     });
-    txt(this, 152 * T, 40 * T, "WARREN'S", { fontSize: '8px', color: '#ff8888' });
+    txt(this, 152 * T, 33 * T, "WARREN'S", { fontSize: '8px', color: '#ff8888' });
 
     // ── Trees (rectangles — circles are too expensive at volume) ─────────────
     this._generateTrees().forEach(([tc, tr]) => {
@@ -298,7 +301,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     });
 
     // ── Player ────────────────────────────────────────────────────────────────
-    this._player = new Player(this, 40 * T, 109 * T);
+    this._player = new Player(this, 36 * T, 107 * T);
     this.physics.add.collider(this._player, this._walls);
 
     // ── Recruited set (must init before Grace / deer which read it) ──────────
@@ -314,7 +317,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._grace = null;
     if (!this._recruited.has(PARTY_WARREN)) {
       this._grace = new GraceBoss(
-        this, 152, 43,
+        this, 152, 42,
         () => this._onGraceDefeated(),
         () => {
           this._resources.applyChanges({ energy: -15 });
