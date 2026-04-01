@@ -307,7 +307,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (gs2?.party) gs2.party.forEach(id => this._recruited.add(id));
 
     // ── Position buffer + followers ───────────────────────────────────────────
-    this._posBuffer = new PositionBuffer(this, this._player);
+    this._posBuffer = new PositionBuffer(this._player);
     this._followers = [];
 
     // ── Grace boss (blocks Warren's house until defeated) ─────────────────────
@@ -362,6 +362,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   update() {
     this._player.update();
+    this._posBuffer.record();
     this._followers.forEach(f => f.update());
 
     const fartJustDown = Phaser.Input.Keyboard.JustDown(this._fartKey);
