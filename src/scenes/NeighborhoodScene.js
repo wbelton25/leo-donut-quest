@@ -163,6 +163,19 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   create() {
+    try {
+      this._createImpl();
+    } catch (err) {
+      console.error('[NeighborhoodScene] create() threw:', err);
+      // Show error on screen so we can see it without devtools
+      this.add.text(10, 10, 'LOAD ERROR:\n' + err.message, {
+        fontFamily: 'monospace', fontSize: '10px', color: '#ff4444',
+        wordWrap: { width: 460 },
+      });
+    }
+  }
+
+  _createImpl() {
     const worldW = MAP_COLS * T;
     const worldH = MAP_ROWS * T;
 
