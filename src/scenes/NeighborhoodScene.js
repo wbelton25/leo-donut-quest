@@ -1,5 +1,5 @@
 import {
-  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, SCENE_GAME_OVER,
+  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL,
   SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
   PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN,
@@ -282,6 +282,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 294 * T, 74 * T, "CARSON'S",  { fontSize: '8px', color: '#88aaff' });
     txt(this, 314 * T, 119 * T, "JUSTIN'S", { fontSize: '8px', color: '#cc88ff' });
 
+    // Departure marker — only visible when full party assembled
+    this._departureMarker = this.add.rectangle(27 * T, 141 * T, 16, 16, 0xf5e642, 0.8).setDepth(3).setVisible(false);
+    this._departureLabel  = txt(this, 27 * T - 18, 141 * T - 16, 'DEPART\nHERE', {
+      fontSize: '8px', color: '#f5e642',
+    }).setDepth(3).setVisible(false);
+    this.tweens.add({ targets: this._departureMarker, alpha: 0.1, yoyo: true, repeat: -1, duration: 500 });
+
     // Zone markers — flashing indicators so the player can see where to go
     FRIEND_ZONES.forEach(zone => {
       const marker = this.add.rectangle(zone.col * T, zone.row * T, 12, 12, zone.color, 0.7).setDepth(3);
@@ -437,6 +444,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     this._updateProximityPrompt();
 
+    // Show departure marker only once the full party is assembled
+    const fullParty = this._party.isFullParty();
+    if (this._departureMarker.visible !== fullParty) {
+      this._departureMarker.setVisible(fullParty);
+      this._departureLabel.setVisible(fullParty);
+    }
+
     this._updateMinimap();
     if (!this._lastSave || Date.now() - this._lastSave > 30000) {
       this._autosave();
@@ -448,8 +462,43 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   _updateProximityPrompt() {
     const px = this._player.x, py = this._player.y;
-    let nearZone = null;
 
+    // ── Departure zone — Leo's house, only when full party is assembled ────────
+    const DEPART_COL = 27, DEPART_ROW = 141, DEPART_RADIUS = 60;
+    if (this._party.isFullParty() && !this._departurePlayed) {
+      const dx = px - DEPART_COL * T;
+      const dy = py - DEPART_ROW * T;
+      if (dx * dx + dy * dy < DEPART_RADIUS * DEPART_RADIUS) {
+        if (!this._departurePromptShown) {
+          this._departurePromptShown = true;
+          this._proximityPrompt.setText('SPACE: HEAD OUT').setVisible(true);
+        }
+        if (Phaser.Input.Keyboard.JustDown(this._spaceKey) && !this._dialoguePlayed) {
+          this._dialoguePlayed = true;
+          this._proximityPrompt.setVisible(false);
+          this.scene.get(SCENE_DIALOGUE).showScript('departure', () => {
+            this._departurePlayed = true;
+            this._dialoguePlayed = false;
+            this.cameras.main.fade(500, 0, 0, 0);
+            this.time.delayedCall(520, () => {
+              this.scene.start(SCENE_OREGON_TRAIL, {
+                party:     this._party.getParty(),
+                resources: this._resources.getAll(),
+              });
+            });
+          });
+        }
+        return;
+      } else {
+        if (this._departurePromptShown) {
+          this._departurePromptShown = false;
+          this._proximityPrompt.setVisible(false);
+        }
+      }
+    }
+
+    // ── Friend house zones ─────────────────────────────────────────────────────
+    let nearZone = null;
     for (const zone of FRIEND_ZONES) {
       if (this._recruited.has(zone.id)) continue;
       const dx = px - zone.col * T;

@@ -57,5 +57,17 @@
     { "speaker": "Leo", "text": "Did NOT see that coming.", "portrait": "leo" },
     { "speaker": "Justin", "text": "He's been doing that zap thing since he found those batteries.", "portrait": "justin" },
     { "speaker": "Justin", "text": "OK. Full squad. Let's GO. Donuts won't wait forever.", "portrait": "justin" }
+  ],
+  "departure": [
+    { "speaker": "Leo", "text": "Full squad. Donut House is 3 miles east. Let's move.", "portrait": "leo" },
+    { "speaker": "Warren", "text": "I've got snacks and a full slingshot. Ready.", "portrait": "warren" },
+    { "speaker": "MJ", "text": "If anything gets in our way, I'll deal with it.", "portrait": "mj" },
+    { "speaker": "Carson", "text": "Quiet and fast. That's how we do this.", "portrait": "carson" },
+    { "speaker": "Justin", "text": "LAST ONE THERE BUYS THE DONUTS. LET'S GOOOO.", "portrait": "justin" }
+  ],
+  "arrival": [
+    { "speaker": "Justin", "text": "I CAN SEE IT. I CAN SEE DONUT HOUSE!", "portrait": "justin" },
+    { "speaker": "Leo", "text": "We made it. Nobody eat until we're inside.", "portrait": "leo" },
+    { "speaker": "Warren", "text": "That was rougher than I expected. Worth it.", "portrait": "warren" }
   ]
 }
