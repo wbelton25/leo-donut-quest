@@ -402,13 +402,25 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
       .once('down', () => this.scene.get(SCENE_DIALOGUE).showScript('intro', () => {}));
 
+    // ── DEV CHEAT: press "2" to skip straight to Act 2 with full party ────────
+    this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO)
+      .once('down', () => {
+        this.cameras.main.fade(400, 0, 0, 0);
+        this.time.delayedCall(420, () => {
+          this.scene.start(SCENE_OREGON_TRAIL, {
+            party:     ['warren', 'mj', 'carson', 'justin'],
+            resources: { time: 100, bikeCondition: 100, energy: 100, snacks: 5, money: 20 },
+          });
+        });
+      });
+
     // ── Camera ────────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, 0, worldW, worldH);
     this.cameras.main.startFollow(this._player, true, 0.08, 0.08);
     this.cameras.main.setDeadzone(80, 60);
 
     // ── Controls hint ─────────────────────────────────────────────────────────
-    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   D: TALK', {
+    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   D: TALK   2: SKIP TO ACT 2', {
       fontSize: '8px', color: '#778899',
     }).setScrollFactor(0).setDepth(10);
 
