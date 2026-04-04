@@ -25,7 +25,7 @@ export default class DialogueBox {
 
     const colors = {
       leo: 0x3b82f6, warren: 0xe74c3c, mj: 0x2ecc71,
-      carsen: 0x9b59b6, justin: 0xf39c12,
+      carson: 0x9b59b6, justin: 0xf39c12,
     };
     this._portrait.setFillStyle(colors[line.speaker?.toLowerCase()] ?? 0x666666);
 

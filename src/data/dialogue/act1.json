@@ -1,7 +1,7 @@
 {
   "intro": [
     { "speaker": "Leo", "text": "Today's the day. Donut House closes at 5pm.", "portrait": "leo" },
-    { "speaker": "Leo", "text": "I need to get Warren, MJ, Carsen, and Justin first.", "portrait": "leo" },
+    { "speaker": "Leo", "text": "I need to get Warren, MJ, Carson, and Justin first.", "portrait": "leo" },
     { "speaker": "Leo", "text": "Let's ride!", "portrait": "leo" }
   ],
   "warren_meet": [
@@ -27,14 +27,20 @@
     { "speaker": "MJ", "text": "Ha! He never learns.", "portrait": "mj" },
     { "speaker": "MJ", "text": "I'll push anything out of our way. Let's ride.", "portrait": "mj" }
   ],
-  "carsen_meet": [
-    { "speaker": "Carsen", "text": "I saw you coming from two blocks away.", "portrait": "carsen" },
-    { "speaker": "Carsen", "text": "Donut House. I knew it. I'm ready.", "portrait": "carsen" },
-    { "speaker": "Carsen", "text": "Nora's around back though. She's in a mood.", "portrait": "carsen" }
+  "carson_meet": [
+    { "speaker": "Carson", "text": "I saw you coming from two blocks away.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "Donut House. I knew it. I'm ready.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "Nora's around back by the pool. She's in a mood.", "portrait": "carson" }
   ],
-  "carsen_join": [
-    { "speaker": "Carsen", "text": "Didn't even see it coming. That's my whole thing.", "portrait": "carsen" },
-    { "speaker": "Carsen", "text": "Stay close and stay quiet. I know the shortcuts.", "portrait": "carsen" }
+  "carson_join": [
+    { "speaker": "Carson", "text": "Didn't even see it coming. That's my whole thing.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "Stay close and stay quiet. I know the shortcuts.", "portrait": "carson" }
+  ],
+  "carson_after_nora": [
+    { "speaker": "Carson", "text": "SHE'S DOWN! I've been waiting for that all summer.", "portrait": "carson" },
+    { "speaker": "Leo", "text": "How long was she hiding in those cabinets?!", "portrait": "leo" },
+    { "speaker": "Carson", "text": "Like... all day. She takes this very seriously.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "Alright, I'm in. Let's go get those donuts.", "portrait": "carson" }
   ],
   "justin_meet": [
     { "speaker": "Justin", "text": "BRO. I've been waiting all week for a donut run.", "portrait": "justin" },
@@ -45,5 +51,11 @@
   "justin_join": [
     { "speaker": "Justin", "text": "YEAH! Full crew! Nobody's faster than us.", "portrait": "justin" },
     { "speaker": "Justin", "text": "I'll get us there in no time. Follow me!", "portrait": "justin" }
+  ],
+  "justin_after_max": [
+    { "speaker": "Justin", "text": "BRO. You just beat my electric brother with a FART.", "portrait": "justin" },
+    { "speaker": "Leo", "text": "Did NOT see that coming.", "portrait": "leo" },
+    { "speaker": "Justin", "text": "He's been doing that zap thing since he found those batteries.", "portrait": "justin" },
+    { "speaker": "Justin", "text": "OK. Full squad. Let's GO. Donuts won't wait forever.", "portrait": "justin" }
   ]
 }

@@ -27,7 +27,7 @@
   "stealth": {
     "id": "stealth",
     "name": "Stealth",
-    "owner": "carsen",
+    "owner": "carson",
     "cooldown": 10000,
     "duration": 3000,
     "description": "The party becomes invisible to enemies and obstacles for a short time."

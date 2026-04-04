@@ -48,7 +48,7 @@ export default class PartySystem {
   }
 
   isFullParty() {
-    return this._party.length === 4; // Warren, MJ, Carsen, Justin
+    return this._party.length === 4; // Warren, MJ, Carson, Justin
   }
 
   // ── Passive Bonuses ───────────────────────────────────────────────────────────
@@ -65,9 +65,9 @@ export default class PartySystem {
     return bonus;
   }
 
-  // Returns true if Carsen is in the party (unlocks stealth event options)
+  // Returns true if Carson is in the party (unlocks stealth event options)
   hasStealthOption() {
-    return this.hasMember('carsen');
+    return this.hasMember('carson');
   }
 
   // Returns the damage bonus from Warren's slingshot passive

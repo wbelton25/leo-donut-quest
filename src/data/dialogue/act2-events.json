@@ -28,9 +28,9 @@
       "choices": [
         { "text": "Sprint away", "effects": { "energy": -15, "time": -5 } },
         {
-          "text": "Carsen uses stealth",
+          "text": "Carson uses stealth",
           "effects": { "energy": 0, "time": 0 },
-          "requiresPartyMember": "carsen"
+          "requiresPartyMember": "carson"
         }
       ]
     },
@@ -66,9 +66,9 @@
       "choices": [
         { "text": "Apologize and detour", "effects": { "time": -12 } },
         {
-          "text": "Carsen sneaks through",
+          "text": "Carson sneaks through",
           "effects": { "time": -3 },
-          "requiresPartyMember": "carsen"
+          "requiresPartyMember": "carson"
         }
       ]
     },

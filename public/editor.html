@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Leo's Quest – Level Editor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  display: flex; height: 100vh; background: #111;
+  color: #ddd; font-family: monospace; font-size: 13px; overflow: hidden;
+}
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; cursor: crosshair; }
+#canvas { display: block; }
+
+#sidebar {
+  width: 230px; min-width: 230px; background: #1a1a1a;
+  border-left: 1px solid #2a2a2a; overflow-y: auto; padding: 10px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+h3 { font-size: 10px; text-transform: uppercase; color: #666; letter-spacing: 1px;
+  border-bottom: 1px solid #222; padding-bottom: 3px; margin-bottom: 1px; }
+
+.tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.tool-btn {
+  padding: 7px 4px; border: 1px solid #2a2a2a; background: #1e1e1e;
+  color: #bbb; cursor: pointer; border-radius: 3px; font-family: monospace;
+  font-size: 11px; text-align: center; line-height: 1.4;
+}
+.tool-btn:hover { border-color: #555; color: #fff; }
+.tool-btn.active { border-color: #f5a623; color: #f5a623; background: #221e0a; }
+.tool-btn.full { grid-column: span 2; }
+
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+  border: 1px solid rgba(255,255,255,.2); vertical-align: middle; margin-right: 3px; }
+
+.section { display: flex; flex-direction: column; gap: 5px; }
+label { font-size: 10px; color: #777; margin-bottom: 1px; display: block; }
+
+input[type=text], input[type=number], select {
+  width: 100%; background: #141414; border: 1px solid #2a2a2a; color: #ddd;
+  padding: 4px 6px; font-family: monospace; font-size: 11px; border-radius: 2px;
+}
+select { cursor: pointer; }
+input[type=range] { width: 100%; }
+input[type=file] { color: #777; font-size: 10px; width: 100%; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+
+.rw-btns { display: flex; gap: 3px; }
+.rw-btn { flex:1; padding:3px 0; border:1px solid #2a2a2a; background:#1e1e1e;
+  color:#aaa; cursor:pointer; border-radius:2px; font-family:monospace; font-size:10px; text-align:center; }
+.rw-btn:hover { border-color:#555; }
+.rw-btn.active { border-color:#8a8a8a; color:#fff; background:#2a2a2a; }
+
+.btn { width:100%; padding:5px 8px; background:#1e1e1e; border:1px solid #2a2a2a;
+  color:#ccc; cursor:pointer; border-radius:2px; font-family:monospace; font-size:11px; }
+.btn:hover { border-color:#555; }
+.btn-accent { background:#1a2e60; border-color:#2a4a90; color:#fff; }
+.btn-accent:hover { background:#1e3870; }
+.btn-danger { border-color:#662222; color:#ff6666; }
+.btn-danger:hover { background:#2a1010; border-color:#883333; }
+
+.landmark-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+
+.info { font-size:10px; color:#484848; line-height:1.5; }
+.coords { font-size:10px; color:#383838; text-align:right; margin-top:auto; padding-top:4px; }
+.status { font-size:11px; color:#f5a623; min-height:15px; }
+
+/* Selected component panel */
+#sel-panel { background:#1e1e10; border:1px solid #3a3a1a; border-radius:3px; padding:8px;
+  display:flex; flex-direction:column; gap:5px; }
+#sel-panel h4 { font-size:10px; color:#f5a623; text-transform:uppercase; margin-bottom:2px; }
+
+/* Modal */
+#modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.82);
+  z-index:100; align-items:center; justify-content:center; }
+#modal-bg.open { display:flex; }
+#modal { background:#1a1a1a; border:1px solid #3a3a3a; border-radius:4px;
+  width:680px; max-width:95vw; max-height:82vh; display:flex; flex-direction:column; }
+#modal-head { display:flex; justify-content:space-between; align-items:center;
+  padding:8px 12px; border-bottom:1px solid #222; }
+#modal-head h2 { font-size:13px; color:#f5a623; }
+#modal-close { background:none; border:none; color:#555; font-size:18px; cursor:pointer; }
+#modal-close:hover { color:#fff; }
+#modal-body { flex:1; overflow-y:auto; padding:10px 12px; }
+#export-out { background:#0a0a0a; border:1px solid #222; color:#7ec850;
+  padding:8px; font-family:monospace; font-size:10px; white-space:pre;
+  overflow:auto; height:380px; border-radius:2px; }
+#modal-foot { padding:8px 12px; border-top:1px solid #222;
+  display:flex; gap:6px; justify-content:flex-end; }
+</style>
+</head>
+<body>
+<div id="canvas-wrap"><canvas id="canvas"></canvas></div>
+
+<div id="sidebar">
+
+  <!-- TOOLS -->
+  <div class="section">
+    <h3>Tool</h3>
+    <div class="tool-grid">
+      <button class="tool-btn active" id="t-road"   onclick="setTool('road')">
+        <span class="dot" style="background:#8a8a8a"></span>Road<br><small>drag</small></button>
+      <button class="tool-btn" id="t-house"  onclick="setTool('house')">
+        <span class="dot" style="background:#a07840"></span>House<br><small>click</small></button>
+      <button class="tool-btn" id="t-friend" onclick="setTool('friend')">
+        <span class="dot" style="background:#e8d020"></span>Friend<br><small>click</small></button>
+      <button class="tool-btn" id="t-park"   onclick="setTool('park')">
+        <span class="dot" style="background:#1e8449"></span>Park<br><small>drag</small></button>
+      <button class="tool-btn" id="t-water"  onclick="setTool('water')">
+        <span class="dot" style="background:#1a5276"></span>Water<br><small>drag</small></button>
+      <button class="tool-btn" id="t-select" onclick="setTool('select')">
+        ↖ Select<br><small>click</small></button>
+      <button class="tool-btn full" id="t-erase" onclick="setTool('erase')">
+        ✕ Erase &nbsp;<small>(drag rect)</small></button>
+    </div>
+  </div>
+
+  <!-- ROAD OPTIONS -->
+  <div class="section" id="road-opts">
+    <h3>Road</h3>
+    <label>Label (optional)</label>
+    <input type="text" id="road-label" placeholder="e.g. Windward Dr">
+    <label>Width snap (tiles)</label>
+    <div class="rw-btns">
+      <button class="rw-btn" onclick="setRW(2)">2</button>
+      <button class="rw-btn active" onclick="setRW(4)">4</button>
+      <button class="rw-btn" onclick="setRW(6)">6</button>
+      <button class="rw-btn" onclick="setRW(8)">8</button>
+      <button class="rw-btn" onclick="setRW(0)">Free</button>
+    </div>
+    <div class="info">Short axis snaps to width. Free = any rectangle.</div>
+  </div>
+
+  <!-- FRIEND HOUSE OPTIONS -->
+  <div class="section" id="friend-opts" style="display:none">
+    <h3>Friend House</h3>
+    <label>Friend</label>
+    <select id="friend-select" onchange="onFriendSelect()">
+      <option value="warren">Warren</option>
+      <option value="mj">MJ</option>
+      <option value="carson">Carson</option>
+      <option value="justin">Justin</option>
+      <option value="custom">Custom…</option>
+    </select>
+    <div id="friend-custom-wrap" style="display:none">
+      <label>Custom name</label>
+      <input type="text" id="friend-custom" placeholder="Friend name">
+    </div>
+    <div class="info">Places a 4×3 zone marker. Click to place.</div>
+  </div>
+
+  <!-- SELECT / EDIT PANEL -->
+  <div id="sel-panel" style="display:none">
+    <h4>Selected Component</h4>
+    <div id="sel-type" class="info"></div>
+    <label>Label / Name</label>
+    <input type="text" id="sel-label" placeholder="(no label)">
+    <label>Horizontal align</label>
+    <div id="sel-align-row" style="display:flex;gap:3px">
+      <button class="rw-btn active" id="align-left"   onclick="setLabelAlign('left')"   title="Left">◀ L</button>
+      <button class="rw-btn"        id="align-center" onclick="setLabelAlign('center')" title="Center">● C</button>
+      <button class="rw-btn"        id="align-right"  onclick="setLabelAlign('right')"  title="Right">R ▶</button>
+    </div>
+    <label>Vertical align</label>
+    <div id="sel-valign-row" style="display:flex;gap:3px">
+      <button class="rw-btn" id="valign-top"    onclick="setLabelVAlign('top')"    title="Top">▲ Top</button>
+      <button class="rw-btn" id="valign-middle" onclick="setLabelVAlign('middle')" title="Middle">● Mid</button>
+      <button class="rw-btn active" id="valign-bottom" onclick="setLabelVAlign('bottom')" title="Bottom">▼ Bot</button>
+    </div>
+    <label>Rotation</label>
+    <div id="sel-rot-row" style="display:flex;gap:3px">
+      <button class="rw-btn active" id="rot-0"   onclick="setLabelRot(0)"    title="No rotation">0°</button>
+      <button class="rw-btn"        id="rot-90"  onclick="setLabelRot(90)"   title="Rotate 90° (reads bottom-up)">90°</button>
+      <button class="rw-btn"        id="rot-270" onclick="setLabelRot(270)"  title="Rotate 270° (reads top-down)">270°</button>
+    </div>
+    <button class="btn" id="sel-apply" onclick="applySelLabel()">✓ Apply</button>
+    <button class="btn btn-danger" onclick="deleteSelected()">✕ Delete</button>
+  </div>
+
+  <!-- REFERENCE IMAGE -->
+  <div class="section">
+    <h3>Reference Image</h3>
+    <input type="file" id="ref-file" accept="image/*">
+    <label>Opacity</label>
+    <input type="range" id="ref-opacity" min="0" max="1" step="0.05" value="0.35">
+    <div class="row2">
+      <div><label>Offset X (tiles)</label><input type="number" id="ref-ox" value="0"></div>
+      <div><label>Offset Y (tiles)</label><input type="number" id="ref-oy" value="0"></div>
+    </div>
+    <div><label>Scale (tiles wide)</label><input type="number" id="ref-scale" value="320" min="1"></div>
+  </div>
+
+  <!-- LANDMARKS -->
+  <div class="section">
+    <h3>Jump To</h3>
+    <div class="landmark-grid">
+      <button class="btn" onclick="jumpTo(40,112)">Leo (40,112)</button>
+      <button class="btn" onclick="jumpTo(154,44)">Warren (154,44)</button>
+      <button class="btn" onclick="jumpTo(254,62)">MJ (254,62)</button>
+      <button class="btn" onclick="jumpTo(160,80)">Center</button>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="section">
+    <h3>Actions</h3>
+    <button class="btn btn-accent" onclick="openExport()">📋 Export Code</button>
+    <button class="btn" onclick="loadCurrentMap()">↩ Load Game Map</button>
+    <button class="btn btn-danger" onclick="clearMap()">🗑 Clear All</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="info" style="margin-top:4px">Right-drag = pan &nbsp;·&nbsp; Scroll = zoom<br>Keys: R H F P W S E</div>
+  <div class="coords" id="coords">col: —  row: —</div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div id="modal-bg">
+  <div id="modal">
+    <div id="modal-head">
+      <h2>Export → paste into NeighborhoodScene.js</h2>
+      <button id="modal-close" onclick="closeExport()">✕</button>
+    </div>
+    <div id="modal-body"><div id="export-out"></div></div>
+    <div id="modal-foot">
+      <button class="btn" onclick="copyExport()">Copy to Clipboard</button>
+      <button class="btn" onclick="closeExport()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+const MAP_COLS = 320, MAP_ROWS = 160;
+const TYPE = { ROAD:1, HOUSE:2, FRIEND:3, PARK:4, WATER:5 };
+const TYPE_COLOR  = { 1:'#8a8a8a', 2:'#a07840', 3:'#e8d020', 4:'#1e8449', 5:'#1a5276' };
+const TYPE_LABEL  = { 1:'Road', 2:'House', 3:'Friend House', 4:'Park', 5:'Water' };
+
+// FRIEND colors by id
+const FRIEND_COLOR = {
+  warren:'#e74c3c', mj:'#2ecc71', carson:'#3498db', justin:'#9b59b6', custom:'#f39c12'
+};
+const FRIEND_LABEL = { warren:'WARREN', mj:'MJ', carson:'CARSON', justin:'JUSTIN' };
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let components   = [];   // { id, type, col, row, w, h, label, friendId }
+let nextId       = 1;
+let selectedTool = 'road';
+let roadWidth    = 4;
+let selectedIds  = new Set(); // set of selected component ids
+
+let viewX = 0, viewY = 0, zoom = 5;
+
+// dragMode: 'place' | 'rubber' | 'move' | 'pan'
+let dragMode     = null;
+let isDragging   = false, isPanning = false;
+let dragStartCol = 0, dragStartRow = 0, dragCurCol = 0, dragCurRow = 0;
+// move drag: pixel anchor so we can track sub-tile movement
+let movePxStartX = 0, movePxStartY = 0;
+let moveColOffset = 0, moveRowOffset = 0;
+let panSX = 0, panSY = 0, panVX = 0, panVY = 0;
+
+let refImg = null, refOpacity = 0.35, refOX = 0, refOY = 0, refScale = 320;
+let hoverCol = -1, hoverRow = -1;
+let saveTimer = null;
+let undoStack = [];  // each entry: { components: [...], nextId }
+
+// ─── DOM ──────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('canvas-wrap');
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+function init() {
+  resizeCanvas();
+  loadFromStorage();
+  centerView(40, 112);
+  render();
+
+  document.getElementById('ref-file').addEventListener('change', onRefFile);
+  document.getElementById('ref-opacity').addEventListener('input', e => { refOpacity = +e.target.value; render(); });
+  ['ref-ox','ref-oy','ref-scale'].forEach(id =>
+    document.getElementById(id).addEventListener('input', () => {
+      refOX    = +document.getElementById('ref-ox').value    || 0;
+      refOY    = +document.getElementById('ref-oy').value    || 0;
+      refScale = +document.getElementById('ref-scale').value || 320;
+      render();
+    })
+  );
+  window.addEventListener('resize', () => { resizeCanvas(); render(); });
+  window.addEventListener('keydown', onKey);
+}
+
+function resizeCanvas() { canvas.width = wrap.clientWidth; canvas.height = wrap.clientHeight; }
+function centerView(c, r) { viewX = canvas.width/2 - c*zoom; viewY = canvas.height/2 - r*zoom; }
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // BG outside map
+  ctx.fillStyle = '#161616';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grass (map area)
+  ctx.fillStyle = '#2d6e2d';
+  ctx.fillRect(viewX, viewY, MAP_COLS*zoom, MAP_ROWS*zoom);
+
+  // Reference image
+  if (refImg) {
+    const pw = refScale * zoom;
+    const ph = refImg.naturalHeight / refImg.naturalWidth * pw;
+    ctx.globalAlpha = refOpacity;
+    ctx.drawImage(refImg, viewX + refOX*zoom, viewY + refOY*zoom, pw, ph);
+    ctx.globalAlpha = 1;
+  }
+
+  // Placed components (back to front); during move, ghost non-selected first
+  components.forEach(c => {
+    const isSel = selectedIds.has(c.id);
+    if (dragMode === 'move' && isSel) return; // drawn below as ghost
+    renderComp(c, isSel);
+  });
+
+  // Move ghost: draw selected components at offset position
+  if (dragMode === 'move' && (moveColOffset !== 0 || moveRowOffset !== 0)) {
+    components.forEach(c => {
+      if (!selectedIds.has(c.id)) return;
+      const gc = { ...c, col: c.col + moveColOffset, row: c.row + moveRowOffset };
+      fillRect(gc.col, gc.row, gc.w, gc.h, TYPE_COLOR[gc.type] ?? '#fff', 0.75);
+      strokeRect(gc.col, gc.row, gc.w, gc.h, '#ffffff99', 1.5);
+    });
+  } else if (dragMode === 'move') {
+    // Moving but no offset yet — still draw them normally with selection outline
+    components.forEach(c => { if (selectedIds.has(c.id)) renderComp(c, true); });
+  }
+
+  // Grid lines
+  if (zoom >= 4) {
+    const c0 = Math.max(0, Math.floor(-viewX/zoom));
+    const r0 = Math.max(0, Math.floor(-viewY/zoom));
+    const c1 = Math.min(MAP_COLS, Math.ceil((W-viewX)/zoom));
+    const r1 = Math.min(MAP_ROWS, Math.ceil((H-viewY)/zoom));
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 0.5;
+    for (let c=c0; c<=c1; c++) {
+      const x = Math.round(viewX + c*zoom)+0.5;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    for (let r=r0; r<=r1; r++) {
+      const y = Math.round(viewY + r*zoom)+0.5;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+  }
+
+  // Map border
+  ctx.strokeStyle = '#f5a62344';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(viewX+.5, viewY+.5, MAP_COLS*zoom-1, MAP_ROWS*zoom-1);
+
+  // Rubber-band selection rect
+  if (dragMode === 'rubber') {
+    const minC = Math.min(dragStartCol, dragCurCol);
+    const minR = Math.min(dragStartRow, dragCurRow);
+    const w    = Math.abs(dragCurCol - dragStartCol) + 1;
+    const h    = Math.abs(dragCurRow - dragStartRow) + 1;
+    const px = viewX + minC * zoom, py = viewY + minR * zoom;
+    ctx.fillStyle = 'rgba(100,160,255,0.12)';
+    ctx.fillRect(px, py, w*zoom, h*zoom);
+    ctx.strokeStyle = '#80b0ff';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(px+.5, py+.5, w*zoom-1, h*zoom-1);
+    ctx.setLineDash([]);
+  }
+
+  // Ghost preview during drag (place tools)
+  if (isDragging && dragMode === 'place') {
+    const g = ghostRect();
+    if (g) {
+      const col = selectedTool === 'erase' ? '#ff4444' : TYPE_COLOR[toolType()] ?? '#fff';
+      fillRect(g.col, g.row, g.w, g.h, col, 0.45);
+      strokeRect(g.col, g.row, g.w, g.h, selectedTool === 'erase' ? '#ff6666' : '#ffffff88', 1);
+      // Dimension label
+      const px = viewX + g.col * zoom;
+      const py = viewY + g.row * zoom;
+      ctx.save();
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.max(9,Math.min(zoom,14))}px monospace`;
+      ctx.shadowColor='#000'; ctx.shadowBlur=3;
+      ctx.fillText(`${g.w}×${g.h}`, px+2, py+zoom*1.5);
+      ctx.restore();
+    }
+  }
+
+  // Hover preview for click tools (house / friend)
+  if (!isDragging && (selectedTool === 'house' || selectedTool === 'friend') && hoverCol >= 0) {
+    const col = selectedTool === 'friend'
+      ? (FRIEND_COLOR[getFriendId()] ?? '#e8d020')
+      : '#a07840';
+    fillRect(hoverCol, hoverRow, 4, 3, col, 0.5);
+    strokeRect(hoverCol, hoverRow, 4, 3, '#ffffff88', 1);
+  }
+}
+
+function renderComp(c, selected) {
+  let color = TYPE_COLOR[c.type];
+  if (c.type === TYPE.FRIEND) color = FRIEND_COLOR[c.friendId] ?? '#e8d020';
+
+  fillRect(c.col, c.row, c.w, c.h, color, 1);
+
+  // Road / park / water: subtle border
+  if (c.type !== TYPE.FRIEND) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(viewX+c.col*zoom+.5, viewY+c.row*zoom+.5, c.w*zoom-1, c.h*zoom-1);
+  }
+
+  // Label text (roads, houses, parks, water — anything with a label)
+  if (c.label && zoom >= 5) {
+    const halign  = c.labelAlign  || 'left';
+    const valign  = c.labelVAlign || 'bottom';
+    const rot     = c.labelRot    || 0;
+    const isFriend = c.type === TYPE.FRIEND;
+    const fontSize = Math.max(8, Math.min(10, zoom));
+
+    const rectPxX = viewX + c.col * zoom;
+    const rectPxY = viewY + c.row * zoom;
+    const rectPxW = c.w * zoom;
+    const rectPxH = c.h * zoom;
+
+    // Anchor point inside the rect (before rotation)
+    let ax = halign === 'right'  ? rectPxX + rectPxW - 3 :
+             halign === 'center' ? rectPxX + rectPxW / 2 :
+                                   rectPxX + 3;
+    let ay = valign === 'top'    ? rectPxY + fontSize + 2 :
+             valign === 'middle' ? rectPxY + rectPxH / 2 + fontSize / 2 - 1 :
+                                   rectPxY + rectPxH - 3;
+
+    ctx.save();
+    ctx.translate(ax, ay);
+    if (rot === 90)  ctx.rotate( Math.PI / 2);
+    if (rot === 270) ctx.rotate(-Math.PI / 2);
+    ctx.font = `${isFriend ? 'bold ' : ''}${fontSize}px monospace`;
+    ctx.textAlign = halign === 'right' ? 'right' : halign === 'center' ? 'center' : 'left';
+    ctx.shadowColor = '#000'; ctx.shadowBlur = 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(c.label, 1, 1);
+    ctx.fillStyle = isFriend ? '#fff' : 'rgba(255,255,255,0.85)';
+    ctx.fillText(c.label, 0, 0);
+    ctx.restore();
+  }
+
+  // Friend house: show name centered in the middle only when no custom label is set
+  if (c.type === TYPE.FRIEND && !c.label) {
+    const name = c.label || FRIEND_LABEL[c.friendId] || c.friendId?.toUpperCase() || '?';
+    const px = viewX + (c.col + c.w/2) * zoom;
+    const py = viewY + (c.row + c.h/2) * zoom + 3;
+    ctx.save();
+    ctx.font = `bold ${Math.max(7, Math.min(10, zoom))}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText(name, px+1, py+1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(name, px, py);
+    ctx.restore();
+  }
+
+  // Selection outline
+  if (selected) {
+    ctx.save();
+    ctx.setLineDash([3, 2]);
+    strokeRect(c.col, c.row, c.w, c.h, '#f5a623', 2);
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+
+function fillRect(col, row, w, h, color, alpha) {
+  ctx.globalAlpha = alpha ?? 1;
+  ctx.fillStyle = color;
+  ctx.fillRect(viewX+col*zoom, viewY+row*zoom, w*zoom, h*zoom);
+  ctx.globalAlpha = 1;
+}
+function strokeRect(col, row, w, h, color, lw) {
+  ctx.strokeStyle = color; ctx.lineWidth = lw ?? 1;
+  ctx.strokeRect(viewX+col*zoom+.5, viewY+row*zoom+.5, w*zoom-1, h*zoom-1);
+}
+
+// ─── Ghost rect ───────────────────────────────────────────────────────────────
+function ghostRect() {
+  const minC = Math.min(dragStartCol, dragCurCol);
+  const minR = Math.min(dragStartRow, dragCurRow);
+  let w = Math.abs(dragCurCol - dragStartCol) + 1;
+  let h = Math.abs(dragCurRow - dragStartRow) + 1;
+  if (selectedTool === 'road' && roadWidth > 0) {
+    if (w >= h) h = roadWidth; else w = roadWidth;
+  }
+  return { col: minC, row: minR, w: Math.max(1,w), h: Math.max(1,h) };
+}
+
+function toolType() {
+  return { road:TYPE.ROAD, house:TYPE.HOUSE, friend:TYPE.FRIEND, park:TYPE.PARK, water:TYPE.WATER }[selectedTool];
+}
+
+function getFriendId() {
+  const sel = document.getElementById('friend-select').value;
+  if (sel === 'custom') return document.getElementById('friend-custom').value.toLowerCase() || 'custom';
+  return sel;
+}
+
+// ─── Coords ───────────────────────────────────────────────────────────────────
+function toTile(cx, cy) {
+  return { col: Math.floor((cx-viewX)/zoom), row: Math.floor((cy-viewY)/zoom) };
+}
+function inMap(c, r) { return c>=0 && c<MAP_COLS && r>=0 && r<MAP_ROWS; }
+
+// ─── Hit test ─────────────────────────────────────────────────────────────────
+function hitTest(col, row) {
+  // Return topmost component at this tile (search in reverse)
+  for (let i = components.length-1; i >= 0; i--) {
+    const c = components[i];
+    if (col >= c.col && col < c.col+c.w && row >= c.row && row < c.row+c.h) return c;
+  }
+  return null;
+}
+
+// ─── Mouse events ─────────────────────────────────────────────────────────────
+canvas.addEventListener('mousedown', e => {
+  const { col, row } = toTile(e.offsetX, e.offsetY);
+  if (e.button === 1 || e.button === 2) {
+    isPanning = true; dragMode = 'pan';
+    panSX = e.clientX; panSY = e.clientY; panVX = viewX; panVY = viewY;
+    wrap.style.cursor = 'grabbing';
+    e.preventDefault(); return;
+  }
+  if (e.button === 0) {
+    if (selectedTool === 'select') {
+      const hit = hitTest(col, row);
+      if (hit && selectedIds.has(hit.id)) {
+        // Drag the whole selection
+        dragMode = 'move';
+        isDragging = true;
+        movePxStartX = e.offsetX; movePxStartY = e.offsetY;
+        moveColOffset = 0; moveRowOffset = 0;
+        wrap.style.cursor = 'move';
+      } else if (hit) {
+        // Click on unselected component — select it (Shift = add to group)
+        if (!e.shiftKey) selectedIds.clear();
+        selectedIds.add(hit.id);
+        updateSelPanel();
+        dragMode = 'move';
+        isDragging = true;
+        movePxStartX = e.offsetX; movePxStartY = e.offsetY;
+        moveColOffset = 0; moveRowOffset = 0;
+        wrap.style.cursor = 'move';
+      } else {
+        // Click on empty space — start rubber-band
+        if (!e.shiftKey) selectedIds.clear();
+        dragMode = 'rubber';
+        isDragging = true;
+        dragStartCol = col; dragStartRow = row;
+        dragCurCol   = col; dragCurRow   = row;
+        updateSelPanel();
+      }
+      render(); return;
+    }
+    if (selectedTool === 'house' || selectedTool === 'friend') {
+      placeClickComp(col, row); return;
+    }
+    isDragging = true; dragMode = 'place';
+    dragStartCol = col; dragStartRow = row;
+    dragCurCol   = col; dragCurRow   = row;
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const { col, row } = toTile(e.offsetX, e.offsetY);
+  hoverCol = col; hoverRow = row;
+  document.getElementById('coords').textContent =
+    inMap(col, row) ? `col: ${col}  row: ${row}` : 'col: —  row: —';
+
+  if (isPanning && (e.buttons & 6)) {
+    viewX = panVX + (e.clientX - panSX);
+    viewY = panVY + (e.clientY - panSY);
+    render(); return;
+  }
+  if (isDragging) {
+    if (dragMode === 'move') {
+      moveColOffset = Math.round((e.offsetX - movePxStartX) / zoom);
+      moveRowOffset = Math.round((e.offsetY - movePxStartY) / zoom);
+    } else {
+      dragCurCol = col; dragCurRow = row;
+    }
+  }
+  render();
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (isPanning) {
+    isPanning = false; dragMode = null; wrap.style.cursor = 'crosshair'; return;
+  }
+  if (isDragging) {
+    isDragging = false;
+    const mode = dragMode; dragMode = null;
+    wrap.style.cursor = 'crosshair';
+    if (mode === 'rubber') commitRubber();
+    else if (mode === 'move') commitMove();
+    else if (mode === 'place') commitDrag();
+    render();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  isDragging = false; isPanning = false; dragMode = null;
+  hoverCol = -1; hoverRow = -1;
+  moveColOffset = 0; moveRowOffset = 0;
+  wrap.style.cursor = 'crosshair';
+  render();
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const { col, row } = toTile(e.offsetX, e.offsetY);
+  const old = zoom;
+  if (e.deltaY < 0) zoom = Math.min(32, zoom < 8 ? zoom+1 : zoom+2);
+  else              zoom = Math.max(1,  zoom <= 8 ? zoom-1 : zoom-2);
+  if (zoom !== old) { viewX = e.offsetX - col*zoom; viewY = e.offsetY - row*zoom; render(); }
+}, { passive: false });
+
+// ─── Placement ────────────────────────────────────────────────────────────────
+function placeClickComp(col, row) {
+  if (!inMap(col, row)) return;
+  if (selectedTool === 'house') {
+    addComp({ type: TYPE.HOUSE, col, row, w: 4, h: 3, label: '' });
+  } else if (selectedTool === 'friend') {
+    const fid = getFriendId();
+    const fname = fid === 'custom'
+      ? document.getElementById('friend-custom').value || 'Friend'
+      : (FRIEND_LABEL[fid] || fid.toUpperCase());
+    addComp({ type: TYPE.FRIEND, col, row, w: 4, h: 3, label: fname, friendId: fid });
+  }
+  render();
+}
+
+function commitDrag() {
+  const g = ghostRect();
+  if (!g) return;
+  if (selectedTool === 'erase') {
+    const before = components.length;
+    const next = components.filter(c => !overlaps(c, g));
+    if (next.length !== before) { pushUndo(); components = next; schedSave(); }
+    return;
+  }
+  if (g.w === 1 && g.h === 1) return; // ignore tiny drags for road/park/water
+  const type = toolType();
+  if (!type) return;
+  const label = selectedTool === 'road' ? (document.getElementById('road-label').value.trim() || '') : '';
+  addComp({ type, col: g.col, row: g.row, w: g.w, h: g.h, label, friendId: null });
+}
+
+function commitRubber() {
+  const minC = Math.min(dragStartCol, dragCurCol);
+  const minR = Math.min(dragStartRow, dragCurRow);
+  const maxC = Math.max(dragStartCol, dragCurCol);
+  const maxR = Math.max(dragStartRow, dragCurRow);
+  components.forEach(c => {
+    // Select if the component overlaps the rubber-band rect
+    if (c.col < maxC+1 && c.col+c.w > minC && c.row < maxR+1 && c.row+c.h > minR)
+      selectedIds.add(c.id);
+  });
+  updateSelPanel();
+}
+
+function commitMove() {
+  if (moveColOffset === 0 && moveRowOffset === 0) return;
+  pushUndo();
+  components.forEach(c => {
+    if (!selectedIds.has(c.id)) return;
+    c.col += moveColOffset;
+    c.row += moveRowOffset;
+  });
+  moveColOffset = 0; moveRowOffset = 0;
+  schedSave();
+}
+
+function pushUndo() {
+  undoStack.push({ components: components.map(c => ({...c})), nextId });
+  if (undoStack.length > 50) undoStack.shift();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  const prev = undoStack.pop();
+  components = prev.components;
+  nextId     = prev.nextId;
+  selectedIds.clear(); updateSelPanel();
+  schedSave();
+  render();
+  setStatus('Undo.');
+}
+
+function addComp(comp) {
+  pushUndo();
+  components.push({ id: nextId++, ...comp });
+  schedSave();
+}
+
+function overlaps(a, b) {
+  return a.col < b.col+b.w && a.col+a.w > b.col && a.row < b.row+b.h && a.row+a.h > b.row;
+}
+
+// ─── Selection ────────────────────────────────────────────────────────────────
+function updateSelPanel() {
+  const panel = document.getElementById('sel-panel');
+  if (selectedIds.size === 0) { panel.style.display = 'none'; return; }
+  panel.style.display = 'flex';
+  if (selectedIds.size === 1) {
+    const c = components.find(x => x.id === [...selectedIds][0]);
+    if (!c) { panel.style.display = 'none'; return; }
+    document.getElementById('sel-type').textContent =
+      TYPE_LABEL[c.type] + (c.friendId ? ` (${c.friendId})` : '');
+    document.getElementById('sel-label').value = c.label || '';
+    document.getElementById('sel-label').disabled = false;
+    document.getElementById('sel-apply').style.display = '';
+    document.getElementById('sel-align-row').style.display  = 'flex';
+    document.getElementById('sel-valign-row').style.display = 'flex';
+    document.getElementById('sel-rot-row').style.display    = 'flex';
+    const align  = c.labelAlign  || 'left';
+    const valign = c.labelVAlign || 'bottom';
+    const rot    = c.labelRot    || 0;
+    document.querySelectorAll('#sel-align-row .rw-btn') .forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#sel-valign-row .rw-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#sel-rot-row .rw-btn')   .forEach(b => b.classList.remove('active'));
+    document.getElementById(`align-${align}`)?.classList.add('active');
+    document.getElementById(`valign-${valign}`)?.classList.add('active');
+    document.getElementById(`rot-${rot}`)?.classList.add('active');
+  } else {
+    document.getElementById('sel-type').textContent = `${selectedIds.size} components selected`;
+    document.getElementById('sel-label').value = '';
+    document.getElementById('sel-label').disabled = true;
+    document.getElementById('sel-apply').style.display = 'none';
+    document.getElementById('sel-align-row').style.display  = 'flex';
+    document.getElementById('sel-valign-row').style.display = 'flex';
+    document.getElementById('sel-rot-row').style.display    = 'flex';
+  }
+}
+
+// Keep old name as alias for single-id select (used in a few places)
+function selectComponent(id) {
+  selectedIds.clear();
+  if (id != null) selectedIds.add(id);
+  updateSelPanel();
+}
+
+function setLabelAlign(align) {
+  document.querySelectorAll('#sel-align-row .rw-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`align-${align}`)?.classList.add('active');
+  if (selectedIds.size === 0) return;
+  pushUndo();
+  components.forEach(c => { if (selectedIds.has(c.id)) c.labelAlign = align; });
+  schedSave(); render();
+}
+
+function setLabelVAlign(valign) {
+  document.querySelectorAll('#sel-valign-row .rw-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`valign-${valign}`)?.classList.add('active');
+  if (selectedIds.size === 0) return;
+  pushUndo();
+  components.forEach(c => { if (selectedIds.has(c.id)) c.labelVAlign = valign; });
+  schedSave(); render();
+}
+
+function setLabelRot(deg) {
+  document.querySelectorAll('#sel-rot-row .rw-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`rot-${deg}`)?.classList.add('active');
+  if (selectedIds.size === 0) return;
+  pushUndo();
+  components.forEach(c => { if (selectedIds.has(c.id)) c.labelRot = deg; });
+  schedSave(); render();
+}
+
+function applySelLabel() {
+  if (selectedIds.size !== 1) return;
+  const c = components.find(x => x.id === [...selectedIds][0]);
+  if (!c) return;
+  pushUndo();
+  c.label = document.getElementById('sel-label').value.trim();
+  schedSave(); render(); setStatus('Label updated.');
+}
+
+function deleteSelected() {
+  if (selectedIds.size === 0) return;
+  pushUndo();
+  components = components.filter(x => !selectedIds.has(x.id));
+  selectedIds.clear();
+  updateSelPanel();
+  schedSave(); render(); setStatus(`Deleted ${selectedIds.size === 0 ? '' : selectedIds.size + ' '}component(s).`);
+}
+
+// ─── Keyboard ─────────────────────────────────────────────────────────────────
+function onKey(e) {
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undo(); return; }
+  if (selectedIds.size > 0 && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+    e.preventDefault();
+    const step = e.shiftKey ? 4 : 1;
+    const dc = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+    const dr = e.key === 'ArrowUp'   ? -step : e.key === 'ArrowDown'  ? step : 0;
+    pushUndo();
+    components.forEach(c => { if (selectedIds.has(c.id)) { c.col += dc; c.row += dr; } });
+    schedSave(); render(); return;
+  }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const map = {r:'road',h:'house',f:'friend',p:'park',w:'water',s:'select',e:'erase',
+               R:'road',H:'house',F:'friend',P:'park',W:'water',S:'select',E:'erase'};
+  if (map[e.key]) setTool(map[e.key]);
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) deleteSelected();
+  if (e.key === 'Escape') { selectedIds.clear(); updateSelPanel(); closeExport(); render(); }
+}
+
+// ─── UI ───────────────────────────────────────────────────────────────────────
+function setTool(t) {
+  selectedTool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`t-${t}`)?.classList.add('active');
+  document.getElementById('road-opts').style.display   = t === 'road'   ? 'flex' : 'none';
+  document.getElementById('friend-opts').style.display = t === 'friend' ? 'flex' : 'none';
+  if (t !== 'select') { selectedIds.clear(); updateSelPanel(); }
+  render();
+}
+
+function setRW(w) {
+  roadWidth = w;
+  document.querySelectorAll('.rw-btn').forEach((b,i) => {
+    b.classList.toggle('active', [2,4,6,8,0][i] === w);
+  });
+}
+
+function onFriendSelect() {
+  const v = document.getElementById('friend-select').value;
+  document.getElementById('friend-custom-wrap').style.display = v === 'custom' ? 'block' : 'none';
+}
+
+function jumpTo(col, row) {
+  viewX = canvas.width/2 - col*zoom;
+  viewY = canvas.height/2 - row*zoom;
+  render();
+}
+
+function onRefFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const img = new Image();
+  img.onload = () => { refImg = img; render(); };
+  img.src = URL.createObjectURL(file);
+}
+
+function clearMap() {
+  if (!confirm('Clear all components?')) return;
+  pushUndo();
+  components = []; selectedIds.clear(); updateSelPanel(); schedSave(); render(); setStatus('Cleared.');
+}
+
+function loadCurrentMap() {
+  if (components.length && !confirm('Replace current map with the game map?')) return;
+  pushUndo();
+  components = []; nextId = 1;
+  GAME_ROADS.forEach(([col,row,w,h,label]) =>
+    components.push({ id:nextId++, type:TYPE.ROAD, col, row, w, h, label:label||'' }));
+  components.push({ id:nextId++, type:TYPE.PARK, col:56, row:22, w:24, h:26, label:'Runde Park' });
+  GAME_HOUSES.forEach(({ col, row, n, stepCol, stepRow }) => {
+    for (let i=0; i<n; i++)
+      components.push({ id:nextId++, type:TYPE.HOUSE,
+        col:col+i*stepCol, row:row+i*stepRow, w:4, h:3, label:'' });
+  });
+  // Existing friend zones
+  GAME_FRIENDS.forEach(f =>
+    components.push({ id:nextId++, type:TYPE.FRIEND,
+      col:f.col-2, row:f.row-2, w:4, h:4, label:f.label, friendId:f.id }));
+  schedSave(); render(); setStatus('Game map loaded.');
+}
+
+// ─── Persistence ──────────────────────────────────────────────────────────────
+function schedSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    localStorage.setItem('leo-editor-v3', JSON.stringify({ components, nextId }));
+    setStatus('Saved.');
+  }, 500);
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem('leo-editor-v3');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    components = data.components || [];
+    nextId     = data.nextId     || (components.length + 1);
+  } catch(e) {}
+}
+
+function setStatus(msg) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 2500);
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+function openExport() {
+  document.getElementById('export-out').textContent = buildExport();
+  document.getElementById('modal-bg').classList.add('open');
+}
+function closeExport() { document.getElementById('modal-bg').classList.remove('open'); }
+function copyExport() {
+  navigator.clipboard.writeText(document.getElementById('export-out').textContent)
+    .then(() => setStatus('Copied!'));
+}
+
+function buildExport() {
+  const roads   = components.filter(c => c.type === TYPE.ROAD);
+  const houses  = components.filter(c => c.type === TYPE.HOUSE);
+  const friends = components.filter(c => c.type === TYPE.FRIEND);
+  const parks   = components.filter(c => c.type === TYPE.PARK);
+  const water   = components.filter(c => c.type === TYPE.WATER);
+
+  let out = '// ── Exported from Level Editor ─────────────────────────────────────────────\n\n';
+
+  out += 'const ROADS = [\n';
+  roads.forEach(c => {
+    const lbl = c.label ? `'${c.label}'` : 'null';
+    out += `  [${c.col}, ${c.row}, ${c.w}, ${c.h}, ${lbl}],\n`;
+  });
+  out += '];\n\n';
+
+  out += 'const HOUSE_GROUPS = [\n';
+  houses.forEach(c =>
+    out += `  { col: ${c.col}, row: ${c.row}, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },\n`);
+  out += '];\n\n';
+
+  out += '// ── Friend Zones (update FRIEND_ZONES in NeighborhoodScene.js) ──────────────\n';
+  out += '// col/row below = center of the placed marker\n';
+  friends.forEach(c => {
+    const centerCol = c.col + Math.floor(c.w/2);
+    const centerRow = c.row + Math.floor(c.h/2);
+    const fid = c.friendId || 'unknown';
+    const name = c.label || FRIEND_LABEL[fid] || fid;
+    out += `//\n// ${name}:\n`;
+    out += `//   col: ${centerCol}, row: ${centerRow}\n`;
+    out += `//   id:  PARTY_${fid.toUpperCase()}\n`;
+    out += `//   meetScript: '${fid}_meet',  joinScript: '${fid}_join'\n`;
+  });
+
+  if (parks.length) {
+    out += '\n// Parks:\n';
+    parks.forEach(c =>
+      out += `// const PARK_C=${c.col}, PARK_R=${c.row}, PARK_W=${c.w}, PARK_H=${c.h}; // ${c.label||'park'}\n`);
+  }
+  if (water.length) {
+    out += '\n// Water:\n';
+    water.forEach(c =>
+      out += `// { col: ${c.col}, row: ${c.row}, w: ${c.w}, h: ${c.h} }\n`);
+  }
+
+  return out;
+}
+
+// ─── Game data (mirrors current NeighborhoodScene.js) ─────────────────────────
+const GAME_ROADS = [
+  [30,109,4,16,'Topsail Cir'],[42,109,4,16,null],[30,123,16,4,null],[36,105,4,6,null],
+  [17,105,60,4,'Anchorage Ln'],
+  [72,78,6,27,'Windward Dr'],[72,74,14,4,null],[78,50,6,28,null],[78,46,14,4,null],[84,18,6,32,null],
+  [80,18,4,24,'Woodhaven Dr'],[80,18,10,4,null],
+  [52,6,4,18,'Catamaran Dr'],[52,6,30,4,null],
+  [84,42,74,4,'Tara Tea Dr'],
+  [102,6,4,22,'Tega Cay Dr'],[102,26,10,4,null],[108,24,4,52,null],
+  [84,62,28,4,'Mariana Ln'],
+  [76,84,20,4,'Marquesas Ave'],
+  [84,14,26,4,null],
+  [108,10,150,4,'Molokai Dr'],[254,10,4,36,null],
+  [92,46,4,52,'Timberlake Dr'],[92,46,18,4,null],[92,94,18,4,null],
+  [114,18,4,18,null],[128,18,4,18,null],[114,18,16,4,'Riley Ln'],[114,34,16,4,null],
+  [158,42,100,4,null],
+  [208,46,4,18,null],[222,46,4,18,null],[208,46,16,4,null],[208,62,16,4,null],
+  [254,42,4,26,'Samar Ct'],
+];
+const GAME_HOUSES = [
+  {col:34,row:112,n:1,stepCol:0,stepRow:0},{col:20,row:110,n:2,stepCol:0,stepRow:8},
+  {col:20,row:122,n:3,stepCol:8,stepRow:0},{col:18,row:96,n:5,stepCol:7,stepRow:0},
+  {col:18,row:88,n:5,stepCol:7,stepRow:0},{col:48,row:110,n:2,stepCol:7,stepRow:0},
+  {col:57,row:11,n:4,stepCol:6,stepRow:0},{col:86,row:11,n:3,stepCol:6,stepRow:0},
+  {col:62,row:50,n:3,stepCol:0,stepRow:9},{col:62,row:68,n:2,stepCol:0,stepRow:9},
+  {col:91,row:34,n:5,stepCol:8,stepRow:0},{col:91,row:49,n:5,stepCol:8,stepRow:0},
+  {col:152,row:36,n:1,stepCol:0,stepRow:0},{col:162,row:35,n:5,stepCol:10,stepRow:0},
+  {col:162,row:48,n:5,stepCol:10,stepRow:0},{col:118,row:4,n:4,stepCol:10,stepRow:0},
+  {col:170,row:4,n:4,stepCol:10,stepRow:0},{col:222,row:4,n:3,stepCol:10,stepRow:0},
+  {col:246,row:35,n:2,stepCol:0,stepRow:9},{col:252,row:60,n:1,stepCol:0,stepRow:0},
+];
+const GAME_FRIENDS = [
+  { id:'warren', label:'WARREN', col:154, row:44 },
+  { id:'mj',     label:'MJ',     col:254, row:62 },
+];
+
+init();
+</script>
+</body>
+</html>

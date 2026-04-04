@@ -8,6 +8,11 @@ import HudScene from './scenes/HudScene.js';
 import NeighborhoodScene from './scenes/NeighborhoodScene.js';
 
 import DialogueScene from './scenes/DialogueScene.js';
+import GraceBossScene from './scenes/GraceBossScene.js';
+import MaxBossScene from './scenes/MaxBossScene.js';
+import NoraBossScene from './scenes/NoraBossScene.js';
+import JustinMaxBossScene from './scenes/JustinMaxBossScene.js';
+import GameOverScene from './scenes/GameOverScene.js';
 
 // Remaining scenes added in later phases:
 // import FriendHouseScene from './scenes/FriendHouseScene.js';
@@ -15,7 +20,6 @@ import DialogueScene from './scenes/DialogueScene.js';
 // import OregonTrailScene from './scenes/OregonTrailScene.js';
 // import DonutShopScene from './scenes/DonutShopScene.js';
 // import FinalBossScene from './scenes/FinalBossScene.js';
-// import GameOverScene from './scenes/GameOverScene.js';
 // import CreditsScene from './scenes/CreditsScene.js';
 
 const config = {
@@ -56,7 +60,12 @@ const config = {
     PreloadScene,
     TitleScene,
     NeighborhoodScene,
-    HudScene,      // renders above NeighborhoodScene
+    GraceBossScene,
+    MaxBossScene,
+    NoraBossScene,
+    JustinMaxBossScene,
+    GameOverScene,
+    HudScene,      // renders above gameplay scenes
     DialogueScene, // renders above HudScene
   ],
 };

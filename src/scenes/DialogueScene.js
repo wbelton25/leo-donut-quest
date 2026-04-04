@@ -23,10 +23,10 @@ export default class DialogueScene extends Phaser.Scene {
     this._lineIndex = 0;
     this._onComplete = null;
 
-    // Space bar or click advances dialogue
-    this.input.keyboard.on('keydown-SPACE', () => this._box.advance());
-    this.input.keyboard.on('keydown-ENTER', () => this._box.advance());
-    this.input.on('pointerdown', () => this._box.advance());
+    // Space bar or click advances dialogue — only when a script is active
+    this.input.keyboard.on('keydown-SPACE', () => { if (this._currentScript) this._box.advance(); });
+    this.input.keyboard.on('keydown-ENTER', () => { if (this._currentScript) this._box.advance(); });
+    this.input.on('pointerdown',            () => { if (this._currentScript) this._box.advance(); });
   }
 
   // ── Public API ────────────────────────────────────────────────────────────────
@@ -76,6 +76,7 @@ export default class DialogueScene extends Phaser.Scene {
   }
 
   _advance() {
+    if (!this._currentScript) return;
     this._lineIndex++;
     if (this._lineIndex >= this._currentScript.length) {
       this._finish();

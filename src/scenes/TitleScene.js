@@ -70,6 +70,7 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   _startNewGame() {
+    SaveSystem.deleteSave();
     this.game.registry.set('gameState', SaveSystem.newGame());
     this._launchGameplay();
   }

@@ -1,40 +1,35 @@
 import {
-  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE,
+  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, SCENE_GAME_OVER,
+  SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
-  PARTY_WARREN,
+  PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN,
 } from '../constants.js';
 import Player from '../entities/Player.js';
 import Follower, { PositionBuffer } from '../entities/Follower.js';
 import DeerObstacle from '../entities/DeerObstacle.js';
-import GraceBoss from '../entities/GraceBoss.js';
+// GraceBoss is now handled in GraceBossScene; import removed
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
 import SaveSystem from '../systems/SaveSystem.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// REAL-WORLD MAP — Tega Cay, SC (calibrated from Google Maps screenshot)
+// MAP v2 — designed in the Level Editor
 //
-// Origin: Leo's house (Topsail Cir) → tile (40, 115)
-// Scale:  1 tile = 8 meters
-//
-// GPS → tile:
-//   col = 40 + (lon + 81.0343) × 11378
-//   row = 115 - (lat - 35.0288) × 13893
-//
-// Road layout (from image):
-//   Topsail Cir     — small cul-de-sac loop, SW corner
-//   Anchorage Lane  — E-W road from Topsail east to Windward roundabout
-//   Windward Dr     — main N-S artery, diagonal NE through center
-//   Catamaran Dr    — NW from Woodhaven/Windward toward marina
-//   Woodhaven Dr    — short N-S road just east of Runde Park
-//   Tega Cay Dr     — diagonal road on east side
-//   Tara Tea Dr     — E-W from Tega Cay Dr to Warren's house
-//   Mariana Ln      — secondary E-W on Windward mid section
-//   Marquesas Ave   — short E-W south of Mariana
+// Leo's house loop — SW corner, cols 21-50, rows 137-151
+// Windward Dr      — main N-S artery, cols 45-56, rows 47-131
+// Tega Cay Drive   — dual E-W roads across top, rows 46-59
+// Tara Tea Dr      — E-W from Windward east to Warren's house, row 63-67
+// Mariana Ln       — E-W below Tara Tea, row 83-87
+// Marquesas Ave    — short E-W, row 115-119
+// Suwarrow Ct      — N-S spur to Warren's house, cols 108-112
+// Water            — left strip (col 0-8) + south strip (row 152+)
+// Park (Runde)     — col 19-43, row 65-91
+// Warren's house   — col 126-130, row 78-81 (zone center 128, 72)
+// MJ's house       — col 188-192, row 69-73 (zone center 190, 67)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const MAP_COLS = 280;
+const MAP_COLS = 320;
 const MAP_ROWS = 160;
 
 const T = TILE_SIZE;
@@ -47,122 +42,125 @@ function darken(hex) {
 }
 
 // ── Road segments [col, row, width, height, label] ────────────────────────────
-// Each entry is [startCol, startRow, widthTiles, heightTiles, label]
 const ROADS = [
-  // ── Topsail Cir — compact oval loop, opens north onto Anchorage Lane ────
-  // The loop runs south from Anchorage Lane down toward the lake.
-  // West arm: cols 30-34, rows 109-124
-  [30, 109, 4, 16, 'Topsail Cir'],
-  // East arm: cols 42-46, rows 109-124
-  [42, 109, 4, 16, null],
-  // South close (bottom of oval): cols 30-46, rows 123-127
-  [30, 123, 16, 4, null],
-  // Short north connector into Anchorage Lane: cols 36-40, rows 105-111
-  [36, 105, 4, 6, null],
-
-  // ── Anchorage Lane — E-W from Topsail junction to Windward roundabout ────
-  [17, 105, 60, 4, 'Anchorage Ln'],
-
-  // ── Windward Dr — main diagonal artery ────────────────────────────────────
-  // S section: runs N from roundabout, col 72-78, rows 78-105
-  [72, 78, 6, 27, 'Windward Dr'],
-  // Step NE at row 78: short E jog cols 72-86, rows 74-78
-  [72, 74, 14, 4, null],
-  // Mid section: col 78-84, rows 50-78
-  [78, 50, 6, 28, null],
-  // Step NE at row 50: short E jog cols 78-92, rows 46-50
-  [78, 46, 14, 4, null],
-  // Upper section: col 84-90, rows 18-50
-  [84, 18, 6, 32, null],
-
-  // ── Woodhaven Dr — short N-S road just east of Runde Park ────────────────
-  [80, 18, 4, 24, 'Woodhaven Dr'],
-  // Top E-W connector to Windward upper
-  [80, 18, 10, 4, null],
-
-  // ── Catamaran Dr — NW toward marina ──────────────────────────────────────
-  [52, 6, 4, 18, 'Catamaran Dr'],
-  // E-W connector from Catamaran to Woodhaven area (Tidal Way equivalent)
-  [52, 6, 30, 4, null],
-
-  // ── Tara Tea Dr — branches east OFF Windward Dr mid section ──────────────
-  // In the map image, Tara Tea Dr intersects Windward Dr ~row 46 and runs E
-  [84, 42, 74, 4, 'Tara Tea Dr'],
-
-  // ── Tega Cay Dr — diagonal road on east side ─────────────────────────────
-  // Runs roughly N-S on the right side, stairstepped
-  [102, 6,  4, 22, 'Tega Cay Dr'],
-  [102, 26, 10, 4, null],           // SE jog
-  [108, 24, 4, 52, null],           // south section runs past Tara Tea Dr
-
-  // ── Mariana Ln — E-W from Windward Dr east ───────────────────────────────
-  [84, 62, 28, 4, 'Mariana Ln'],
-
-  // ── Marquesas Ave — short E-W south of Mariana ───────────────────────────
-  [76, 84, 20, 4, 'Marquesas Ave'],
+  [56, 63, 74, 4, 'Tara Tea Dr'],
+  [56, 83, 28, 4, 'Mariana Ln'],
+  [64, 115, 18, 4, null],
+  [10, 147, 5, 4, null],
+  [10, 145, 5, 4, null],
+  [15, 146, 8, 4, null],
+  [20, 146, 16, 4, null],
+  [21, 137, 4, 10, null],
+  [24, 137, 12, 4, null],
+  [32, 139, 4, 8, null],
+  [34, 137, 16, 4, null],
+  [56, 115, 10, 4, 'Marquesas Ave'],
+  [45, 131, 4, 8, null],
+  [48, 131, 8, 4, null],
+  [52, 134, 4, 7, null],
+  [46, 137, 9, 4, null],
+  [45, 60, 4, 71, null],
+  [52, 59, 4, 72, 'Windward'],
+  [45, 59, 4, 5, 'Windward'],
+  [80, 67, 4, 19, null],
+  [122, 66, 4, 17, null],
+  [108, 79, 17, 4, null],
+  [108, 65, 4, 14, 'Suwarrow Ct.'],
+  [45, 55, 169, 4, 'Tega Cay Drive'],
+  [45, 46, 168, 4, 'Tega Cay Drive'],
+  [45, 49, 4, 11, null],
+  [52, 47, 4, 14, null],
+  [209, 46, 4, 38, null],
+  [188, 80, 22, 4, null],
+  [188, 69, 4, 12, null],
+  // ── Eastern extension — Carson and Justin's neighborhood ─────────────────
+  [209, 55, 103, 4, null],
+  [211, 46, 100, 4, null],
+  [311, 46, 4, 36, null],
+  [273, 78, 38, 4, null],
+  [273, 82, 4, 19, null],
+  [275, 97, 40, 4, null],
+  [311, 79, 4, 48, null],
+  [238, 57, 4, 99, null],
+  [240, 152, 75, 4, null],
+  [311, 124, 4, 30, null],
+  [283, 151, 1, 4, null],
 ];
 
-// Roundabout center — where Windward Dr S meets Anchorage Lane
-const RBT_COL = 75, RBT_ROW = 105;
-
-// ── Runde Park bounds — west of Woodhaven Dr, east of Catamaran ──────────────
-const PARK_C = 56, PARK_R = 22, PARK_W = 24, PARK_H = 26;
+// ── Runde Park ────────────────────────────────────────────────────────────────
+const PARK_C = 19, PARK_R = 65, PARK_W = 24, PARK_H = 26;
 
 // ── House clusters ────────────────────────────────────────────────────────────
-// All positions hand-checked to not overlap any road segment.
-// House footprint: cols hc → hc+4, rows hr → hr+3
 const HOUSE_GROUPS = [
-  // Inside Topsail loop — Leo's house
-  { col: 34, row: 112, n: 1, stepCol: 0, stepRow: 0, color: 0x9b8765 },
-  // Around Topsail loop (west arm)
-  { col: 20, row: 110, n: 2, stepCol: 0, stepRow: 8, color: 0x7a6b52 },
-  // Waterfront south of Topsail (backs up to Lake Wylie)
-  { col: 20, row: 122, n: 3, stepCol: 8, stepRow: 0, color: 0x6b8ca5 },
-
-  // North of Anchorage Lane (The Anchorage neighborhood)
-  { col: 18, row: 96,  n: 5, stepCol: 7, stepRow: 0, color: 0x8b7355 },
-  { col: 18, row: 88,  n: 5, stepCol: 7, stepRow: 0, color: 0x7a6b52 },
-
-  // East of Anchorage Lane, west of roundabout
-  { col: 48, row: 110, n: 2, stepCol: 7, stepRow: 0, color: 0x856b52 },
-
-  // North of Catamaran E-W connector
-  { col: 57, row: 11,  n: 4, stepCol: 6, stepRow: 0, color: 0x8b7b55 },
-  { col: 86, row: 11,  n: 3, stepCol: 6, stepRow: 0, color: 0x7a6b52 },
-
-  // West of Windward Dr — between Catamaran connector and Mariana
-  { col: 62, row: 50,  n: 3, stepCol: 0, stepRow: 9, color: 0x7a8b52 },
-  // West of Windward Dr — between Mariana and Marquesas
-  { col: 62, row: 68,  n: 2, stepCol: 0, stepRow: 9, color: 0x7a7b52 },
-
-  // North of Tara Tea Dr, east of Windward Dr
-  { col: 91, row: 34,  n: 5, stepCol: 8, stepRow: 0, color: 0x8b7b55 },
-  // South of Tara Tea Dr, east of Windward Dr
-  { col: 91, row: 49,  n: 5, stepCol: 8, stepRow: 0, color: 0x9b8060 },
-
-  // Warren's house — north of Tara Tea Dr at east end
-  { col: 152, row: 36, n: 1, stepCol: 0, stepRow: 0, color: 0x992222 },
+  { col: 126, row: 78,  n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
+  { col: 117, row: 70,  n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
+  { col: 79,  row: 111, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
+  { col: 80,  row: 120, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
+  { col: 71,  row: 120, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
+  { col: 71,  row: 111, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
+  { col: 64,  row: 111, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
+  { col: 65,  row: 120, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
 ];
 
 // ── Friend house interaction zones ────────────────────────────────────────────
-// Each zone: { id, col, row, radius, meetScript, joinScript, color }
-// radius in pixels — player must be within this to see the prompt
 const FRIEND_ZONES = [
   {
-    id:         PARTY_WARREN,
-    col:        154, row: 42,   // on Tara Tea Dr, right in front of Warren's house
-    radius:     52,
-    meetScript: 'warren_meet',
-    joinScript: 'warren_join',
-    color:      0xe74c3c,
-    label:      'WARREN',
+    id:          PARTY_WARREN,
+    col:         128, row: 72,
+    radius:      80,
+    meetScript:  'warren_meet',
+    joinScript:  'warren_join',
+    color:       0xe74c3c,
+    label:       'WARREN',
+    hasBoss:     true,
+    bossScene:   'GraceBossScene',
+    defeatedFlag:'graceDefeated',
   },
-  // MJ, Carsen, Justin zones will be added once their locations are confirmed
+  {
+    id:          PARTY_MJ,
+    col:         190, row: 67,
+    radius:      72,
+    meetScript:  'mj_meet',
+    joinScript:  'mj_join',
+    color:       0x2ecc71,
+    label:       'MJ',
+    hasBoss:     true,
+    bossScene:   'MaxBossScene',
+    defeatedFlag:'maxDefeated',
+  },
+  {
+    id:          PARTY_CARSON,
+    col:         296, row: 76,
+    radius:      72,
+    meetScript:  'carson_meet',
+    joinScript:  'carson_join',
+    color:       0x3498db,
+    label:       'CARSON',
+    hasBoss:     true,
+    bossScene:   'NoraBossScene',
+    defeatedFlag:'noraDefeated',
+  },
+  {
+    id:          PARTY_JUSTIN,
+    col:         317, row: 122,
+    radius:      72,
+    meetScript:  'justin_meet',
+    joinScript:  'justin_join',
+    color:       0x9b59b6,
+    label:       'JUSTIN',
+    hasBoss:     true,
+    bossScene:   'JustinMaxBossScene',
+    defeatedFlag:'justinMaxDefeated',
+  },
 ];
 
 export default class NeighborhoodScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_NEIGHBORHOOD });
+  }
+
+  init(data) {
+    this._initData = data ?? {};
   }
 
   create() {
@@ -244,13 +242,6 @@ export default class NeighborhoodScene extends Phaser.Scene {
       }
     });
 
-    // ── Roundabout at Windward Dr / Anchorage Lane junction ───────────────────
-    const rbtX = RBT_COL * T + T / 2;
-    const rbtY = RBT_ROW * T + T / 2;
-    // Use rectangles — circles (Graphics objects) are expensive
-    this.add.rectangle(rbtX, rbtY, T * 7, T * 7, 0x4a4a55);  // road surface
-    this.add.rectangle(rbtX, rbtY, T * 4, T * 4, 0x2d5a1b);  // grassy center
-
     // ── Runde Park ────────────────────────────────────────────────────────────
     const parkPx = PARK_C * T + (PARK_W * T) / 2;
     const parkPy = PARK_R * T + (PARK_H * T) / 2;
@@ -263,8 +254,8 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.add.rectangle(parkPx, parkPy, PARK_W * T, 2, 0x4a7a2a);
     this.add.rectangle(parkPx, parkPy, 2, PARK_H * T, 0x4a7a2a);
 
-    // ── Golf course ───────────────────────────────────────────────────────────
-    const GC_C = 165, GC_R = 0, GC_W = 68, GC_H = 30;
+    // ── Golf course (east side, above Tega Cay Drive) ─────────────────────────
+    const GC_C = 220, GC_R = 0, GC_W = 70, GC_H = 44;
     const gcPx = GC_C * T + (GC_W * T) / 2;
     const gcPy = GC_R * T + (GC_H * T) / 2;
     this.add.rectangle(gcPx, gcPy, GC_W * T, GC_H * T, 0x1a6b1a);
@@ -286,7 +277,19 @@ export default class NeighborhoodScene extends Phaser.Scene {
         this.add.rectangle(hx, hr * T + 0.5 * T, hw, T, darken(color));
       }
     });
-    txt(this, 152 * T, 33 * T, "WARREN'S", { fontSize: '8px', color: '#ff8888' });
+    txt(this, 126 * T, 75 * T, "WARREN'S",  { fontSize: '8px', color: '#ff8888' });
+    txt(this, 188 * T, 66 * T, "MJ'S",      { fontSize: '8px', color: '#88ff88' });
+    txt(this, 294 * T, 74 * T, "CARSON'S",  { fontSize: '8px', color: '#88aaff' });
+    txt(this, 314 * T, 119 * T, "JUSTIN'S", { fontSize: '8px', color: '#cc88ff' });
+
+    // Zone markers — flashing indicators so the player can see where to go
+    FRIEND_ZONES.forEach(zone => {
+      const marker = this.add.rectangle(zone.col * T, zone.row * T, 12, 12, zone.color, 0.7).setDepth(3);
+      this.tweens.add({ targets: marker, alpha: 0.1, yoyo: true, repeat: -1, duration: 600 });
+      txt(this, zone.col * T, zone.row * T - 14, '▼', {
+        fontSize: '8px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(3);
+    });
 
     // ── Trees (rectangles — circles are too expensive at volume) ─────────────
     this._generateTrees().forEach(([tc, tr]) => {
@@ -295,13 +298,15 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this.add.rectangle(tx, ty, T * 0.6, T * 0.6, 0x228b22); // lighter inner
     });
 
-    // ── Boat docks ────────────────────────────────────────────────────────────
-    [[28, 132], [44, 133], [62, 132]].forEach(([dc, dr]) => {
-      this.add.rectangle(dc * T + T, dr * T + T * 2, T * 2, T * 4, 0x8b6914);
+    // ── Boat docks — on left lake shore ───────────────────────────────────────
+    [[10, 40], [10, 60], [10, 90], [10, 120]].forEach(([dc, dr]) => {
+      this.add.rectangle(dc * T, dr * T, T * 2, T * 4, 0x8b6914);
     });
 
     // ── Player ────────────────────────────────────────────────────────────────
-    this._player = new Player(this, 36 * T, 107 * T);
+    const startX = this._initData.spawnCol ? this._initData.spawnCol * T : 30 * T;
+    const startY = this._initData.spawnRow ? this._initData.spawnRow * T : 142 * T;
+    this._player = new Player(this, startX, startY);
     this.physics.add.collider(this._player, this._walls);
 
     // ── Recruited set (must init before Grace / deer which read it) ──────────
@@ -313,26 +318,70 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._posBuffer = new PositionBuffer(this._player);
     this._followers = [];
 
-    // ── Grace boss (blocks Warren's house until defeated) ─────────────────────
-    this._grace = null;
-    if (!this._recruited.has(PARTY_WARREN)) {
-      this._grace = new GraceBoss(
-        this, 152, 42,
-        () => this._onGraceDefeated(),
-        () => {
-          this._resources.applyChanges({ energy: -15 });
-          this.cameras.main.flash(200, 255, 0, 0);
-        }
-      );
+    // ── Boss return handling ──────────────────────────────────────────────────
+    // If returning from a boss scene with a win, recruit the friend immediately
+    this._graceDefeated = this._recruited.has(PARTY_WARREN) || !!this._initData.graceDefeated;
+    if (this._initData.graceDefeated && !this._recruited.has(PARTY_WARREN)) {
+      this._recruited.add(PARTY_WARREN);
+      this._party.addMember(PARTY_WARREN);
+      const zone = FRIEND_ZONES.find(z => z.id === PARTY_WARREN);
+      if (zone) this._spawnFollower(zone);
     }
 
-    // ── Deer obstacles ────────────────────────────────────────────────────────
+    this._maxDefeated = this._recruited.has(PARTY_MJ) || !!this._initData.maxDefeated;
+    if (this._initData.maxDefeated && !this._recruited.has(PARTY_MJ)) {
+      this._recruited.add(PARTY_MJ);
+      this._party.addMember(PARTY_MJ);
+      const zone = FRIEND_ZONES.find(z => z.id === PARTY_MJ);
+      if (zone) this._spawnFollower(zone);
+    }
+
+    this._noraDefeated = this._recruited.has(PARTY_CARSON) || !!this._initData.noraDefeated;
+    if (this._initData.noraDefeated && !this._recruited.has(PARTY_CARSON)) {
+      this._recruited.add(PARTY_CARSON);
+      this._party.addMember(PARTY_CARSON);
+      const zone = FRIEND_ZONES.find(z => z.id === PARTY_CARSON);
+      if (zone) this._spawnFollower(zone);
+    }
+
+    this._justinMaxDefeated = this._recruited.has(PARTY_JUSTIN) || !!this._initData.justinMaxDefeated;
+    if (this._initData.justinMaxDefeated && !this._recruited.has(PARTY_JUSTIN)) {
+      this._recruited.add(PARTY_JUSTIN);
+      this._party.addMember(PARTY_JUSTIN);
+      const zone = FRIEND_ZONES.find(z => z.id === PARTY_JUSTIN);
+      if (zone) this._spawnFollower(zone);
+    }
+
+    // ── Deer obstacles — frogger-style lanes ──────────────────────────────────
+    const H = () => this._onDeerHit();
     this._deer = [
-      new DeerObstacle(this, 55, 108, [38, 72],   () => this._onDeerHit()),  // Anchorage Lane
-      new DeerObstacle(this, 75, 80,  [72, 82],   () => this._onDeerHit()),  // Windward Dr S
-      new DeerObstacle(this, 80, 55,  [78, 88],   () => this._onDeerHit()),  // Windward Dr Mid
-      new DeerObstacle(this, 85, 30,  [83, 100],  () => this._onDeerHit()),  // upper connector
-      new DeerObstacle(this, 120, 43, [100, 148], () => this._onDeerHit()),  // Tara Tea Dr
+      // Tega Cay Drive upper (row 47-50, cols 45-213): 4 deer E-W
+      new DeerObstacle(this, 70,  48, [45, 213], H),
+      new DeerObstacle(this, 110, 47, [45, 213], H),
+      new DeerObstacle(this, 155, 48, [45, 213], H),
+      new DeerObstacle(this, 195, 47, [45, 213], H),
+
+      // Tega Cay Drive lower (row 56-59, cols 45-213): 4 deer E-W
+      new DeerObstacle(this, 80,  57, [45, 213], H),
+      new DeerObstacle(this, 130, 56, [45, 213], H),
+      new DeerObstacle(this, 170, 57, [45, 213], H),
+      new DeerObstacle(this, 205, 56, [45, 213], H),
+
+      // Tara Tea Dr (row 64-66, cols 56-129): 4 deer E-W
+      new DeerObstacle(this, 70,  64, [56, 129], H),
+      new DeerObstacle(this, 90,  65, [56, 129], H),
+      new DeerObstacle(this, 108, 64, [56, 129], H),
+      new DeerObstacle(this, 120, 65, [56, 129], H),
+
+      // Windward N-S (col 46-56, rows 60-130): 4 deer N-S
+      new DeerObstacle(this, 47,  75, [60, 130], H),
+      new DeerObstacle(this, 48,  95, [60, 130], H),
+      new DeerObstacle(this, 53,  85, [60, 130], H),
+      new DeerObstacle(this, 54, 110, [60, 130], H),
+
+      // Mariana Ln (row 84-86, cols 56-84): 2 deer
+      new DeerObstacle(this, 65,  84, [56, 84],  H),
+      new DeerObstacle(this, 75,  85, [56, 84],  H),
     ];
 
     // Proximity prompt label (shown when near a friend's house)
@@ -373,13 +422,18 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this._abilities.execute('lightning_fart', this, this._player);
     }
 
-    // Update Grace boss
-    if (this._grace) {
-      this._grace.update(this._player, fartJustDown);
-    }
-
     // Update deer
     this._deer.forEach(d => d.update(this._player));
+
+    // Game over check — energy hits 0
+    if (this._resources.isExhausted() && !this._gameOverTriggered) {
+      this._gameOverTriggered = true;
+      this.cameras.main.fade(600, 0, 0, 0, false, (cam, progress) => {
+        if (progress === 1) {
+          this.scene.start(SCENE_GAME_OVER, { reason: 'energy' });
+        }
+      });
+    }
 
     this._updateProximityPrompt();
 
@@ -407,43 +461,27 @@ export default class NeighborhoodScene extends Phaser.Scene {
     }
 
     if (nearZone) {
-      const cam = this.cameras.main;
-      const sx = (px - cam.scrollX) * cam.zoom;
-      const sy = (py - cam.scrollY) * cam.zoom - 28;
+      const zoneId       = nearZone.id;
+      const bossBlocking = nearZone.hasBoss && !this._recruited.has(zoneId);
+      const metFlagKey   = `_${zoneId}MetDialogueDone`;
 
-      // Show different prompt depending on whether Grace is still up
-      const promptText = (nearZone.id === PARTY_WARREN && this._grace)
-        ? 'SPACE: Talk to Warren'
-        : 'SPACE: Talk';
-      this._proximityPrompt.setText(promptText).setPosition(sx - 40, sy).setVisible(true);
-
-      if (Phaser.Input.Keyboard.JustDown(this._spaceKey) && !this._dialoguePlayed) {
-        if (nearZone.id === PARTY_WARREN && this._grace && !this._warrenMetDialogueDone) {
-          // First visit: show warren_meet ("Grace is out front!") as a warning
-          this._dialoguePlayed = true;
-          this.scene.get(SCENE_DIALOGUE).showScript('warren_meet', () => {
-            this._warrenMetDialogueDone = true;
-            this._dialoguePlayed = false;
-          });
-        } else if (nearZone.id === PARTY_WARREN && !this._grace) {
-          // Grace defeated: recruit Warren
-          this._startRecruitment(nearZone);
-        }
+      // Auto-trigger meet dialogue on first zone entry, then launch boss fight
+      if (bossBlocking && !this[metFlagKey] && !this._dialoguePlayed) {
+        this._dialoguePlayed = true;
+        this.scene.get(SCENE_DIALOGUE).showScript(nearZone.meetScript, () => {
+          this[metFlagKey] = true;
+          this._dialoguePlayed = false;
+          this.cameras.main.fade(400, 0, 0, 0);
+          this.time.delayedCall(420, () =>
+            this.scene.start(nearZone.bossScene, { returnFlag: nearZone.defeatedFlag })
+          );
+        });
       }
+
+      this._proximityPrompt.setVisible(false);
     } else {
       this._proximityPrompt.setVisible(false);
-      this._dialoguePlayed = false;
     }
-  }
-
-  _onGraceDefeated() {
-    this._grace = null;
-    // Immediate reaction dialogue, then Warren joins when player talks to him
-    this.scene.get(SCENE_DIALOGUE).showScript('warren_after_grace', () => {
-      this._recruited.add(PARTY_WARREN);
-      this._party.addMember(PARTY_WARREN);
-      this._spawnFollower(FRIEND_ZONES.find(z => z.id === PARTY_WARREN));
-    });
   }
 
   _onDeerHit() {
@@ -472,30 +510,30 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   _buildLake() {
-    const W = MAP_COLS * T;
-    this.add.rectangle(W / 2, 129 * T, W, 3 * T, 0xc8a870);    // sandy shore
-    this.add.rectangle(W / 2, 132 * T, W, 4 * T, 0x2980b9);     // shallow
-    this.add.rectangle(W / 2, 141 * T, W, 20 * T, 0x1a5f8a);    // deep lake
-    this.add.rectangle(6 * T, 105 * T, 12 * T, 30 * T, 0x1a5f8a); // west arm
-    this.add.rectangle(13 * T, 105 * T, 3 * T, 30 * T, 0x2980b9);
-    this.add.rectangle(16 * T, 105 * T, 2 * T, 30 * T, 0xc8a870);
-    txt(this, 90 * T, 137 * T, 'LAKE WYLIE', { fontSize: '8px', color: '#7cc8e8' });
-    txt(this, 2 * T, 108 * T, 'LAKE\nWYLIE', { fontSize: '8px', color: '#7cc8e8' });
-    txt(this, 35 * T, 12 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
+    // Left water strip (col 0-8, full height) — Lake Wylie inlet / marina
+    this.add.rectangle(4 * T, MAP_ROWS * T / 2, 8 * T, MAP_ROWS * T, 0x1a5f8a);
+    this.add.rectangle(8 * T, MAP_ROWS * T / 2, 2 * T, MAP_ROWS * T, 0x2980b9); // shallow edge
+    this.add.rectangle(9 * T, MAP_ROWS * T / 2, T,     MAP_ROWS * T, 0xc8a870); // sandy shore
+
+    // South water strip (col 1-109, rows 152-160)
+    this.add.rectangle(55 * T, 156 * T, 109 * T, 8 * T, 0x1a5f8a);
+    this.add.rectangle(55 * T, 152 * T, 109 * T, T,     0x2980b9); // shallow north edge
+    this.add.rectangle(55 * T, 151 * T, 109 * T, T,     0xc8a870); // sandy shore
+
+    txt(this, 2 * T,  80 * T, 'LAKE\nWYLIE', { fontSize: '8px', color: '#7cc8e8' });
+    txt(this, 30 * T, 156 * T, 'LAKE WYLIE', { fontSize: '8px', color: '#7cc8e8' });
+    txt(this, 2 * T,  10 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
   }
 
-  // Returns true if a chunk at (c,r) overlaps any road or roundabout.
+  // Returns true if a chunk at (c,r) overlaps any road (i.e. is walkable).
   _isRoadChunk(c, r, step) {
-    // Lake / water — always blocked
-    if (r + step > 132) return false;          // off-road (water)
-    if (c + step <= 15 && r + step > 100) return false; // west arm
+    // Left water strip (col 0-9)
+    if (c + step <= 10) return false;
+    // South water (rows 151+)
+    if (r >= 151) return false;
+    // South water left portion (col 0-110, rows 151+)
+    if (c + step <= 110 && r + step > 151) return false;
 
-    // Roundabout — treat as road
-    const cMid = c + step / 2, rMid = r + step / 2;
-    const dc = cMid - RBT_COL, dr = rMid - RBT_ROW;
-    if (dc * dc + dr * dr <= (step * 2.5) * (step * 2.5)) return true;
-
-    // Road segments
     for (const [rc, rr, rw, rh] of ROADS) {
       if (c < rc + rw && c + step > rc && r < rr + rh && r + step > rr) return true;
     }
@@ -536,16 +574,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   _generateTrees() {
     const onClearArea = (c, r) => {
-      // Avoid road tiles (visual only — no physics needed)
-      const dc = c - RBT_COL, dr = r - RBT_ROW;
-      if (dc * dc + dr * dr <= 16) return true; // roundabout
       for (const [rc, rr, rw, rh] of ROADS) {
         if (c >= rc && c < rc + rw && r >= rr && r < rr + rh) return true;
       }
-      if (c >= PARK_C && c <= PARK_C + PARK_W && r >= PARK_R && r <= PARK_R + PARK_H) return true;
-      if (c >= 165 && r <= 30) return true; // golf course
-      if (r >= 128) return true;            // lake
-      if (c <= 14 && r >= 100) return true; // west arm
+      if (c >= PARK_C && c < PARK_C + PARK_W && r >= PARK_R && r < PARK_R + PARK_H) return true;
+      if (c <= 10) return true;              // left water
+      if (r >= 151) return true;             // south water
+      if (c <= 110 && r >= 148) return true; // south water buffer
       return false;
     };
 
@@ -592,10 +627,16 @@ export default class NeighborhoodScene extends Phaser.Scene {
       ).setScrollFactor(0).setDepth(51);
     });
 
-    // Leo (blue) + Warren (red)
-    this.add.rectangle(MM_X + 40 * T * sx, MM_Y + 111 * T * sy, 3, 3, 0x4488ff)
+    // House markers: Leo (blue), Warren (red), MJ (green)
+    this.add.rectangle(MM_X + 30  * T * sx, MM_Y + 142 * T * sy, 3, 3, 0x4488ff)
       .setScrollFactor(0).setDepth(51);
-    this.add.rectangle(MM_X + 152 * T * sx, MM_Y + 38 * T * sy, 3, 3, 0xff4444)
+    this.add.rectangle(MM_X + 128 * T * sx, MM_Y + 78  * T * sy, 3, 3, 0xff4444)
+      .setScrollFactor(0).setDepth(51);
+    this.add.rectangle(MM_X + 190 * T * sx, MM_Y + 69  * T * sy, 3, 3, 0x22cc44)
+      .setScrollFactor(0).setDepth(51);
+    this.add.rectangle(MM_X + 296 * T * sx, MM_Y + 76  * T * sy, 3, 3, 0x3498db)
+      .setScrollFactor(0).setDepth(51);
+    this.add.rectangle(MM_X + 317 * T * sx, MM_Y + 122 * T * sy, 3, 3, 0x9b59b6)
       .setScrollFactor(0).setDepth(51);
 
     this._minimapDot = this.add.circle(0, 0, 2, 0xffffff).setScrollFactor(0).setDepth(52);

@@ -48,7 +48,7 @@ export const PLAYER_SPEED = 180;
 export const SPRITE_LEO = 'sprite-leo';
 export const SPRITE_WARREN = 'sprite-warren';
 export const SPRITE_MJ = 'sprite-mj';
-export const SPRITE_CARSEN = 'sprite-carsen';
+export const SPRITE_CARSON = 'sprite-carson';
 export const SPRITE_JUSTIN = 'sprite-justin';
 
 // Tilemaps & tilesets
@@ -81,7 +81,11 @@ export const SCENE_OREGON_TRAIL = 'OregonTrailScene';
 export const SCENE_DONUT_SHOP = 'DonutShopScene';
 export const SCENE_FINAL_BOSS = 'FinalBossScene';
 export const SCENE_DIALOGUE = 'DialogueScene';
-export const SCENE_GAME_OVER = 'GameOverScene';
+export const SCENE_GAME_OVER  = 'GameOverScene';
+export const SCENE_GRACE_BOSS      = 'GraceBossScene';
+export const SCENE_MAX_BOSS        = 'MaxBossScene';
+export const SCENE_NORA_BOSS       = 'NoraBossScene';
+export const SCENE_JUSTIN_MAX_BOSS = 'JustinMaxBossScene';
 export const SCENE_CREDITS = 'CreditsScene';
 
 // ─── Event Bus Keys ───────────────────────────────────────────────────────────
@@ -95,7 +99,7 @@ export const EVT_DIALOGUE_END = 'dialogue-end';
 // ─── Party Member IDs ─────────────────────────────────────────────────────────
 export const PARTY_WARREN = 'warren';
 export const PARTY_MJ = 'mj';
-export const PARTY_CARSEN = 'carsen';
+export const PARTY_CARSON = 'carson';
 export const PARTY_JUSTIN = 'justin';
 
 // ─── Default Game State ───────────────────────────────────────────────────────

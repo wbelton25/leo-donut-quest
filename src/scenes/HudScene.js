@@ -40,9 +40,16 @@ export default class HudScene extends Phaser.Scene {
     this.add.rectangle(248, y + 10, 60, 6, 0x1a3a1a).setOrigin(0, 0.5);
     this._energyFill = this.add.rectangle(248, y + 10, 58, 4, 0x66bb6a).setOrigin(0, 0.5);
 
+    // ── Fart recharge meter ───────────────────────────────────────────────────
+    txt(this, 316, y, 'F', { fontSize: '8px', color: '#f5e642' });
+    this.add.rectangle(326, y + 10, 36, 6, 0x3a3a1a).setOrigin(0, 0.5);
+    this._fartFill = this.add.rectangle(326, y + 10, 34, 4, 0xf5e642).setOrigin(0, 0.5);
+    this._fartCooldown = 0;   // ms; 0 means ready
+    this._fartDuration = 0;
+
     // ── Snacks & money counters (8px) ─────────────────────────────────────────
-    this._snackText = txt(this, 316, y, 'S:5', { fontSize: '8px', color: '#f5e642' });
-    this._moneyText = txt(this, 356, y, '$20', { fontSize: '8px', color: '#f5a623' });
+    this._snackText = txt(this, 368, y, 'S:5', { fontSize: '8px', color: '#f5e642' });
+    this._moneyText = txt(this, 400, y, '$20', { fontSize: '8px', color: '#f5a623' });
 
     // ── Party member dots ─────────────────────────────────────────────────────
     // Four circles near the right edge — light up when that member joins
@@ -50,7 +57,7 @@ export default class HudScene extends Phaser.Scene {
     const members = [
       { id: 'warren', color: 0xe74c3c },
       { id: 'mj',     color: 0x2ecc71 },
-      { id: 'carsen', color: 0x9b59b6 },
+      { id: 'carson', color: 0x9b59b6 },
       { id: 'justin', color: 0xf39c12 },
     ];
     members.forEach((m, i) => {
@@ -82,8 +89,25 @@ export default class HudScene extends Phaser.Scene {
     });
   }
 
-  _onAbilityUsed({ abilityId }) {
-    console.log(`[Hud] ability used: ${abilityId}`);
+  _onAbilityUsed({ abilityId, cooldown }) {
+    if (abilityId === 'lightning_fart') {
+      this._fartCooldown = Date.now() + cooldown;
+      this._fartDuration = cooldown;
+    }
+  }
+
+  update() {
+    if (this._fartDuration > 0) {
+      const remaining = this._fartCooldown - Date.now();
+      const progress = remaining > 0 ? 1 - remaining / this._fartDuration : 1;
+      this._fartFill.scaleX = Math.min(1, Math.max(0, progress));
+      // Flash yellow when fully recharged
+      if (progress >= 1) {
+        this._fartFill.setFillStyle(0xf5e642);
+      } else {
+        this._fartFill.setFillStyle(0xa09020);
+      }
+    }
   }
 
   shutdown() {

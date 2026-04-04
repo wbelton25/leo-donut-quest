@@ -25,17 +25,17 @@
     "sprite": "sprite-mj",
     "color": "#2ecc71"
   },
-  "carsen": {
-    "id": "carsen",
-    "name": "Carsen",
+  "carson": {
+    "id": "carson",
+    "name": "Carson",
     "ability": "stealth",
-    "house": "carsen_house",
+    "house": "carson_house",
     "bossId": "nora",
     "passiveBonus": {
       "type": "event_options",
       "value": "stealth_choice"
     },
-    "sprite": "sprite-carsen",
+    "sprite": "sprite-carson",
     "color": "#9b59b6"
   },
   "justin": {
