@@ -14,6 +14,7 @@ import NoraBossScene from './scenes/NoraBossScene.js';
 import JustinMaxBossScene from './scenes/JustinMaxBossScene.js';
 import OregonTrailScene from './scenes/OregonTrailScene.js';
 import DonutShopScene from './scenes/DonutShopScene.js';
+import CreditsScene from './scenes/CreditsScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
 
 // Remaining scenes added in later phases:
@@ -68,6 +69,7 @@ const config = {
     JustinMaxBossScene,
     OregonTrailScene,
     DonutShopScene,
+    CreditsScene,
     GameOverScene,
     HudScene,      // renders above gameplay scenes
     DialogueScene, // renders above HudScene

@@ -1,5 +1,5 @@
 import {
-  SCENE_DONUT_SHOP, SCENE_DIALOGUE, SCENE_TITLE,
+  SCENE_DONUT_SHOP, SCENE_CREDITS,
   BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
@@ -159,8 +159,7 @@ export default class DonutShopScene extends Phaser.Scene {
     bg.on('pointerdown', () => {
       this.cameras.main.fade(500, 0, 0, 0);
       this.time.delayedCall(520, () => {
-        // Phase 6 will replace this with FinalBossScene
-        this.scene.start(SCENE_TITLE);
+        this.scene.start(SCENE_CREDITS, { party: this._party.getParty() });
       });
     });
   }
