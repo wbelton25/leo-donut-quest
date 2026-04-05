@@ -69,5 +69,27 @@
     { "speaker": "Justin", "text": "I CAN SEE IT. I CAN SEE DONUT HOUSE!", "portrait": "justin" },
     { "speaker": "Leo", "text": "We made it. Nobody eat until we're inside.", "portrait": "leo" },
     { "speaker": "Warren", "text": "That was rougher than I expected. Worth it.", "portrait": "warren" }
+  ],
+  "checkpoint_school": [
+    { "speaker": "Leo", "text": "Tega Cay Elementary. Almost forgot I went here.", "portrait": "leo" },
+    { "speaker": "Justin", "text": "KEEP MOVING! No time for nostalgia!", "portrait": "justin" }
+  ],
+  "checkpoint_tire": [
+    { "speaker": "Leo", "text": "Tire store. Should we stop?", "portrait": "leo" },
+    { "speaker": "MJ", "text": "No time. The bikes are fine. Mostly.", "portrait": "mj" }
+  ],
+  "checkpoint_petsupply": [
+    { "speaker": "Leo", "text": "Almost there. Pet Supply Store is right before Donut House.", "portrait": "leo" },
+    { "speaker": "Carson", "text": "Something just came out of that store...", "portrait": "carson" }
+  ],
+  "edie_defeated": [
+    { "speaker": "Leo", "text": "Edie... it's over. We earned these donuts.", "portrait": "leo" },
+    { "speaker": "Leo", "text": "Nobody is taking them from us.", "portrait": "leo" }
+  ],
+  "return_journey": [
+    { "speaker": "Leo", "text": "Got the donuts. Let's get home before anyone notices.", "portrait": "leo" },
+    { "speaker": "Justin", "text": "Wait. Are those... Grace? And Max? AND NORA?!", "portrait": "justin" },
+    { "speaker": "Leo", "text": "They want our donuts. RIDE. NOW.", "portrait": "leo" },
+    { "speaker": "Warren", "text": "I knew this was too easy.", "portrait": "warren" }
   ]
 }

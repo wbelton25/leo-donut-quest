@@ -14,6 +14,9 @@ import NoraBossScene from './scenes/NoraBossScene.js';
 import JustinMaxBossScene from './scenes/JustinMaxBossScene.js';
 import OregonTrailScene from './scenes/OregonTrailScene.js';
 import DonutShopScene from './scenes/DonutShopScene.js';
+import ReturnJourneyScene from './scenes/ReturnJourneyScene.js';
+import BossGauntletScene from './scenes/BossGauntletScene.js';
+import EdieBossScene from './scenes/EdieBossScene.js';
 import CreditsScene from './scenes/CreditsScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
 
@@ -69,6 +72,9 @@ const config = {
     JustinMaxBossScene,
     OregonTrailScene,
     DonutShopScene,
+    ReturnJourneyScene,
+    BossGauntletScene,
+    EdieBossScene,
     CreditsScene,
     GameOverScene,
     HudScene,      // renders above gameplay scenes

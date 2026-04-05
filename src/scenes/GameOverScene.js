@@ -32,9 +32,10 @@ export default class GameOverScene extends Phaser.Scene {
 
     // Reason sub-text
     const reasonMap = {
-      energy:  "YOU RAN OUT OF ENERGY",
-      bike:    "YOUR BIKE BROKE DOWN",
-      time:    "DONUT HOUSE IS CLOSED",
+      energy:   "YOU RAN OUT OF ENERGY",
+      bike:     "YOUR BIKE BROKE DOWN",
+      time:     "DONUT HOUSE IS CLOSED",
+      gauntlet: "THE SIBLINGS GOT YOUR DONUTS",
     };
     txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 20, reasonMap[this._reason] ?? "YOU GAVE UP", {
       fontSize: '8px', color: '#ffaa44',

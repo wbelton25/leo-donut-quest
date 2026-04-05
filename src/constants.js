@@ -86,6 +86,9 @@ export const SCENE_GRACE_BOSS      = 'GraceBossScene';
 export const SCENE_MAX_BOSS        = 'MaxBossScene';
 export const SCENE_NORA_BOSS       = 'NoraBossScene';
 export const SCENE_JUSTIN_MAX_BOSS = 'JustinMaxBossScene';
+export const SCENE_RETURN_JOURNEY  = 'ReturnJourneyScene';
+export const SCENE_BOSS_GAUNTLET   = 'BossGauntletScene';
+export const SCENE_EDIE_BOSS       = 'EdieBossScene';
 export const SCENE_CREDITS = 'CreditsScene';
 
 // ─── Event Bus Keys ───────────────────────────────────────────────────────────

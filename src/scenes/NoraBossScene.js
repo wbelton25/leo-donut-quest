@@ -1,5 +1,5 @@
 import {
-  SCENE_NORA_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD,
+  SCENE_NORA_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, txt,
 } from '../constants.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
@@ -76,6 +76,11 @@ const LEO_SPEED  = 170;
 export default class NoraBossScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_NORA_BOSS });
+  }
+
+  init(data) {
+    this._gauntlet     = data?.gauntlet ?? false;
+    this._gauntletData = data?.gauntletData ?? {};
   }
 
   create() {
@@ -556,7 +561,11 @@ export default class NoraBossScene extends Phaser.Scene {
       this.scene.get(SCENE_DIALOGUE).showScript('carson_after_nora', () => {
         this.cameras.main.fade(500, 0, 0, 0);
         this.time.delayedCall(520, () => {
-          this.scene.start(SCENE_NEIGHBORHOOD, { noraDefeated: true, spawnCol: 295, spawnRow: 79 });
+          if (this._gauntlet) {
+              this.scene.start(SCENE_BOSS_GAUNTLET, this._gauntletData);
+            } else {
+              this.scene.start(SCENE_NEIGHBORHOOD, { noraDefeated: true, spawnCol: 295, spawnRow: 79 });
+            }
         });
       });
     });

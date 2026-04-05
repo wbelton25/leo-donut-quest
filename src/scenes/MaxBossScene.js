@@ -1,5 +1,5 @@
 import {
-  SCENE_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_GAME_OVER,
+  SCENE_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_GAME_OVER, SCENE_BOSS_GAUNTLET,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, txt,
 } from '../constants.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
@@ -47,7 +47,9 @@ export default class MaxBossScene extends Phaser.Scene {
   }
 
   init(data) {
-    this._returnData = data ?? {};
+    this._returnData   = data ?? {};
+    this._gauntlet     = data?.gauntlet ?? false;
+    this._gauntletData = data?.gauntletData ?? {};
   }
 
   create() {
@@ -506,7 +508,11 @@ export default class MaxBossScene extends Phaser.Scene {
         this.scene.get(SCENE_DIALOGUE).showScript('mj_join', () => {
           this.cameras.main.fade(500, 0, 0, 0);
           this.time.delayedCall(520, () => {
-            this.scene.start(SCENE_NEIGHBORHOOD, { maxDefeated: true, spawnCol: 189, spawnRow: 70 });
+            if (this._gauntlet) {
+              this.scene.start(SCENE_BOSS_GAUNTLET, this._gauntletData);
+            } else {
+              this.scene.start(SCENE_NEIGHBORHOOD, { maxDefeated: true, spawnCol: 189, spawnRow: 70 });
+            }
           });
         });
       },
