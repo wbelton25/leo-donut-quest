@@ -69,11 +69,15 @@ export default class EventSystem {
         const party = this._party.getParty();
         const victim = party[Math.floor(Math.random() * party.length)];
         this._party.removeMember(victim);
-        return { resourceChanges: changes, partyLoss: victim };
+        return { resourceChanges: changes, partyLoss: victim, usedMember: choice.requiresPartyMember ?? null };
       }
     }
 
-    return { resourceChanges: changes, partyLoss: null };
+    return {
+      resourceChanges: changes,
+      partyLoss:   null,
+      usedMember:  choice.requiresPartyMember ?? null,
+    };
   }
 
   // Register a custom event table (used in Phase 6 for harder Act 4 events)

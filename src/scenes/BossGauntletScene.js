@@ -24,6 +24,14 @@ const SIBLING_NAMES = {
   justin: 'MAX (BASEBALL)',
 };
 
+// Dialogue scripts to show before each gauntlet fight
+const SIBLING_INTRO_SCRIPTS = {
+  warren: 'gauntlet_grace',
+  mj:     'gauntlet_max_football',
+  carson: 'gauntlet_nora',
+  justin: 'gauntlet_max_baseball',
+};
+
 export default class BossGauntletScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_BOSS_GAUNTLET });
@@ -79,21 +87,30 @@ export default class BossGauntletScene extends Phaser.Scene {
       `${remaining} FIGHT${remaining > 1 ? 'S' : ''} LEFT  (+EDIE)`,
       { fontSize: '8px', color: '#556677' }).setOrigin(0.5);
 
-    // Auto-transition to boss scene after 2.5s
-    this.time.delayedCall(2500, () => {
+    // Show taunt dialogue then transition to boss fight
+    const introScript = SIBLING_INTRO_SCRIPTS[nextFight.id];
+    const launchFight = () => {
       this.cameras.main.fade(400, 0, 0, 0);
       this.time.delayedCall(420, () => {
         this.scene.start(nextFight.scene, {
           gauntlet: true,
           gauntletData: {
             party,
-            donuts:        this._data.donuts ?? 0,
-            resources:     this._data.resources ?? {},
+            donuts:         this._data.donuts ?? 0,
+            resources:      this._data.resources ?? {},
             defeatedBosses: newDefeated,
           },
         });
       });
-    });
+    };
+
+    if (introScript) {
+      this.time.delayedCall(1800, () => {
+        this.scene.get(SCENE_DIALOGUE).showScript(introScript, launchFight);
+      });
+    } else {
+      this.time.delayedCall(2500, launchFight);
+    }
   }
 
   _fightEdie() {
@@ -111,18 +128,22 @@ export default class BossGauntletScene extends Phaser.Scene {
       "LEO'S SISTER WANTS THE DONUTS",
       { fontSize: '8px', color: '#ff88cc' }).setOrigin(0.5);
 
-    this.time.delayedCall(2500, () => {
+    const launchEdie = () => {
       this.cameras.main.fade(400, 0, 0, 0);
       this.time.delayedCall(420, () => {
         this.scene.start(SCENE_EDIE_BOSS, {
-          gauntlet: true,
-          gauntletData: { ...this._data },
-          party:    this._data.party ?? [],
-          donuts:   this._data.donuts ?? 0,
-          resources: this._data.resources ?? {},
+          gauntlet:       true,
+          gauntletData:   { ...this._data },
+          party:          this._data.party ?? [],
+          donuts:         this._data.donuts ?? 0,
+          resources:      this._data.resources ?? {},
           defeatedBosses: this._data.defeatedBosses ?? [],
         });
       });
+    };
+
+    this.time.delayedCall(1800, () => {
+      this.scene.get(SCENE_DIALOGUE).showScript('gauntlet_edie', launchEdie);
     });
   }
 

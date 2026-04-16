@@ -82,6 +82,48 @@
     { "speaker": "Leo", "text": "Almost there. Pet Supply Store is right before Donut House.", "portrait": "leo" },
     { "speaker": "Carson", "text": "Something just came out of that store...", "portrait": "carson" }
   ],
+  "gauntlet_grace": [
+    { "speaker": "Grace", "text": "You made it back?! Hand over those donuts RIGHT NOW.", "portrait": "grace" },
+    { "speaker": "Leo", "text": "We rode 3 miles for these. We fought for these. You're not getting them.", "portrait": "leo" },
+    { "speaker": "Grace", "text": "Then I'm taking them. Pool noodle round TWO.", "portrait": "grace" }
+  ],
+  "gauntlet_max_football": [
+    { "speaker": "Max", "text": "Ooh. Donuts. Hand them over and nobody gets a stiff arm.", "portrait": "max" },
+    { "speaker": "Leo", "text": "Back off, Max. We earned every single one.", "portrait": "leo" },
+    { "speaker": "Max", "text": "I'm blocking this street all day. Give me the bag.", "portrait": "max" }
+  ],
+  "gauntlet_nora": [
+    { "speaker": "Nora", "text": "I knew you'd come back this way. I've been in these bushes for an hour.", "portrait": "nora" },
+    { "speaker": "Leo", "text": "Nora. Get out of the way.", "portrait": "leo" },
+    { "speaker": "Nora", "text": "Not a chance. Drop the donuts and I'll let the rest of you pass.", "portrait": "nora" }
+  ],
+  "gauntlet_max_baseball": [
+    { "speaker": "JustinMax", "text": "BRO. You brought DONUTS past my block without offering me ONE?!", "portrait": "justinmax" },
+    { "speaker": "Leo", "text": "Justin, keep your brother away from us!", "portrait": "leo" },
+    { "speaker": "Justin", "text": "Sorry Leo — he goes electric when he smells sugar.", "portrait": "justin" }
+  ],
+  "gauntlet_grace_win": [
+    { "speaker": "Leo", "text": "MOVE, Grace.", "portrait": "leo" },
+    { "speaker": "Grace", "text": "...Fine. But I'm telling mom.", "portrait": "grace" }
+  ],
+  "gauntlet_max_win": [
+    { "speaker": "Leo", "text": "Street's clear. Let's go.", "portrait": "leo" },
+    { "speaker": "MJ", "text": "My brother needs to find a hobby that isn't blocking roads.", "portrait": "mj" }
+  ],
+  "gauntlet_nora_win": [
+    { "speaker": "Leo", "text": "Nice try, Nora.", "portrait": "leo" },
+    { "speaker": "Carson", "text": "She's gonna be in those bushes again next time. I know it.", "portrait": "carson" }
+  ],
+  "gauntlet_max_baseball_win": [
+    { "speaker": "Leo", "text": "Somebody get Justin's brother some actual batteries.", "portrait": "leo" },
+    { "speaker": "Justin", "text": "THIS WAS SO WORTH IT. LET'S GO.", "portrait": "justin" }
+  ],
+  "gauntlet_edie": [
+    { "speaker": "Edie", "text": "Donuts? From DONUT HOUSE? And you didn't bring me any?!", "portrait": "edie" },
+    { "speaker": "Leo", "text": "Edie... step aside.", "portrait": "leo" },
+    { "speaker": "Edie", "text": "Nope. You get past me, you can keep them. But you won't.", "portrait": "edie" },
+    { "speaker": "Leo", "text": "I've fought everyone on this block today. You're next.", "portrait": "leo" }
+  ],
   "edie_defeated": [
     { "speaker": "Leo", "text": "Edie... it's over. We earned these donuts.", "portrait": "leo" },
     { "speaker": "Leo", "text": "Nobody is taking them from us.", "portrait": "leo" }

@@ -25,31 +25,28 @@ export default class HudScene extends Phaser.Scene {
     const y = HUD_Y + 5; // top of text/bars inside the strip
 
     // ── Resource bars with 8px labels ────────────────────────────────────────
-    // TIME bar
-    txt(this, 4, y, 'TIME', { fontSize: '8px', color: '#4fc3f7' });
-    this.add.rectangle(40, y + 10, 60, 6, 0x1a3a4a).setOrigin(0, 0.5);
-    this._timeFill = this.add.rectangle(40, y + 10, 58, 4, 0x4fc3f7).setOrigin(0, 0.5);
+    // TIME — clock label only, no bar
+    this._timeLabel = txt(this, 4, y, '3:00P', { fontSize: '8px', color: '#4fc3f7' });
 
-    // BIKE bar
-    txt(this, 108, y, 'BIKE', { fontSize: '8px', color: '#ef5350' });
-    this.add.rectangle(144, y + 10, 60, 6, 0x4a1a1a).setOrigin(0, 0.5);
-    this._bikeFill = this.add.rectangle(144, y + 10, 58, 4, 0xef5350).setOrigin(0, 0.5);
+    // BIKE bar (shifted left into the space the time bar used to occupy)
+    txt(this, 52, y, 'BIKE', { fontSize: '8px', color: '#ef5350' });
+    this.add.rectangle(88, y + 10, 56, 6, 0x4a1a1a).setOrigin(0, 0.5);
+    this._bikeFill = this.add.rectangle(88, y + 10, 54, 4, 0xef5350).setOrigin(0, 0.5);
 
     // NRG bar
-    txt(this, 212, y, 'NRG', { fontSize: '8px', color: '#66bb6a' });
-    this.add.rectangle(248, y + 10, 60, 6, 0x1a3a1a).setOrigin(0, 0.5);
-    this._energyFill = this.add.rectangle(248, y + 10, 58, 4, 0x66bb6a).setOrigin(0, 0.5);
+    txt(this, 152, y, 'NRG', { fontSize: '8px', color: '#66bb6a' });
+    this.add.rectangle(188, y + 10, 56, 6, 0x1a3a1a).setOrigin(0, 0.5);
+    this._energyFill = this.add.rectangle(188, y + 10, 54, 4, 0x66bb6a).setOrigin(0, 0.5);
 
     // ── Fart recharge meter ───────────────────────────────────────────────────
-    txt(this, 316, y, 'F', { fontSize: '8px', color: '#f5e642' });
-    this.add.rectangle(326, y + 10, 36, 6, 0x3a3a1a).setOrigin(0, 0.5);
-    this._fartFill = this.add.rectangle(326, y + 10, 34, 4, 0xf5e642).setOrigin(0, 0.5);
+    txt(this, 252, y, 'F', { fontSize: '8px', color: '#f5e642' });
+    this.add.rectangle(262, y + 10, 36, 6, 0x3a3a1a).setOrigin(0, 0.5);
+    this._fartFill = this.add.rectangle(262, y + 10, 34, 4, 0xf5e642).setOrigin(0, 0.5);
     this._fartCooldown = 0;   // ms; 0 means ready
     this._fartDuration = 0;
 
-    // ── Snacks & money counters (8px) ─────────────────────────────────────────
-    this._snackText = txt(this, 368, y, 'S:5', { fontSize: '8px', color: '#f5e642' });
-    this._moneyText = txt(this, 400, y, '$20', { fontSize: '8px', color: '#f5a623' });
+    // ── Money counter ─────────────────────────────────────────────────────────
+    this._moneyText = txt(this, 308, y, '$50', { fontSize: '8px', color: '#f5a623' });
 
     // ── Party member dots ─────────────────────────────────────────────────────
     // Four circles near the right edge — light up when that member joins
@@ -74,13 +71,20 @@ export default class HudScene extends Phaser.Scene {
 
   _onResourceUpdate(r) {
     const clamp01 = v => Math.max(0, Math.min(1, v / 100));
-    this._timeFill.scaleX   = clamp01(r.time);
     this._bikeFill.scaleX   = clamp01(r.bikeCondition);
     this._energyFill.scaleX = clamp01(r.energy);
-    this._snackText.setText('S:' + r.snacks);
     this._moneyText.setText('$' + r.money);
-    this._timeFill.setFillStyle(r.time < 25          ? 0xff3333 : 0x4fc3f7);
-    this._bikeFill.setFillStyle(r.bikeCondition < 25 ? 0xff3333 : 0xef5350);
+
+    // Clock label: time 100 = 3:00 PM, time 0 = 5:00 PM (120 real minutes)
+    const minPast = Math.round((100 - r.time) * 1.2);
+    const hour    = 3 + Math.floor(minPast / 60);
+    const min     = minPast % 60;
+    const label   = `${hour}:${min.toString().padStart(2, '0')}P`;
+    this._timeLabel.setText(label);
+
+    const bikeColor  = r.bikeCondition < 25 ? 0xff3333 : 0xef5350;
+    this._bikeFill.setFillStyle(bikeColor);
+    this._timeLabel.setColor(r.time < 25 ? '#ff3333' : r.time < 50 ? '#ffaa00' : '#4fc3f7');
   }
 
   _onPartyUpdate(party) {

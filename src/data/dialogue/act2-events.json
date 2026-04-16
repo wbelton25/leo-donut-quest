@@ -40,12 +40,12 @@
       "id": "shortcut_found",
       "weight": 7,
       "title": "Shortcut!",
-      "description": "Justin spots a shortcut through the park.",
+      "description": "Justin spots a path through the park that cuts a chunk off the trip.",
       "choices": [
         { "text": "Stay on the main road", "effects": {} },
-        { "text": "Take it (risky, might be dead end)", "effects": { "time": 10, "energy": -5 } },
-        { "text": "Justin leads the way confidently", "effects": { "time": 20 }, "requiresPartyMember": "justin" },
-        { "text": "Warren scouts it first to confirm", "effects": { "time": 15 }, "requiresPartyMember": "warren" }
+        { "text": "Take it (risky, might be a dead end)", "effects": { "energy": -5, "distance": 150 } },
+        { "text": "Justin leads the way confidently", "effects": { "distance": 250 }, "requiresPartyMember": "justin" },
+        { "text": "Warren scouts it first to confirm", "effects": { "distance": 200 }, "requiresPartyMember": "warren" }
       ]
     },
     {
@@ -187,7 +187,7 @@
         { "text": "Push through and suffer", "effects": { "energy": -18 } },
         { "text": "Take a water break (costs time)", "effects": { "time": -8, "energy": 10 } },
         { "text": "Carson finds a shady back-road route", "effects": { "energy": -5, "time": -4 }, "requiresPartyMember": "carson" },
-        { "text": "Justin sets a fast pace to get through it quick", "effects": { "energy": -8, "time": 5 }, "requiresPartyMember": "justin" }
+        { "text": "Justin sets a fast pace to blast through quick", "effects": { "energy": -8, "distance": 80 }, "requiresPartyMember": "justin" }
       ]
     },
     {
@@ -200,6 +200,125 @@
         { "text": "Ignore the sign and ride through", "effects": { "bikeCondition": -8, "time": -3 } },
         { "text": "Carson sneaks everyone through a gap in the barrier", "effects": { "time": -2 }, "requiresPartyMember": "carson" },
         { "text": "MJ moves the barrier aside", "effects": { "time": -1 }, "requiresPartyMember": "mj" }
+      ]
+    },
+    {
+      "id": "bent_rim",
+      "weight": 9,
+      "title": "Bent Rim!",
+      "description": "Someone clipped a curb hard. The wheel is warped — every pedal stroke wobbles and squeals.",
+      "choices": [
+        { "text": "Ride on it (destroys the wheel)", "effects": { "bikeCondition": -28, "time": -3 } },
+        { "text": "Tap it back into shape with a rock", "effects": { "time": -16, "bikeCondition": -8 } },
+        { "text": "MJ strong-arms it back with brute force", "effects": { "time": -5, "bikeCondition": -5 }, "requiresPartyMember": "mj" },
+        { "text": "Warren uses a curb as a lever — actually works", "effects": { "time": -7, "bikeCondition": 8 }, "requiresPartyMember": "warren" }
+      ]
+    },
+    {
+      "id": "hill_climb",
+      "weight": 8,
+      "title": "Big Hill Ahead",
+      "description": "A steep hill with no way around it. Everyone can see it from a block away and nobody is happy.",
+      "choices": [
+        { "text": "Grind it out (brutal)", "effects": { "energy": -22, "time": -9 } },
+        { "text": "Walk the bikes up (slower but safer)", "effects": { "time": -20, "energy": -5 } },
+        { "text": "Justin sets a killer pace and drags the group up", "effects": { "energy": -10, "time": -3 }, "requiresPartyMember": "justin" },
+        { "text": "Carson knows a winding back path, less steep", "effects": { "energy": -8, "time": -11 }, "requiresPartyMember": "carson" }
+      ]
+    },
+    {
+      "id": "junk_on_road",
+      "weight": 8,
+      "title": "Debris on Road!",
+      "description": "The road ahead is covered in broken glass and metal screws from a nearby construction site.",
+      "choices": [
+        { "text": "Weave through carefully (slow)", "effects": { "time": -11 } },
+        { "text": "Gun it and hope for the best", "effects": { "bikeCondition": -22 } },
+        { "text": "Carson guides everyone single-file through the gaps", "effects": { "time": -3 }, "requiresPartyMember": "carson" },
+        { "text": "Warren tries to slingshot the screws clear... mixed results", "effects": { "time": -5, "bikeCondition": -8 }, "requiresPartyMember": "warren" }
+      ]
+    },
+    {
+      "id": "busy_intersection",
+      "weight": 6,
+      "title": "Red Light",
+      "description": "A busy four-way intersection. The light just turned red and traffic is moving fast.",
+      "choices": [
+        { "text": "Wait for green (safe, costs time)", "effects": { "time": -9 } },
+        { "text": "Run the light (risky)", "effects": { "energy": -5, "partyLossRisk": 0.2 } },
+        { "text": "Carson times the traffic gap perfectly", "effects": { "time": -2 }, "requiresPartyMember": "carson" },
+        { "text": "Justin blasts through before anyone can stop him", "effects": { "energy": -5, "distance": 40 }, "requiresPartyMember": "justin" }
+      ]
+    },
+    {
+      "id": "neighborhood_shortcut",
+      "weight": 7,
+      "title": "Yard Shortcut",
+      "description": "A yard cuts a big chunk off the trip — but there's a fence, a BEWARE OF DOG sign, and barking.",
+      "choices": [
+        { "text": "Stay on the road (safe)", "effects": {} },
+        { "text": "Risk it — cut through the yard", "effects": { "bikeCondition": -12, "partyLossRisk": 0.15, "distance": 200 } },
+        { "text": "Carson scouts it silently, finds the safe path", "effects": { "bikeCondition": -4, "distance": 175 }, "requiresPartyMember": "carson" },
+        { "text": "Warren distracts the dog with a slingshot trick shot", "effects": { "distance": 220 }, "requiresPartyMember": "warren" }
+      ]
+    },
+    {
+      "id": "spotted_by_adult",
+      "weight": 6,
+      "title": "Nosy Neighbor!",
+      "description": "Mr. Henderson from two blocks over is waving you down. He looks like he's already dialing.",
+      "choices": [
+        { "text": "Stop and explain yourselves (costs time)", "effects": { "time": -13 } },
+        { "text": "Ride past him fast — don't look back", "effects": { "partyLossRisk": 0.3 } },
+        { "text": "Carson vanishes behind a hedge before he sees them", "effects": { "time": -3 }, "requiresPartyMember": "carson" },
+        { "text": "Warren talks him up — kid's charm wins every time", "effects": { "time": -5 }, "requiresPartyMember": "warren" }
+      ]
+    },
+    {
+      "id": "water_fountain",
+      "weight": 5,
+      "title": "Water Fountain!",
+      "description": "A working water fountain by the park. Everyone is drenched in sweat. Quick stop?",
+      "choices": [
+        { "text": "Skip it — no time", "effects": {} },
+        { "text": "Everybody drinks (costs 5 minutes, worth it)", "effects": { "time": -5, "energy": 25 } },
+        { "text": "Justin refills water bottles in record time", "effects": { "time": -2, "energy": 25 }, "requiresPartyMember": "justin" }
+      ]
+    },
+    {
+      "id": "downhill_coast",
+      "weight": 6,
+      "title": "Downhill!",
+      "description": "A long, glorious downhill stretch. You can coast and recover — or hammer it and make up ground.",
+      "choices": [
+        { "text": "Coast easy and let everyone rest", "effects": { "energy": 18 } },
+        { "text": "Full speed — whip down it! (risky)", "effects": { "bikeCondition": -14, "distance": 180 } },
+        { "text": "Justin leads a controlled fast descent", "effects": { "bikeCondition": -5, "distance": 220 }, "requiresPartyMember": "justin" },
+        { "text": "Carson reads the best racing line down", "effects": { "energy": 8, "distance": 150 }, "requiresPartyMember": "carson" }
+      ]
+    },
+    {
+      "id": "sprinkler_chaos",
+      "weight": 5,
+      "title": "Lawn Sprinklers!",
+      "description": "A front yard's sprinklers suddenly blast on, soaking everyone and the bikes. Chain starts slipping.",
+      "choices": [
+        { "text": "Ride through soaked (chain damage)", "effects": { "bikeCondition": -15, "energy": -5 } },
+        { "text": "Detour around the block", "effects": { "time": -10 } },
+        { "text": "MJ rips the sprinkler head out of the ground", "effects": { "bikeCondition": -5 }, "requiresPartyMember": "mj" },
+        { "text": "Carson times the spray pattern and ducks through", "effects": { "bikeCondition": -3 }, "requiresPartyMember": "carson" }
+      ]
+    },
+    {
+      "id": "loose_handlebars",
+      "weight": 7,
+      "title": "Loose Handlebars!",
+      "description": "Someone's handlebars are wobbling. One pothole away from losing steering completely.",
+      "choices": [
+        { "text": "Ignore it and pray (very risky)", "effects": { "bikeCondition": -30, "partyLossRisk": 0.15 } },
+        { "text": "Stop and tighten with a coin", "effects": { "time": -12, "bikeCondition": 5 } },
+        { "text": "Warren has a multi-tool — fixed in 2 minutes", "effects": { "time": -4, "bikeCondition": 12 }, "requiresPartyMember": "warren" },
+        { "text": "MJ holds them straight through brute grip", "effects": { "time": -2, "bikeCondition": -8 }, "requiresPartyMember": "mj" }
       ]
     }
   ]

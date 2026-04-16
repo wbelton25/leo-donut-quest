@@ -1,6 +1,6 @@
 import {
-  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL,
-  SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS,
+  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL, SCENE_BOSS_GAUNTLET,
+  SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_DONUT_SHOP,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
   PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN,
 } from '../constants.js';
@@ -409,7 +409,33 @@ export default class NeighborhoodScene extends Phaser.Scene {
         this.time.delayedCall(420, () => {
           this.scene.start(SCENE_OREGON_TRAIL, {
             party:     ['warren', 'mj', 'carson', 'justin'],
-            resources: { time: 100, bikeCondition: 100, energy: 100, snacks: 5, money: 20 },
+            resources: { time: 100, bikeCondition: 100, energy: 100, snacks: 0, money: 50 },
+          });
+        });
+      });
+
+    // ── DEV CHEAT: press "4" to skip straight to the Donut Shop ─────────────
+    this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR)
+      .once('down', () => {
+        this.cameras.main.fade(400, 0, 0, 0);
+        this.time.delayedCall(420, () => {
+          this.scene.start(SCENE_DONUT_SHOP, {
+            party:     ['warren', 'mj', 'carson', 'justin'],
+            resources: { time: 55, bikeCondition: 60, energy: 50, snacks: 0, money: 30 },
+          });
+        });
+      });
+
+    // ── DEV CHEAT: press "3" to skip straight to the Boss Gauntlet ───────────
+    this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
+      .once('down', () => {
+        this.cameras.main.fade(400, 0, 0, 0);
+        this.time.delayedCall(420, () => {
+          this.scene.start(SCENE_BOSS_GAUNTLET, {
+            party:          ['warren', 'mj', 'carson', 'justin'],
+            donuts:         6,
+            resources:      { time: 80, bikeCondition: 75, energy: 70, snacks: 2, money: 5 },
+            defeatedBosses: [],
           });
         });
       });
@@ -420,7 +446,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.cameras.main.setDeadzone(80, 60);
 
     // ── Controls hint ─────────────────────────────────────────────────────────
-    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   D: TALK   2: SKIP TO ACT 2', {
+    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   D: TALK   2: ACT 2   3: GAUNTLET', {
       fontSize: '8px', color: '#778899',
     }).setScrollFactor(0).setDepth(10);
 

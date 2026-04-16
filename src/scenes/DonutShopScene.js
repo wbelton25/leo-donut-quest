@@ -1,5 +1,5 @@
 import {
-  SCENE_DONUT_SHOP, SCENE_RETURN_JOURNEY,
+  SCENE_DONUT_SHOP, SCENE_RETURN_JOURNEY, SCENE_HUD,
   BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
@@ -33,7 +33,12 @@ export default class DonutShopScene extends Phaser.Scene {
     this.game.registry.set('resources', this._resources);
     this.game.registry.set('party',     this._party);
 
-    this._donuts = 0;
+    this._donuts     = 0;
+    this._tierQtys   = new Array(DONUT_TIERS.length).fill(0);
+    this._refreshFns = [];
+
+    // Hide the HUD — it covers the shop header and isn't needed here
+    this.scene.sleep(SCENE_HUD);
 
     // ── Background ────────────────────────────────────────────────────────────
     this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x2a1a0a);
@@ -61,18 +66,13 @@ export default class DonutShopScene extends Phaser.Scene {
       fontSize: '8px', color: '#f5a623',
     }).setOrigin(0.5);
 
-    // Donut tier buttons
+    // Donut tier rows (stackable +/-)
     this._buildDonutTiers();
 
-    // Selection summary (updates as player picks)
-    this._selectionText = txt(this, BASE_WIDTH / 2, BASE_HEIGHT * 0.82, 'SELECT YOUR ORDER', {
-      fontSize: '8px', color: '#888888',
-    }).setOrigin(0.5);
-
-    // Order button (disabled until a tier selected)
+    // Order button
     this._buildOrderButton();
 
-    txt(this, BASE_WIDTH / 2, BASE_HEIGHT - 8, 'PICK AN ORDER, THEN CONFIRM', {
+    txt(this, BASE_WIDTH / 2, BASE_HEIGHT - 8, 'BUY AS MANY AS YOU WANT  —  THEN CONFIRM', {
       fontSize: '8px', color: '#445566',
     }).setOrigin(0.5);
 
@@ -101,48 +101,58 @@ export default class DonutShopScene extends Phaser.Scene {
   }
 
   _buildDonutTiers() {
-    this._tierBtns = [];
-    DONUT_TIERS.forEach((tier, i) => {
-      const bx = 60 + i * 100;
-      const by = BASE_HEIGHT * 0.63;
+    const CARD_W = 300;
+    const CARD_X = (BASE_WIDTH - CARD_W) / 2;
+    const startY = Math.round(BASE_HEIGHT * 0.56);
 
+    // Card background
+    this.add.rectangle(
+      BASE_WIDTH / 2, startY + DONUT_TIERS.length * 20 / 2,
+      CARD_W, DONUT_TIERS.length * 20 + 8, 0x0a0a18,
+    );
+
+    DONUT_TIERS.forEach((tier, i) => {
+      const rowY      = startY + i * 20;
       const canAfford = () => this._resources.money >= tier.cost;
 
-      const bg = this.add.rectangle(bx, by, 88, 32, 0x1a1a2a)
-        .setInteractive({ useHandCursor: true });
-      const lbl = txt(this, bx, by - 8, tier.label, {
-        fontSize: '8px', color: '#cccccc',
-      }).setOrigin(0.5);
-      const costLbl = txt(this, bx, by + 6, `$${tier.cost}`, {
-        fontSize: '8px', color: '#f5a623',
-      }).setOrigin(0.5);
+      this.add.rectangle(BASE_WIDTH / 2, rowY + 9, CARD_W - 4, 18, 0x0a0f1a);
+      const lbl  = txt(this, CARD_X + 8,   rowY + 9, tier.label,    { fontSize: '8px', color: '#cccccc' }).setOrigin(0, 0.5);
+      const cost = txt(this, CARD_X + 150,  rowY + 9, `$${tier.cost} each`, { fontSize: '8px', color: '#f5a623' }).setOrigin(0, 0.5);
+
+      const minusBtn = this.add.rectangle(CARD_X + CARD_W - 52, rowY + 9, 14, 14, 0x1a1a2a).setInteractive({ useHandCursor: true });
+      const minusLbl = txt(this, CARD_X + CARD_W - 52, rowY + 9, '-', { fontSize: '8px', color: '#cccccc' }).setOrigin(0.5);
+      const qtyLbl   = txt(this, CARD_X + CARD_W - 36, rowY + 9, '0', { fontSize: '8px', color: '#ffffff' }).setOrigin(0.5);
+      const plusBtn  = this.add.rectangle(CARD_X + CARD_W - 20, rowY + 9, 14, 14, 0x1a1a2a).setInteractive({ useHandCursor: true });
+      const plusLbl  = txt(this, CARD_X + CARD_W - 20, rowY + 9, '+', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5);
 
       const refresh = () => {
+        const qty = this._tierQtys[i];
+        qtyLbl.setText(String(qty));
         const ok = canAfford();
-        bg.setFillStyle(ok ? 0x1a2a3a : 0x111111);
-        lbl.setColor(ok ? '#ffffff' : '#444444');
-        costLbl.setColor(ok ? '#f5a623' : '#333333');
-        if (ok) bg.setInteractive({ useHandCursor: true });
-        else    bg.removeInteractive();
+        plusBtn.setFillStyle(ok ? 0x1a3a1a : 0x111111);
+        plusLbl.setColor(ok ? '#88ff88' : '#444444');
+        if (ok) plusBtn.setInteractive({ useHandCursor: true });
+        else    plusBtn.removeInteractive();
+        minusBtn.setFillStyle(qty > 0 ? 0x2a1a1a : 0x111111);
+        minusLbl.setColor(qty > 0 ? '#ff8888' : '#444444');
+        if (qty > 0) minusBtn.setInteractive({ useHandCursor: true });
+        else         minusBtn.removeInteractive();
       };
 
-      bg.on('pointerover', () => { if (canAfford()) bg.setFillStyle(0x2a3a5a); });
-      bg.on('pointerout',  () => refresh());
-      bg.on('pointerdown', () => {
+      plusBtn.on('pointerdown', () => {
         if (!canAfford()) return;
-        this._donuts = tier.count;
-        this._selectionText.setText(`ORDER: ${tier.label}  for $${tier.cost}`);
-        this._selectionText.setColor('#f5e642');
-        this._orderBtn.setFillStyle(0x8b4513);
-        this._orderBtn.setInteractive({ useHandCursor: true });
-        this._orderBtnLbl.setColor('#f5e642');
-        this._selectedTier = tier;
-        // Highlight selected
-        this._tierBtns.forEach(b => b.bg.setStrokeStyle(0, 0));
-        bg.setStrokeStyle(2, 0xf5e642);
+        this._resources.applyChanges({ money: -tier.cost });
+        this._tierQtys[i]++;
+        this._refreshAll();
+      });
+      minusBtn.on('pointerdown', () => {
+        if (this._tierQtys[i] <= 0) return;
+        this._resources.applyChanges({ money: tier.cost }); // refund
+        this._tierQtys[i]--;
+        this._refreshAll();
       });
 
-      this._tierBtns.push({ bg, lbl, costLbl, refresh });
+      this._refreshFns.push(refresh);
     });
   }
 
@@ -150,38 +160,52 @@ export default class DonutShopScene extends Phaser.Scene {
     const bx = BASE_WIDTH / 2;
     const by = BASE_HEIGHT * 0.9;
 
-    this._orderBtn = this.add.rectangle(bx, by, 180, 22, 0x3a2a1a);
-    this._orderBtnLbl = txt(this, bx, by, 'CONFIRM ORDER  →', {
+    this._orderBtn    = this.add.rectangle(bx, by, 220, 22, 0x3a2a1a);
+    this._orderBtnLbl = txt(this, bx, by, 'SELECT DONUTS ABOVE', {
       fontSize: '8px', color: '#666666',
     }).setOrigin(0.5);
 
-    this._orderBtn.on('pointerover', () => { if (this._donuts > 0) this._orderBtn.setFillStyle(0xaa5520); });
-    this._orderBtn.on('pointerout',  () => { if (this._donuts > 0) this._orderBtn.setFillStyle(0x8b4513); });
+    this._orderBtn.on('pointerover', () => { if (this._getTotalDonuts() > 0) this._orderBtn.setFillStyle(0xaa5520); });
+    this._orderBtn.on('pointerout',  () => { if (this._getTotalDonuts() > 0) this._orderBtn.setFillStyle(0x8b4513); });
     this._orderBtn.on('pointerdown', () => {
-      if (!this._donuts || !this._selectedTier) return;
-      this._resources.applyChanges({ money: -this._selectedTier.cost });
+      const total = this._getTotalDonuts();
+      if (total <= 0) return;
+      this._donuts = total;
       this._startReturn();
     });
   }
 
+  _getTotalDonuts() {
+    return DONUT_TIERS.reduce((sum, tier, i) => sum + tier.count * this._tierQtys[i], 0);
+  }
+
+  _refreshAll() {
+    this._refreshFns.forEach(r => r());
+    this._moneyDisplay.setText(`MONEY: $${this._resources.money}`);
+    const total = this._getTotalDonuts();
+    if (total > 0) {
+      this._orderBtnLbl.setText(`ORDER ${total} DONUT${total === 1 ? '' : 'S'}  →`).setColor('#f5e642');
+      this._orderBtn.setFillStyle(0x8b4513).setInteractive({ useHandCursor: true });
+    } else {
+      this._orderBtnLbl.setText('SELECT DONUTS ABOVE').setColor('#666666');
+      this._orderBtn.setFillStyle(0x3a2a1a).removeInteractive();
+    }
+  }
+
   _startReturn() {
+    this.scene.wake(SCENE_HUD);
     this.cameras.main.fade(500, 0, 0, 0);
     this.time.delayedCall(520, () => {
-      this.scene.get(SCENE_DIALOGUE)?.showScript('return_journey', () => {
-        this.cameras.main.fade(400, 0, 0, 0);
-        this.time.delayedCall(420, () => {
-          this.scene.start(SCENE_RETURN_JOURNEY, {
-            party:     this._party.getParty(),
-            donuts:    this._donuts,
-            resources: this._resources.getAll(),
-          });
-        });
+      this.scene.start(SCENE_RETURN_JOURNEY, {
+        party:     this._party.getParty(),
+        donuts:    this._donuts,
+        resources: this._resources.getAll(),
       });
     });
   }
 
   _refreshMoney() {
-    this._moneyDisplay.setText(`YOUR MONEY: $${this._resources.money}  —  SPEND WISELY`);
-    this._tierBtns?.forEach(b => b.refresh());
+    this._moneyDisplay.setText(`MONEY: $${this._resources.money}`);
+    this._refreshFns.forEach(r => r());
   }
 }

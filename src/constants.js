@@ -117,8 +117,8 @@ export const DEFAULT_GAME_STATE = {
     time: 100,         // time remaining before donut shop closes (0-100)
     bikeCondition: 100, // bike health (0-100)
     energy: 100,       // party energy (0-100)
-    snacks: 5,         // snack count
-    money: 20,         // dollars
+    snacks: 0,         // snack count (buy at Walmart — $10 per party member pooled)
+    money: 50,         // dollars ($10 × 5 members; reduced if fewer recruited)
   },
   donuts: 0,           // donuts collected at the shop
 };

@@ -1,44 +1,53 @@
 import { BASE_WIDTH, BASE_HEIGHT, txt } from '../constants.js';
 
-// WalmartShopCard: mid-ride gear shop overlay shown at the Walmart checkpoint.
-// Similar to EventCard but persistent (multiple purchases) until player closes it.
-// Time drains 1/sec while shopping to create mild urgency.
+// WalmartShopCard: mid-ride gear shop at the Walmart checkpoint.
+// Two sections: SNACKS and BIKE PARTS. Items are stackable (buy multiples).
+// Purchases go into an inventory object — they are NOT applied immediately.
+// The scene applies them when the player uses them (S key or critical repair card).
+//
+// Inventory shape (passed in by reference from OregonTrailScene):
+//   snackInv:  { gatorade: N, granola: N, hotdog: N }
+//   bikeInv:   { patch: N, tire: N, chain: N }
 
-const CARD_W = 340;
-const CARD_H = 190;
+const CARD_W = 300;
 const CARD_X = (BASE_WIDTH - CARD_W) / 2;
-const CARD_Y = (BASE_HEIGHT - CARD_H) / 2 - 10;
+const CARD_Y = 34; // sits just below the HUD strip
 
-const WALMART_ITEMS = [
-  { id: 'inner_tube', label: 'INNER TUBE',   cost: 8,  effects: { bikeCondition: 35 }, desc: '+35 BIKE'  },
-  { id: 'energy_bar', label: 'ENERGY BARS',  cost: 5,  effects: { energy: 20 },        desc: '+20 NRG'   },
-  { id: 'water',      label: 'WATER BOTTLE', cost: 3,  effects: { energy: 10 },        desc: '+10 NRG'   },
-  { id: 'chain_lube', label: 'CHAIN LUBE',   cost: 6,  effects: { bikeCondition: 15 }, desc: '+15 BIKE'  },
-  { id: 'snack_bag',  label: 'SNACK BAG',    cost: 7,  effects: { snacks: 2 },         desc: '+2 SNACKS' },
+const SNACK_ITEMS = [
+  { id: 'gatorade', label: 'GATORADE',    cost: 1, desc: '+33 STAMINA', inv: 'snackInv' },
+  { id: 'granola',  label: 'GRANOLA BAR', cost: 2, desc: '+67 STAMINA', inv: 'snackInv' },
+  { id: 'hotdog',   label: 'HOT DOG',     cost: 3, desc: 'FULL STAMINA', inv: 'snackInv' },
+];
+
+const BIKE_ITEMS = [
+  { id: 'patch', label: 'TIRE PATCH', cost: 1, desc: '+33 BIKE', inv: 'bikeInv' },
+  { id: 'tire',  label: 'NEW TIRE',   cost: 2, desc: '+67 BIKE', inv: 'bikeInv' },
+  { id: 'chain', label: 'NEW CHAIN',  cost: 3, desc: 'FULL BIKE', inv: 'bikeInv' },
 ];
 
 export default class WalmartShopCard {
-  constructor(scene, resources) {
+  constructor(scene, resources, snackInv, bikeInv) {
     this._scene     = scene;
     this._resources = resources;
-    this._purchased = new Set();
+    this._snackInv  = snackInv;
+    this._bikeInv   = bikeInv;
     this._onClose   = null;
     this._drainEvent = null;
-    this._container = scene.add.container(0, 0).setDepth(30).setVisible(false);
-    this._itemRows  = [];
-    this._moneyText = null;
+
+    this._container  = scene.add.container(0, 0).setDepth(30).setVisible(false);
+    this._refreshFns = [];
+    this._moneyText  = null;
     this._build();
   }
 
   show(onClose) {
-    this._onClose   = onClose;
-    this._purchased.clear();
+    this._onClose = onClose;
     this._container.setVisible(true);
     this._refreshAll();
-    // Time drains 1 per second while at Walmart
+    // Time drains 2 per second while shopping — mild pressure to not linger
     this._drainEvent = this._scene.time.addEvent({
       delay: 1000, loop: true,
-      callback: () => this._resources.applyChanges({ time: -1 }),
+      callback: () => this._resources.applyChanges({ time: -2 }),
     });
   }
 
@@ -50,100 +59,102 @@ export default class WalmartShopCard {
   // ── Internal ──────────────────────────────────────────────────────────────────
 
   _build() {
-    // Overlay
-    const overlay = this._scene.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.65);
-    // Card bg
-    const bg     = this._scene.add.rectangle(BASE_WIDTH / 2, CARD_Y + CARD_H / 2, CARD_W, CARD_H, 0x0a0a1a, 0.97);
-    const border = this._scene.add.rectangle(BASE_WIDTH / 2, CARD_Y + CARD_H / 2, CARD_W, CARD_H, 0, 0)
+    // money(16) + gap(8) + 3 snack rows(60) + gap(8) + 3 bike rows(60) + gap(8) + footer(20) + padding(8)
+    const cardH = 16 + 8 + 60 + 8 + 60 + 8 + 20 + 8;
+
+    // Dark overlay
+    const overlay = this._scene.add.rectangle(
+      BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.72,
+    );
+    // Card bg + border
+    const bg     = this._scene.add.rectangle(BASE_WIDTH / 2, CARD_Y + cardH / 2, CARD_W, cardH, 0x080c18, 0.98);
+    const border = this._scene.add.rectangle(BASE_WIDTH / 2, CARD_Y + cardH / 2, CARD_W, cardH, 0, 0)
       .setStrokeStyle(2, 0x4488ff);
 
-    // Header bar
-    this._scene.add.rectangle(BASE_WIDTH / 2, CARD_Y + 12, CARD_W, 22, 0x001a44);
-    const title = txt(this._scene, BASE_WIDTH / 2, CARD_Y + 12, 'WALMART  —  GEAR UP!', {
-      fontSize: '8px', color: '#4488ff',
-    }).setOrigin(0.5);
+    // Money
+    this._moneyText = txt(this._scene, BASE_WIDTH / 2, CARD_Y + 10, '', { fontSize: '8px', color: '#f5a623' }).setOrigin(0.5);
 
-    // Money display
-    this._moneyText = txt(this._scene, BASE_WIDTH / 2, CARD_Y + 28, '', {
-      fontSize: '8px', color: '#f5a623',
-    }).setOrigin(0.5);
+    this._container.add([overlay, bg, border]);
 
-    this._container.add([overlay, bg, border, title, this._moneyText]);
-
-    // Item rows
-    WALMART_ITEMS.forEach((item, i) => {
-      const rowY = CARD_Y + 44 + i * 22;
-      this._buildItemRow(item, rowY);
+    // ── SNACKS rows ───────────────────────────────────────────────────────────
+    let curY = CARD_Y + 24;
+    SNACK_ITEMS.forEach(item => {
+      this._buildRow(item, curY, this._snackInv);
+      curY += 20;
     });
 
-    // Continue button
-    const contBg = this._scene.add.rectangle(BASE_WIDTH / 2, CARD_Y + CARD_H - 14, 160, 20, 0x1a3a1a)
+    curY += 8;
+
+    // ── BIKE PARTS rows ───────────────────────────────────────────────────────
+    BIKE_ITEMS.forEach(item => {
+      this._buildRow(item, curY, this._bikeInv);
+      curY += 20;
+    });
+
+    curY += 8;
+
+    // ── Continue button ───────────────────────────────────────────────────────
+    const contBg = this._scene.add.rectangle(BASE_WIDTH / 2, curY + 10, 180, 20, 0x1a3a1a)
       .setInteractive({ useHandCursor: true });
-    const contLbl = txt(this._scene, BASE_WIDTH / 2, CARD_Y + CARD_H - 14, 'CONTINUE RIDING  →', {
+    const contLbl = txt(this._scene, BASE_WIDTH / 2, curY + 10, 'CONTINUE RIDING  →', {
       fontSize: '8px', color: '#88ff88',
     }).setOrigin(0.5);
 
     contBg.on('pointerover', () => contBg.setFillStyle(0x2a6a2a));
     contBg.on('pointerout',  () => contBg.setFillStyle(0x1a3a1a));
-    contBg.on('pointerdown', () => {
-      this.hide();
-      if (this._onClose) this._onClose();
-    });
-
-    this._container.add([contBg, contLbl]);
+    contBg.on('pointerdown', () => { this.hide(); if (this._onClose) this._onClose(); });
+    this._container.add([contBg, contLbl, this._moneyText]);
   }
 
-  _buildItemRow(item, y) {
+  _buildRow(item, y, inv) {
     const canAfford = () => this._resources.money >= item.cost;
-    const bought    = () => this._purchased.has(item.id);
 
-    const rowBg = this._scene.add.rectangle(BASE_WIDTH / 2, y, CARD_W - 16, 18, 0x0f1a2a);
+    const rowBg  = this._scene.add.rectangle(BASE_WIDTH / 2, y + 9, CARD_W - 4, 18, 0x0a0f1a);
+    const lbl    = txt(this._scene, CARD_X + 8,   y + 9, item.label, { fontSize: '8px', color: '#cccccc' }).setOrigin(0, 0.5);
+    const desc   = txt(this._scene, CARD_X + 110,  y + 9, item.desc,  { fontSize: '8px', color: '#778899' }).setOrigin(0, 0.5);
+    const cost   = txt(this._scene, CARD_X + 200,  y + 9, `$${item.cost}`, { fontSize: '8px', color: '#f5a623' }).setOrigin(0, 0.5);
 
-    const label = txt(this._scene, CARD_X + 14, y, item.label, {
-      fontSize: '8px', color: '#cccccc',
-    }).setOrigin(0, 0.5);
-
-    const desc = txt(this._scene, CARD_X + 130, y, item.desc, {
-      fontSize: '8px', color: '#88aacc',
-    }).setOrigin(0, 0.5);
-
-    const costLbl = txt(this._scene, CARD_X + 230, y, `$${item.cost}`, {
-      fontSize: '8px', color: '#f5a623',
-    }).setOrigin(0, 0.5);
-
-    const btn = this._scene.add.rectangle(CARD_X + CARD_W - 36, y, 44, 14, 0x1a3a1a)
-      .setInteractive({ useHandCursor: true });
-    const btnLbl = txt(this._scene, CARD_X + CARD_W - 36, y, 'BUY', {
-      fontSize: '8px', color: '#88ff88',
-    }).setOrigin(0.5);
+    // Minus / qty / plus
+    const minusBtn = this._scene.add.rectangle(CARD_X + CARD_W - 52, y + 9, 14, 14, 0x1a1a2a).setInteractive({ useHandCursor: true });
+    const minusLbl = txt(this._scene, CARD_X + CARD_W - 52, y + 9, '-', { fontSize: '8px', color: '#cccccc' }).setOrigin(0.5);
+    const qtyLbl   = txt(this._scene, CARD_X + CARD_W - 36, y + 9, '0', { fontSize: '8px', color: '#ffffff' }).setOrigin(0.5);
+    const plusBtn  = this._scene.add.rectangle(CARD_X + CARD_W - 20, y + 9, 14, 14, 0x1a1a2a).setInteractive({ useHandCursor: true });
+    const plusLbl  = txt(this._scene, CARD_X + CARD_W - 20, y + 9, '+', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5);
 
     const refresh = () => {
-      const ok = canAfford() && !bought();
-      rowBg.setFillStyle(bought() ? 0x0a1a0a : 0x0f1a2a);
-      label.setColor(bought() ? '#446644' : '#cccccc');
-      btn.setFillStyle(ok ? 0x1a3a1a : 0x111111);
-      btnLbl.setText(bought() ? 'GOT IT' : 'BUY');
-      btnLbl.setColor(ok ? '#88ff88' : (bought() ? '#446644' : '#444444'));
-      if (ok) btn.setInteractive({ useHandCursor: true });
-      else    btn.removeInteractive();
+      const qty = inv[item.id] ?? 0;
+      qtyLbl.setText(String(qty));
+      const ok = canAfford();
+      plusBtn.setFillStyle(ok ? 0x1a3a1a : 0x111111);
+      plusLbl.setColor(ok ? '#88ff88' : '#444444');
+      if (ok) plusBtn.setInteractive({ useHandCursor: true });
+      else    plusBtn.removeInteractive();
+      minusBtn.setFillStyle(qty > 0 ? 0x2a1a1a : 0x111111);
+      minusLbl.setColor(qty > 0 ? '#ff8888' : '#444444');
+      if (qty > 0) minusBtn.setInteractive({ useHandCursor: true });
+      else         minusBtn.removeInteractive();
       this._moneyText.setText(`MONEY: $${this._resources.money}  (save some for donuts!)`);
     };
 
-    btn.on('pointerover', () => { if (canAfford() && !bought()) btn.setFillStyle(0x2a5a2a); });
-    btn.on('pointerout',  () => refresh());
-    btn.on('pointerdown', () => {
-      if (!canAfford() || bought()) return;
-      this._resources.applyChanges({ money: -item.cost, ...item.effects });
-      this._purchased.add(item.id);
+    plusBtn.on('pointerdown', () => {
+      if (!canAfford()) return;
+      this._resources.applyChanges({ money: -item.cost });
+      inv[item.id] = (inv[item.id] ?? 0) + 1;
+      this._refreshAll();
+    });
+    minusBtn.on('pointerdown', () => {
+      if ((inv[item.id] ?? 0) <= 0) return;
+      this._resources.applyChanges({ money: item.cost }); // refund
+      inv[item.id] -= 1;
       this._refreshAll();
     });
 
-    this._container.add([rowBg, label, desc, costLbl, btn, btnLbl]);
-    this._itemRows.push(refresh);
+    this._container.add([rowBg, lbl, desc, cost, minusBtn, minusLbl, qtyLbl, plusBtn, plusLbl]);
+    this._refreshFns.push(refresh);
   }
 
   _refreshAll() {
-    this._itemRows.forEach(r => r());
-    this._moneyText.setText(`MONEY: $${this._resources.money}  (save some for donuts!)`);
+    this._refreshFns.forEach(r => r());
+    this._moneyText?.setText(`MONEY: $${this._resources.money}  (save some for donuts!)`);
   }
 }

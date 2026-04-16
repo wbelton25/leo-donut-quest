@@ -545,7 +545,8 @@ export default class GraceBossScene extends Phaser.Scene {
 
         // Show post-fight dialogue then return to neighborhood
         // DIALOGUE is already a persistent parallel scene — don't launch/stop it
-        this.scene.get(SCENE_DIALOGUE).showScript('warren_after_grace', () => {
+        const victoryScript = this._gauntlet ? 'gauntlet_grace_win' : 'warren_after_grace';
+        this.scene.get(SCENE_DIALOGUE).showScript(victoryScript, () => {
           this.cameras.main.fade(500, 0, 0, 0);
           this.time.delayedCall(520, () => {
             if (this._gauntlet) {

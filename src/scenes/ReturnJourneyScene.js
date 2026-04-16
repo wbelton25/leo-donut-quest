@@ -1,5 +1,5 @@
 import {
-  SCENE_RETURN_JOURNEY, SCENE_BOSS_GAUNTLET,
+  SCENE_RETURN_JOURNEY, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE,
   BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
 
@@ -58,10 +58,18 @@ export default class ReturnJourneyScene extends Phaser.Scene {
     // ── Auto-transition ───────────────────────────────────────────────────────
     this._elapsed = 0;
     this._done    = false;
+    this._riding  = false;
+
+    // Show return_journey dialogue, then start the ride
+    this.time.delayedCall(200, () => {
+      this.scene.get(SCENE_DIALOGUE).showScript('return_journey', () => {
+        this._riding = true;
+      });
+    });
   }
 
   update(time, delta) {
-    if (this._done) return;
+    if (this._done || !this._riding) return;
     const dt = delta / 1000;
     this._elapsed += delta;
 

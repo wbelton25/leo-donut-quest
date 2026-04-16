@@ -505,7 +505,8 @@ export default class MaxBossScene extends Phaser.Scene {
         this._maxHpFill.destroy();
 
         // DIALOGUE is already a persistent parallel scene — don't launch/stop it
-        this.scene.get(SCENE_DIALOGUE).showScript('mj_join', () => {
+        const victoryScript = this._gauntlet ? 'gauntlet_max_win' : 'mj_join';
+        this.scene.get(SCENE_DIALOGUE).showScript(victoryScript, () => {
           this.cameras.main.fade(500, 0, 0, 0);
           this.time.delayedCall(520, () => {
             if (this._gauntlet) {

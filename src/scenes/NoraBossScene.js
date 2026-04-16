@@ -558,7 +558,8 @@ export default class NoraBossScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(900, () => {
-      this.scene.get(SCENE_DIALOGUE).showScript('carson_after_nora', () => {
+      const victoryScript = this._gauntlet ? 'gauntlet_nora_win' : 'carson_after_nora';
+      this.scene.get(SCENE_DIALOGUE).showScript(victoryScript, () => {
         this.cameras.main.fade(500, 0, 0, 0);
         this.time.delayedCall(520, () => {
           if (this._gauntlet) {
