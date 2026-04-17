@@ -6,7 +6,11 @@ import {
 } from '../constants.js';
 import Player from '../entities/Player.js';
 import Follower, { PositionBuffer } from '../entities/Follower.js';
-import DeerObstacle from '../entities/DeerObstacle.js';
+import DeerObstacle     from '../entities/DeerObstacle.js';
+import CarObstacle      from '../entities/CarObstacle.js';
+import GolfCartObstacle from '../entities/GolfCartObstacle.js';
+import BikeObstacle     from '../entities/BikeObstacle.js';
+import GolfBallSpawner  from '../entities/GolfBallSpawner.js';
 // GraceBoss is now handled in GraceBossScene; import removed
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
@@ -371,37 +375,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this.time.delayedCall(400, () => this._showBossRetryDialog(this._initData));
     }
 
-    // ── Deer obstacles — frogger-style lanes ──────────────────────────────────
-    const H = () => this._onDeerHit();
-    this._deer = [
-      // Tega Cay Drive upper (row 47-50, cols 45-213): 4 deer E-W
-      new DeerObstacle(this, 70,  48, [45, 213], H),
-      new DeerObstacle(this, 110, 47, [45, 213], H),
-      new DeerObstacle(this, 155, 48, [45, 213], H),
-      new DeerObstacle(this, 195, 47, [45, 213], H),
-
-      // Tega Cay Drive lower (row 56-59, cols 45-213): 4 deer E-W
-      new DeerObstacle(this, 80,  57, [45, 213], H),
-      new DeerObstacle(this, 130, 56, [45, 213], H),
-      new DeerObstacle(this, 170, 57, [45, 213], H),
-      new DeerObstacle(this, 205, 56, [45, 213], H),
-
-      // Tara Tea Dr (row 64-66, cols 56-129): 4 deer E-W
-      new DeerObstacle(this, 70,  64, [56, 129], H),
-      new DeerObstacle(this, 90,  65, [56, 129], H),
-      new DeerObstacle(this, 108, 64, [56, 129], H),
-      new DeerObstacle(this, 120, 65, [56, 129], H),
-
-      // Windward N-S (col 46-56, rows 60-130): 4 deer N-S
-      new DeerObstacle(this, 47,  75, [60, 130], H),
-      new DeerObstacle(this, 48,  95, [60, 130], H),
-      new DeerObstacle(this, 53,  85, [60, 130], H),
-      new DeerObstacle(this, 54, 110, [60, 130], H),
-
-      // Mariana Ln (row 84-86, cols 56-84): 2 deer
-      new DeerObstacle(this, 65,  84, [56, 84],  H),
-      new DeerObstacle(this, 75,  85, [56, 84],  H),
-    ];
+    // ── Dynamic obstacles (deer, cars, golf carts, bikes, golf balls) ────────────
+    // Reads from a Tiled 'DynamicObstacles' object layer when the map is loaded.
+    // Until Tiled integration is active, DEFAULT_OBSTACLES below defines the spawn set.
+    this._spawnObstaclesFromMap();
 
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
@@ -480,7 +457,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     }
 
     // Update obstacles
-    this._deer.forEach(d => d.update(this._player));
+    this._obstacles.forEach(o => o.update(this._player));
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
@@ -595,7 +572,75 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   _onObstacleHit(damage = 10) {
     this._resources.applyChanges({ bikeCondition: -damage });
-    this.cameras.main.flash(200, 255, damage * 5, 0);
+    this.cameras.main.flash(200, 255, Math.min(damage * 5, 255), 0);
+  }
+
+  // ── Obstacle factory ───────────────────────────────────────────────────────────
+  // When the neighborhood uses a Tiled map, replace DEFAULT_OBSTACLES with:
+  //   const layer = this._map.getObjectLayer('DynamicObstacles');
+  //   const defs  = layer ? layer.objects.map(o => ({ ... })) : DEFAULT_OBSTACLES;
+  //
+  // Each entry: { type, x, y, min, max, isH, speed?, damage?, interval?, angle? }
+  //   type  = 'deer' | 'car' | 'golf_cart' | 'bike' | 'golf_ball'
+  //   x, y  = center spawn (pixels)
+  //   min, max = patrol range (pixels) on the patrol axis; ignored for golf_ball
+  //   isH   = true (E-W) | false (N-S); ignored for golf_ball
+  //   angle = degrees for golf_ball direction (0=right, 90=down, 180=left, 270=up)
+  //   interval = ms between golf_ball shots
+
+  _spawnObstaclesFromMap() {
+    const T = TILE_SIZE;
+    const cb = (dmg) => this._onObstacleHit(dmg);
+
+    // Pixel-coord conversion helper: tc() converts tile col/row to pixel center
+    const tc = (n) => n * T + T / 2;
+    const tp = (n) => n * T; // tile edge → pixel
+
+    // Default obstacle set — mirrors the original hardcoded deer positions.
+    // Replace/extend this list by placing objects in the Tiled DynamicObstacles layer.
+    const DEFAULT_OBSTACLES = [
+      // ── Deer: Tega Cay Drive upper (E-W) ───────────────────────────────────────
+      { type:'deer', x:tc(70),  y:tc(48), min:tp(45), max:tp(213), isH:true  },
+      { type:'deer', x:tc(110), y:tc(47), min:tp(45), max:tp(213), isH:true  },
+      { type:'deer', x:tc(155), y:tc(48), min:tp(45), max:tp(213), isH:true  },
+      { type:'deer', x:tc(195), y:tc(47), min:tp(45), max:tp(213), isH:true  },
+      // ── Deer: Tega Cay Drive lower (E-W) ───────────────────────────────────────
+      { type:'deer', x:tc(80),  y:tc(57), min:tp(45), max:tp(213), isH:true  },
+      { type:'deer', x:tc(130), y:tc(56), min:tp(45), max:tp(213), isH:true  },
+      { type:'deer', x:tc(170), y:tc(57), min:tp(45), max:tp(213), isH:true  },
+      { type:'deer', x:tc(205), y:tc(56), min:tp(45), max:tp(213), isH:true  },
+      // ── Deer: Tara Tea Dr (E-W) ─────────────────────────────────────────────────
+      { type:'deer', x:tc(70),  y:tc(64), min:tp(56), max:tp(129), isH:true  },
+      { type:'deer', x:tc(90),  y:tc(65), min:tp(56), max:tp(129), isH:true  },
+      { type:'deer', x:tc(108), y:tc(64), min:tp(56), max:tp(129), isH:true  },
+      { type:'deer', x:tc(120), y:tc(65), min:tp(56), max:tp(129), isH:true  },
+      // ── Deer: Windward Dr (N-S) ──────────────────────────────────────────────────
+      { type:'deer', x:tc(47), y:tc(75),  min:tp(60), max:tp(130), isH:false },
+      { type:'deer', x:tc(48), y:tc(95),  min:tp(60), max:tp(130), isH:false },
+      { type:'deer', x:tc(53), y:tc(85),  min:tp(60), max:tp(130), isH:false },
+      { type:'deer', x:tc(54), y:tc(110), min:tp(60), max:tp(130), isH:false },
+      // ── Deer: Mariana Ln (E-W) ──────────────────────────────────────────────────
+      { type:'deer', x:tc(65), y:tc(84), min:tp(56), max:tp(84), isH:true },
+      { type:'deer', x:tc(75), y:tc(85), min:tp(56), max:tp(84), isH:true },
+    ];
+
+    this._obstacles = DEFAULT_OBSTACLES.map(d => {
+      switch (d.type) {
+        case 'deer':
+          return new DeerObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed);
+        case 'car':
+          return new CarObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed, d.damage);
+        case 'golf_cart':
+          return new GolfCartObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed, d.damage);
+        case 'bike':
+          return new BikeObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed, d.damage);
+        case 'golf_ball':
+          return new GolfBallSpawner(this, d.x, d.y, d.angle ?? 0, d.interval, d.speed, d.damage, cb);
+        default:
+          console.warn('[NeighborhoodScene] Unknown obstacle type:', d.type);
+          return null;
+      }
+    }).filter(Boolean);
   }
 
   _doDepart() {
