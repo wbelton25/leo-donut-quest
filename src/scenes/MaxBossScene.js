@@ -1,5 +1,5 @@
 import {
-  SCENE_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_GAME_OVER, SCENE_BOSS_GAUNTLET,
+  SCENE_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, txt,
 } from '../constants.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
@@ -482,7 +482,9 @@ export default class MaxBossScene extends Phaser.Scene {
 
     if (!this._gauntlet) {
       this.cameras.main.fade(600, 0, 0, 0, false, (cam, progress) => {
-        if (progress === 1) this.scene.start(SCENE_GAME_OVER, { reason: 'energy' });
+        if (progress === 1) this.scene.start(SCENE_NEIGHBORHOOD, {
+          bossLost: 'max', bossScene: SCENE_MAX_BOSS, spawnCol: 189, spawnRow: 70,
+        });
       });
       return;
     }

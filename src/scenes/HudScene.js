@@ -75,16 +75,20 @@ export default class HudScene extends Phaser.Scene {
     this._energyFill.scaleX = clamp01(r.energy);
     this._moneyText.setText('$' + r.money);
 
-    // Clock label: time 100 = 3:00 PM, time 0 = 5:00 PM (120 real minutes)
-    const minPast = Math.round((100 - r.time) * 1.2);
-    const hour    = 3 + Math.floor(minPast / 60);
-    const min     = minPast % 60;
-    const label   = `${hour}:${min.toString().padStart(2, '0')}P`;
+    // Clock: time=270 → 12:30 PM, time=120 → 3:00 PM (Act 1 hard stop), time=0 → 5:00 PM
+    const minPast  = Math.round(270 - r.time);
+    const totalMin = 12 * 60 + 30 + minPast;   // base: 12:30 PM in absolute minutes
+    const h    = Math.floor(totalMin / 60);
+    const m    = totalMin % 60;
+    const h12  = h > 12 ? h - 12 : h;
+    const ampm = h >= 12 ? 'P' : 'A';
+    const label = `${h12}:${m.toString().padStart(2, '0')}${ampm}`;
     this._timeLabel.setText(label);
 
     const bikeColor  = r.bikeCondition < 25 ? 0xff3333 : 0xef5350;
     this._bikeFill.setFillStyle(bikeColor);
-    this._timeLabel.setColor(r.time < 25 ? '#ff3333' : r.time < 50 ? '#ffaa00' : '#4fc3f7');
+    // Red < 3:30 PM (time < 90), orange < 4:00 PM (time < 150), blue otherwise
+    this._timeLabel.setColor(r.time < 90 ? '#ff3333' : r.time < 150 ? '#ffaa00' : '#4fc3f7');
   }
 
   _onPartyUpdate(party) {

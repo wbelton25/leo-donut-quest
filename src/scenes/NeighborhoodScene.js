@@ -1,5 +1,5 @@
 import {
-  SCENE_NEIGHBORHOOD, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL, SCENE_BOSS_GAUNTLET,
+  SCENE_NEIGHBORHOOD, SCENE_TITLE, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL, SCENE_BOSS_GAUNTLET,
   SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_DONUT_SHOP,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
   PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN,
@@ -282,12 +282,15 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 294 * T, 74 * T, "CARSON'S",  { fontSize: '8px', color: '#88aaff' });
     txt(this, 314 * T, 119 * T, "JUSTIN'S", { fontSize: '8px', color: '#cc88ff' });
 
-    // Departure marker — only visible when full party assembled
-    this._departureMarker = this.add.rectangle(27 * T, 141 * T, 16, 16, 0xf5e642, 0.8).setDepth(3).setVisible(false);
-    this._departureLabel  = txt(this, 27 * T - 18, 141 * T - 16, 'DEPART\nHERE', {
-      fontSize: '8px', color: '#f5e642',
-    }).setDepth(3).setVisible(false);
-    this.tweens.add({ targets: this._departureMarker, alpha: 0.1, yoyo: true, repeat: -1, duration: 500 });
+    // ── Act 2 exit zone — position driven by Tiled 'act2_exit' object ────────────
+    // Place a Point object named 'act2_exit' in the Spawns layer of neighborhood.json.
+    // Until placed, the exit zone is inactive (no silent fallback).
+    this._exitX = null;
+    this._exitY = null;
+    this._exitRadius = 50;
+    // (Tiled map reading will be wired in once the map has a DynamicObstacles/Spawns layer.
+    //  For now the exit is inactive; use cheat key "2" to test Act 2.)
+    // TODO: this._map.findObject('Spawns', o => o.name === 'act2_exit') once map is loaded via Tiled
 
     // Zone markers — flashing indicators so the player can see where to go
     FRIEND_ZONES.forEach(zone => {
@@ -331,6 +334,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (this._initData.graceDefeated && !this._recruited.has(PARTY_WARREN)) {
       this._recruited.add(PARTY_WARREN);
       this._party.addMember(PARTY_WARREN);
+      this._resources.applyChanges({ money: 10 });
       const zone = FRIEND_ZONES.find(z => z.id === PARTY_WARREN);
       if (zone) this._spawnFollower(zone);
     }
@@ -339,6 +343,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (this._initData.maxDefeated && !this._recruited.has(PARTY_MJ)) {
       this._recruited.add(PARTY_MJ);
       this._party.addMember(PARTY_MJ);
+      this._resources.applyChanges({ money: 10 });
       const zone = FRIEND_ZONES.find(z => z.id === PARTY_MJ);
       if (zone) this._spawnFollower(zone);
     }
@@ -347,6 +352,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (this._initData.noraDefeated && !this._recruited.has(PARTY_CARSON)) {
       this._recruited.add(PARTY_CARSON);
       this._party.addMember(PARTY_CARSON);
+      this._resources.applyChanges({ money: 10 });
       const zone = FRIEND_ZONES.find(z => z.id === PARTY_CARSON);
       if (zone) this._spawnFollower(zone);
     }
@@ -355,8 +361,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (this._initData.justinMaxDefeated && !this._recruited.has(PARTY_JUSTIN)) {
       this._recruited.add(PARTY_JUSTIN);
       this._party.addMember(PARTY_JUSTIN);
+      this._resources.applyChanges({ money: 10 });
       const zone = FRIEND_ZONES.find(z => z.id === PARTY_JUSTIN);
       if (zone) this._spawnFollower(zone);
+    }
+
+    // Boss retry dialog — if returning from a loss with bossLost flag set
+    if (this._initData.bossLost) {
+      this.time.delayedCall(400, () => this._showBossRetryDialog(this._initData));
     }
 
     // ── Deer obstacles — frogger-style lanes ──────────────────────────────────
@@ -457,7 +469,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._party._emit();
   }
 
-  update() {
+  update(time, delta) {
     this._player.update();
     this._posBuffer.record();
     this._followers.forEach(f => f.update());
@@ -467,28 +479,46 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this._abilities.execute('lightning_fart', this, this._player);
     }
 
-    // Update deer
+    // Update obstacles
     this._deer.forEach(d => d.update(this._player));
 
-    // Game over check — energy hits 0
+    // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
+    this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
+
+    // ── Act 1 clock drain (constant real-time rate) ───────────────────────────────
+    // ACT1_TIME_RATE: time-units per second. 0.5 = ~9 min real time to drain Act 1 budget.
+    // Tune this so optimal full-party route feels like ~2-3 min of real play.
+    const ACT1_TIME_RATE = 0.5;
+    if (!this._departurePlayed) {
+      this._act1TimeAccum = (this._act1TimeAccum ?? 0) + delta;
+      if (this._act1TimeAccum >= 1000) {
+        this._resources.applyChanges({ time: -Math.round(ACT1_TIME_RATE * this._act1TimeAccum / 1000) });
+        this._act1TimeAccum = 0;
+      }
+    }
+
+    // ── Game over checks ──────────────────────────────────────────────────────────
+    // Energy hits 0
     if (this._resources.isExhausted() && !this._gameOverTriggered) {
       this._gameOverTriggered = true;
       this.cameras.main.fade(600, 0, 0, 0, false, (cam, progress) => {
-        if (progress === 1) {
-          this.scene.start(SCENE_GAME_OVER, { reason: 'energy' });
-        }
+        if (progress === 1) this.scene.start(SCENE_GAME_OVER, { reason: 'energy' });
       });
     }
 
-    this._updateProximityPrompt();
-
-    // Show departure marker only once the full party is assembled
-    const fullParty = this._party.isFullParty();
-    if (this._departureMarker.visible !== fullParty) {
-      this._departureMarker.setVisible(fullParty);
-      this._departureLabel.setVisible(fullParty);
+    // Bike condition hits 0
+    if (this._resources.isBikeBroken() && !this._bikeBrokenTriggered) {
+      this._bikeBrokenTriggered = true;
+      this._showBikeBrokenOverlay();
     }
 
+    // 3:00 PM hard stop (time ≤ 120)
+    if (!this._deadlineShown && this._resources.time <= 120 && !this._departurePlayed) {
+      this._deadlineShown = true;
+      this._showDeadlineOverlay();
+    }
+
+    this._updateProximityPrompt();
     this._updateMinimap();
     if (!this._lastSave || Date.now() - this._lastSave > 30000) {
       this._autosave();
@@ -501,37 +531,25 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _updateProximityPrompt() {
     const px = this._player.x, py = this._player.y;
 
-    // ── Departure zone — Leo's house, only when full party is assembled ────────
-    const DEPART_COL = 27, DEPART_ROW = 141, DEPART_RADIUS = 60;
-    if (this._party.isFullParty() && !this._departurePlayed) {
-      const dx = px - DEPART_COL * T;
-      const dy = py - DEPART_ROW * T;
-      if (dx * dx + dy * dy < DEPART_RADIUS * DEPART_RADIUS) {
+    // ── Exit zone — position read from Tiled map (act2_exit object in Spawns layer)
+    // Always active; no full-party requirement.
+    if (this._exitX !== null && !this._departurePlayed) {
+      const edx = px - this._exitX;
+      const edy = py - this._exitY;
+      if (edx * edx + edy * edy < this._exitRadius * this._exitRadius) {
         if (!this._departurePromptShown) {
           this._departurePromptShown = true;
-          this._proximityPrompt.setText('SPACE: HEAD OUT').setVisible(true);
+          this._proximityPrompt.setText('SPACE: DEPART').setVisible(true);
         }
         if (Phaser.Input.Keyboard.JustDown(this._spaceKey) && !this._dialoguePlayed) {
           this._dialoguePlayed = true;
           this._proximityPrompt.setVisible(false);
-          this.scene.get(SCENE_DIALOGUE).showScript('departure', () => {
-            this._departurePlayed = true;
-            this._dialoguePlayed = false;
-            this.cameras.main.fade(500, 0, 0, 0);
-            this.time.delayedCall(520, () => {
-              this.scene.start(SCENE_OREGON_TRAIL, {
-                party:     this._party.getParty(),
-                resources: this._resources.getAll(),
-              });
-            });
-          });
+          this.scene.get(SCENE_DIALOGUE).showScript('departure', () => this._doDepart());
         }
         return;
-      } else {
-        if (this._departurePromptShown) {
-          this._departurePromptShown = false;
-          this._proximityPrompt.setVisible(false);
-        }
+      } else if (this._departurePromptShown) {
+        this._departurePromptShown = false;
+        this._proximityPrompt.setVisible(false);
       }
     }
 
@@ -572,10 +590,82 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   _onDeerHit() {
-    // Deer collision drains bike condition
-    this._resources.applyChanges({ bikeCondition: -10 });
-    // Brief screen flash
-    this.cameras.main.flash(200, 255, 100, 0);
+    this._onObstacleHit(10);
+  }
+
+  _onObstacleHit(damage = 10) {
+    this._resources.applyChanges({ bikeCondition: -damage });
+    this.cameras.main.flash(200, 255, damage * 5, 0);
+  }
+
+  _doDepart() {
+    this._departurePlayed = true;
+    this.cameras.main.fade(500, 0, 0, 0);
+    this.time.delayedCall(520, () =>
+      this.scene.start(SCENE_OREGON_TRAIL, {
+        party:     this._party.getParty(),
+        resources: this._resources.getAll(),
+      })
+    );
+  }
+
+  _showBikeBrokenOverlay() {
+    const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
+    this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50);
+    txt(this, cx, cy - 20, 'BIKE TOO DAMAGED!', { fontSize: '12px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(51);
+    txt(this, cx, cy - 2,  "CAN'T CONTINUE",    { fontSize: '8px',  color: '#aaaaaa' }).setScrollFactor(0).setOrigin(0.5).setDepth(51);
+    const btn = this.add.rectangle(cx, cy + 18, 100, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    txt(this, cx, cy + 18, 'RESTART', { fontSize: '8px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(52);
+    btn.on('pointerdown', () => { SaveSystem.deleteSave(); this.scene.start(SCENE_TITLE); });
+  }
+
+  _showDeadlineOverlay() {
+    const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
+    const objs = [];
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50));
+    objs.push(txt(this, cx, cy - 30, "IT'S 3:00 PM!", { fontSize: '12px', color: '#f5a623' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+    objs.push(txt(this, cx, cy - 10, 'LAST CHANCE TO DEPART', { fontSize: '8px', color: '#cccccc' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+
+    const btn1 = this.add.rectangle(cx, cy + 12, 148, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    objs.push(btn1);
+    objs.push(txt(this, cx, cy + 12, 'DEPART WITH CURRENT CREW', { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+
+    const btn2 = this.add.rectangle(cx, cy + 34, 90, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    objs.push(btn2);
+    objs.push(txt(this, cx, cy + 34, 'RESTART GAME', { fontSize: '8px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+
+    btn1.on('pointerdown', () => { objs.forEach(o => o.destroy()); this._doDepart(); });
+    btn2.on('pointerdown', () => { SaveSystem.deleteSave(); this.scene.start(SCENE_TITLE); });
+  }
+
+  _showBossRetryDialog({ bossLost, bossScene, spawnCol, spawnRow }) {
+    const NAMES = { grace: 'GRACE', max: 'MAX', nora: 'NORA', justinmax: 'MAX' };
+    const name = NAMES[bossLost] ?? 'SIBLING';
+    const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
+    const objs = [];
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setScrollFactor(0).setDepth(50));
+    objs.push(txt(this, cx, cy - 28, `LOST TO ${name}!`, { fontSize: '10px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+
+    const dismiss = () => objs.forEach(o => o.destroy());
+
+    if (this._resources.time > 10) {
+      const btnR = this.add.rectangle(cx, cy - 4, 170, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+      objs.push(btnR);
+      objs.push(txt(this, cx, cy - 4, 'FIGHT AGAIN  (-10 MIN)', { fontSize: '8px', color: '#4fc3f7' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+      btnR.on('pointerdown', () => {
+        this._resources.applyChanges({ time: -10, energy: 100 - this._resources.energy });
+        dismiss();
+        this.cameras.main.fade(400, 0, 0, 0);
+        this.time.delayedCall(420, () => this.scene.start(bossScene, { returnFlag: `${bossLost}Defeated` }));
+      });
+    } else {
+      objs.push(txt(this, cx, cy - 4, 'NOT ENOUGH TIME TO RETRY', { fontSize: '8px', color: '#556677' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+    }
+
+    const btnS = this.add.rectangle(cx, cy + 18, 170, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    objs.push(btnS);
+    objs.push(txt(this, cx, cy + 18, `CONTINUE WITHOUT ${name}`, { fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+    btnS.on('pointerdown', dismiss);
   }
 
   _startRecruitment(zone) {

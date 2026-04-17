@@ -38,6 +38,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Direction: 'up' | 'down' | 'left' | 'right'
     this._facing = 'down';
+
+    // Set externally by NeighborhoodScene based on bikeCondition (0.3–1.0)
+    this.speedMultiplier = 1.0;
   }
 
   update() {
@@ -52,10 +55,10 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     // Velocity
     let vx = 0;
     let vy = 0;
-    if (left) vx = -PLAYER_SPEED;
-    if (right) vx = PLAYER_SPEED;
-    if (up) vy = -PLAYER_SPEED;
-    if (down) vy = PLAYER_SPEED;
+    if (left) vx = -PLAYER_SPEED * this.speedMultiplier;
+    if (right) vx =  PLAYER_SPEED * this.speedMultiplier;
+    if (up)   vy = -PLAYER_SPEED * this.speedMultiplier;
+    if (down) vy =  PLAYER_SPEED * this.speedMultiplier;
 
     // Normalize diagonal movement so you don't go faster diagonally
     if (vx !== 0 && vy !== 0) {

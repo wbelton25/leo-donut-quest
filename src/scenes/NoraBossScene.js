@@ -544,7 +544,9 @@ export default class NoraBossScene extends Phaser.Scene {
 
     if (!this._gauntlet) {
       this.cameras.main.fade(600, 0, 0, 0, false, (cam, progress) => {
-        if (progress === 1) this.scene.start('GameOverScene', { reason: 'energy' });
+        if (progress === 1) this.scene.start(SCENE_NEIGHBORHOOD, {
+          bossLost: 'nora', bossScene: SCENE_NORA_BOSS, spawnCol: 295, spawnRow: 79,
+        });
       });
       return;
     }

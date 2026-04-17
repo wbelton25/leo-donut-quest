@@ -114,11 +114,11 @@ export const DEFAULT_GAME_STATE = {
   defeatedBosses: [],  // IDs of defeated bosses
   checkpoint: 'home',  // last safe save point
   resources: {
-    time: 100,         // time remaining before donut shop closes (0-100)
+    time: 270,         // minutes remaining until 5:00 PM (270 = 12:30 PM start; 120 = 3:00 PM Act 1 hard stop; 0 = game over)
     bikeCondition: 100, // bike health (0-100)
     energy: 100,       // party energy (0-100)
     snacks: 0,         // snack count (buy at Walmart — $10 per party member pooled)
-    money: 50,         // dollars ($10 × 5 members; reduced if fewer recruited)
+    money: 10,         // dollars (Leo's $10; each recruited friend adds $10, max $50)
   },
   donuts: 0,           // donuts collected at the shop
 };

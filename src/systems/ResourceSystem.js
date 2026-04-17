@@ -41,7 +41,7 @@ export default class ResourceSystem {
     // delta is an object like: { time: -10, bikeCondition: 5, snacks: -1 }
     // Only keys present in delta are changed.
     const r = this._resources;
-    if (delta.time !== undefined)          r.time = this._clamp(r.time + delta.time);
+    if (delta.time !== undefined)          r.time = Math.max(0, r.time + delta.time); // no upper cap; starts at 270
     if (delta.bikeCondition !== undefined) r.bikeCondition = this._clamp(r.bikeCondition + delta.bikeCondition);
     if (delta.energy !== undefined)        r.energy = this._clamp(r.energy + delta.energy);
     if (delta.snacks !== undefined)        r.snacks = Math.max(0, r.snacks + delta.snacks);
