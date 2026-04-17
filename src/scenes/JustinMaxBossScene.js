@@ -321,6 +321,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
         this._lastContact = Date.now();
         this._resources.applyChanges({ energy: -CONTACT_DAMAGE });
         this.cameras.main.shake(150, 0.008);
+        if (!this._defeated && this._resources.isExhausted()) this._gameOver();
       }
 
     } else if (this._maxState === 'STUNNED') {
@@ -358,6 +359,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       if (Math.sqrt(dx * dx + dy * dy) < 18) {
         this._resources.applyChanges({ energy: -PITCH_DAMAGE });
         this.cameras.main.shake(150, 0.007);
+        if (!this._defeated && this._resources.isExhausted()) this._gameOver();
         b.sprite.destroy();
         this._pitches.splice(i, 1);
       }
@@ -407,6 +409,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       if (Math.sqrt(dx * dx + dy * dy) < SWING_RANGE + 10) {
         this._resources.applyChanges({ energy: -SWING_DAMAGE });
         this.cameras.main.shake(200, 0.012);
+        if (!this._defeated && this._resources.isExhausted()) this._gameOver();
       }
     });
   }
@@ -469,6 +472,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
           this._resources.applyChanges({ energy: -ELECTRIC_DAMAGE });
           this.cameras.main.flash(200, 255, 255, 0);
           this.cameras.main.shake(200, 0.014);
+          if (!this._defeated && this._resources.isExhausted()) this._gameOver();
         }
 
         radius += ELECTRIC_RADIUS / (ELECTRIC_EXPAND / 16);
@@ -505,6 +509,66 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this.time.delayedCall(STUN_DURATION, () => {
       if (!this._defeated) this._maxState = 'CHASE';
     });
+  }
+
+  // ─── Game over ────────────────────────────────────────────────────────────
+
+  _gameOver() {
+    this._defeated    = true;
+    this._inputLocked = true;
+
+    if (!this._gauntlet) {
+      this.cameras.main.fade(600, 0, 0, 0, false, (cam, progress) => {
+        if (progress === 1) this.scene.start('GameOverScene', { reason: 'energy' });
+      });
+      return;
+    }
+
+    const donuts    = this._gauntletData.donuts ?? 0;
+    const stolen    = Math.ceil(donuts / 2);
+    const newDonuts = donuts - stolen;
+    this._resources.applyChanges({ energy: 100 - this._resources.energy });
+    this._gauntletData = { ...this._gauntletData, donuts: newDonuts };
+
+    const msg = stolen > 0
+      ? `MAX STEALS ${stolen} DONUT${stolen !== 1 ? 'S' : ''}!`
+      : 'MAX TRIES TO STEAL — BUT YOU HAD NONE LEFT!';
+
+    const overlay = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.78).setDepth(40);
+    const t1 = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 16, 'YOU LOST!', { fontSize: '12px', color: '#ff4444' }).setOrigin(0.5).setDepth(41);
+    const t2 = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 4,  msg,         { fontSize: '8px',  color: '#f5a623' }).setOrigin(0.5).setDepth(41);
+    const t3 = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 20, `DONUTS LEFT: ${newDonuts}`, { fontSize: '8px', color: '#aaaaaa' }).setOrigin(0.5).setDepth(41);
+
+    this.time.delayedCall(2400, () => {
+      [overlay, t1, t2, t3].forEach(o => o.destroy());
+      this.cameras.main.fade(400, 0, 0, 0);
+      this.time.delayedCall(420, () => this.scene.start(SCENE_BOSS_GAUNTLET, this._gauntletData));
+    });
+  }
+
+  _offerDonutRecharge(onDone) {
+    const energy = this._resources.energy;
+    const donuts = this._gauntletData.donuts ?? 0;
+    if (energy >= 100 || donuts <= 0) { onDone(); return; }
+
+    const overlay = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setDepth(40);
+    txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 24, 'ENERGY LOW!', { fontSize: '10px', color: '#ff8888' }).setOrigin(0.5).setDepth(41);
+    txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 8, `EAT A DONUT TO RECHARGE?  (${donuts} left)`, { fontSize: '7px', color: '#f5e642' }).setOrigin(0.5).setDepth(41);
+
+    const yesBg = this.add.rectangle(BASE_WIDTH / 2 - 36, BASE_HEIGHT / 2 + 14, 60, 14, 0x1a3a1a).setDepth(41).setInteractive({ useHandCursor: true });
+    txt(this, BASE_WIDTH / 2 - 36, BASE_HEIGHT / 2 + 14, 'YES', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5).setDepth(42);
+    const noBg  = this.add.rectangle(BASE_WIDTH / 2 + 36, BASE_HEIGHT / 2 + 14, 60, 14, 0x2a1a1a).setDepth(41).setInteractive({ useHandCursor: true });
+    txt(this, BASE_WIDTH / 2 + 36, BASE_HEIGHT / 2 + 14, 'NO', { fontSize: '8px', color: '#ff8888' }).setOrigin(0.5).setDepth(42);
+
+    const cleanup = () => this.children.list.filter(c => c.depth >= 40).forEach(c => c.destroy());
+
+    yesBg.once('pointerdown', () => {
+      this._gauntletData = { ...this._gauntletData, donuts: donuts - 1 };
+      this._resources.applyChanges({ energy: 100 - this._resources.energy });
+      cleanup();
+      onDone();
+    });
+    noBg.once('pointerdown', () => { cleanup(); onDone(); });
   }
 
   // ─── Defeat ───────────────────────────────────────────────────────────────
@@ -552,14 +616,15 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this.time.delayedCall(900, () => {
       const victoryScript = this._gauntlet ? 'gauntlet_max_baseball_win' : 'justin_after_max';
       this.scene.get(SCENE_DIALOGUE).showScript(victoryScript, () => {
-        this.cameras.main.fade(500, 0, 0, 0);
-        this.time.delayedCall(520, () => {
-          if (this._gauntlet) {
-              this.scene.start(SCENE_BOSS_GAUNTLET, this._gauntletData);
-            } else {
-              this.scene.start(SCENE_NEIGHBORHOOD, { justinMaxDefeated: true, spawnCol: 312, spawnRow: 123 });
-            }
-        });
+        if (this._gauntlet) {
+          this._offerDonutRecharge(() => {
+            this.cameras.main.fade(500, 0, 0, 0);
+            this.time.delayedCall(520, () => this.scene.start(SCENE_BOSS_GAUNTLET, this._gauntletData));
+          });
+        } else {
+          this.cameras.main.fade(500, 0, 0, 0);
+          this.time.delayedCall(520, () => this.scene.start(SCENE_NEIGHBORHOOD, { justinMaxDefeated: true, spawnCol: 312, spawnRow: 123 }));
+        }
       });
     });
   }

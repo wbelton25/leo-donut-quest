@@ -1,5 +1,5 @@
 import {
-  SCENE_EDIE_BOSS, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_GAME_OVER,
+  SCENE_EDIE_BOSS, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_CREDITS,
   BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
 
@@ -297,8 +297,28 @@ export default class EdieBossScene extends Phaser.Scene {
 
     if (this._leoHP <= 0) {
       this._gameover = true;
-      this.time.delayedCall(400, () => {
-        this.scene.start(SCENE_GAME_OVER, { reason: 'gauntlet' });
+      const donuts    = this._gauntletData.donuts ?? 0;
+      const stolen    = Math.ceil(donuts / 2);
+      const newDonuts = donuts - stolen;
+
+      const msg = stolen > 0
+        ? `EDIE STEALS ${stolen} DONUT${stolen !== 1 ? 'S' : ''}!`
+        : 'EDIE TRIES TO STEAL — BUT YOU HAD NONE LEFT!';
+
+      const overlay = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.78).setDepth(40);
+      const t1 = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 16, 'YOU LOST!', { fontSize: '12px', color: '#ff4444' }).setOrigin(0.5).setDepth(41);
+      const t2 = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 4,  msg,         { fontSize: '8px',  color: '#f5a623' }).setOrigin(0.5).setDepth(41);
+      const t3 = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 20, `DONUTS LEFT: ${newDonuts}`, { fontSize: '8px', color: '#aaaaaa' }).setOrigin(0.5).setDepth(41);
+
+      this.time.delayedCall(2400, () => {
+        [overlay, t1, t2, t3].forEach(o => o.destroy());
+        this.cameras.main.fade(400, 0, 0, 0);
+        this.time.delayedCall(420, () => {
+          this.scene.start(SCENE_CREDITS, {
+            party:  this._gauntletData.party  ?? [],
+            donuts: newDonuts,
+          });
+        });
       });
     }
   }

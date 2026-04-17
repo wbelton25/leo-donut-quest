@@ -54,10 +54,10 @@ function timeToDisplay(t) {
 }
 
 const CHECKPOINTS = [
-  { distance:  400, id: 'school',    label: 'TEGA CAY ELEMENTARY', dialogue: 'checkpoint_school',    isShop: false },
-  { distance:  800, id: 'walmart',   label: 'WALMART',             dialogue: null,                   isShop: true  },
-  { distance: 1200, id: 'tire',      label: 'TIRE STORE',          dialogue: 'checkpoint_tire',      isShop: false },
-  { distance: 1600, id: 'petsupply', label: 'PET SUPPLY STORE',    dialogue: 'checkpoint_petsupply', isShop: false, autoEffect: { energy: -5 } },
+  { distance:  400, id: 'school',    label: 'SCHOOL',             tick: 'SCHOOL',    dialogue: 'checkpoint_school',    isShop: false },
+  { distance:  800, id: 'walmart',   label: 'WALMART',            tick: 'WALMART',   dialogue: null,                   isShop: true  },
+  { distance: 1200, id: 'tire',      label: 'DISCOUNT TIRE',      tick: 'DISC TIRE', dialogue: 'checkpoint_tire',      isShop: false },
+  { distance: 1600, id: 'petsupply', label: 'PET SUPPLIES PLUS',  tick: 'PET SUPLS', dialogue: 'checkpoint_petsupply', isShop: false, autoEffect: { energy: -5 } },
 ];
 
 // Location-specific events fired when reaching each checkpoint
@@ -801,7 +801,7 @@ export default class OregonTrailScene extends Phaser.Scene {
         r(cx, cy + 58, BASE_WIDTH, 28, 0x444444),           // ground
         r(cx, cy + 10, 220, 80, 0xf0e0c0),                  // building
         r(cx, cy - 30, 220, 22, 0xcc2222),                  // red band
-        t(cx, cy - 31, 'TIRE KING', '#ffffff'),
+        t(cx, cy - 31, 'DISCOUNT TIRE', '#ffffff'),
         // garage bays
         r(cx - 50, cy + 22, 72, 52, 0x222222),
         r(cx + 50, cy + 22, 72, 52, 0x222222),
@@ -819,7 +819,7 @@ export default class OregonTrailScene extends Phaser.Scene {
         r(cx, cy + 58, BASE_WIDTH, 28, 0x2a4a2a),           // ground
         r(cx, cy + 10, 210, 80, 0xd4e8a4),                  // building (green)
         r(cx, cy - 30, 214, 22, 0x8844cc),                  // purple band
-        t(cx, cy - 31, 'PET PALACE', '#ffffff'),
+        t(cx, cy - 31, 'PET SUPPLIES PLUS', '#ffffff'),
         // awning stripes
         r(cx - 60, cy - 10, 16, 20, 0xff8844), r(cx - 30, cy - 10, 16, 20, 0xff8844),
         r(cx,      cy - 10, 16, 20, 0xff8844), r(cx + 30, cy - 10, 16, 20, 0xff8844),
@@ -929,7 +929,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     // Bike bar
     const bBarX = x + 110;
     const bW    = Math.max(1, Math.round(40 * bike / 100));
-    const bCol  = bike > 50 ? 0x4488ff : bike > 25 ? 0xf5a623 : 0xff3333;
+    const bCol  = bike > 25 ? 0xef5350 : 0xff3333;
     makeRect(bBarX + 20, cy, 40, 5, 0x111111);
     makeRect(bBarX, cy, bW, 4, bCol).setOrigin(0, 0.5);
     makeText(bBarX + 44, cy, String(bike), { color: '#667788' }).setOrigin(0, 0.5);
@@ -1182,7 +1182,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     const sBg   = this.add.rectangle(x, stamY, 16, 4, 0x111111);
     const sFill = this.add.rectangle(x - 7, stamY, 14, 3, 0x44cc44).setOrigin(0, 0.5);
     const bBg   = this.add.rectangle(x, bikeY, 16, 4, 0x111111);
-    const bFill = this.add.rectangle(x - 7, bikeY, 14, 3, 0x4488ff).setOrigin(0, 0.5);
+    const bFill = this.add.rectangle(x - 7, bikeY, 14, 3, 0xef5350).setOrigin(0, 0.5);
 
     const shortName = (MEMBER_NAMES[id] ?? id).substring(0, 2);
     txt(this, x, bikeY + 8, shortName, { fontSize: '8px', color: '#555566' }).setOrigin(0.5);
@@ -1223,7 +1223,7 @@ export default class OregonTrailScene extends Phaser.Scene {
       const hp = this._bikeHP[id];
       if (hp === undefined) return;
       bars.fill.setSize(Math.max(1, 14 * (hp / 100)), 3);
-      bars.fill.setFillStyle(hp > 50 ? 0x4488ff : hp > 25 ? 0xf5a623 : 0xff3333);
+      bars.fill.setFillStyle(hp > 25 ? 0xef5350 : 0xff3333);
       // Wheel color per biker reflects their own bike condition
       const biker = this._bikerMap[id];
       if (biker) {
@@ -1254,7 +1254,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     CHECKPOINTS.forEach(cp => {
       const tickX = barX + (cp.distance / TOTAL_DISTANCE) * barW;
       this.add.rectangle(tickX, barY - 4, 2, 8, 0x4488ff, 0.7);
-      txt(this, tickX, barY - 24, cp.label.split(' ')[0], { fontSize: '8px', color: '#4488ff' }).setOrigin(0.5);
+      txt(this, tickX, barY - 24, cp.tick ?? cp.label.split(' ')[0], { fontSize: '8px', color: '#4488ff' }).setOrigin(0.5);
     });
   }
 
