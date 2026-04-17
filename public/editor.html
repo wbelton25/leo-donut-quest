@@ -13,7 +13,7 @@ body {
 #canvas { display: block; }
 
 #sidebar {
-  width: 230px; min-width: 230px; background: #1a1a1a;
+  width: 240px; min-width: 240px; background: #1a1a1a;
   border-left: 1px solid #2a2a2a; overflow-y: auto; padding: 10px;
   display: flex; flex-direction: column; gap: 10px;
 }
@@ -29,6 +29,8 @@ h3 { font-size: 10px; text-transform: uppercase; color: #666; letter-spacing: 1p
 .tool-btn:hover { border-color: #555; color: #fff; }
 .tool-btn.active { border-color: #f5a623; color: #f5a623; background: #221e0a; }
 .tool-btn.full { grid-column: span 2; }
+.tool-btn.obs-active { border-color: #e67e22; color: #e67e22; background: #201508; }
+.tool-btn.exit-active { border-color: #f1c40f; color: #f1c40f; background: #201e00; }
 
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px;
   border: 1px solid rgba(255,255,255,.2); vertical-align: middle; margin-right: 3px; }
@@ -56,6 +58,8 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
 .btn:hover { border-color:#555; }
 .btn-accent { background:#1a2e60; border-color:#2a4a90; color:#fff; }
 .btn-accent:hover { background:#1e3870; }
+.btn-obs { background:#201508; border-color:#7a4010; color:#e67e22; }
+.btn-obs:hover { background:#281c0a; }
 .btn-danger { border-color:#662222; color:#ff6666; }
 .btn-danger:hover { background:#2a1010; border-color:#883333; }
 
@@ -65,23 +69,32 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
 .coords { font-size:10px; color:#383838; text-align:right; margin-top:auto; padding-top:4px; }
 .status { font-size:11px; color:#f5a623; min-height:15px; }
 
-/* Selected component panel */
+/* Selected component panels */
 #sel-panel { background:#1e1e10; border:1px solid #3a3a1a; border-radius:3px; padding:8px;
   display:flex; flex-direction:column; gap:5px; }
 #sel-panel h4 { font-size:10px; color:#f5a623; text-transform:uppercase; margin-bottom:2px; }
+#obs-sel-panel { background:#1a1208; border:1px solid #4a3010; border-radius:3px; padding:8px;
+  display:flex; flex-direction:column; gap:5px; }
+#obs-sel-panel h4 { font-size:10px; color:#e67e22; text-transform:uppercase; margin-bottom:2px; }
+#exit-sel-panel { background:#141200; border:1px solid #4a4200; border-radius:3px; padding:8px;
+  display:flex; flex-direction:column; gap:5px; }
+#exit-sel-panel h4 { font-size:10px; color:#f1c40f; text-transform:uppercase; margin-bottom:2px; }
+
+hr.sep { border:none; border-top:1px solid #222; margin: 2px 0; }
 
 /* Modal */
 #modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.82);
   z-index:100; align-items:center; justify-content:center; }
 #modal-bg.open { display:flex; }
 #modal { background:#1a1a1a; border:1px solid #3a3a3a; border-radius:4px;
-  width:680px; max-width:95vw; max-height:82vh; display:flex; flex-direction:column; }
+  width:720px; max-width:95vw; max-height:82vh; display:flex; flex-direction:column; }
 #modal-head { display:flex; justify-content:space-between; align-items:center;
   padding:8px 12px; border-bottom:1px solid #222; }
 #modal-head h2 { font-size:13px; color:#f5a623; }
 #modal-close { background:none; border:none; color:#555; font-size:18px; cursor:pointer; }
 #modal-close:hover { color:#fff; }
 #modal-body { flex:1; overflow-y:auto; padding:10px 12px; }
+#modal-note { font-size:10px; color:#666; padding: 4px 12px; border-top:1px solid #1a1a1a; }
 #export-out { background:#0a0a0a; border:1px solid #222; color:#7ec850;
   padding:8px; font-family:monospace; font-size:10px; white-space:pre;
   overflow:auto; height:380px; border-radius:2px; }
@@ -112,6 +125,10 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
         ↖ Select<br><small>click</small></button>
       <button class="tool-btn full" id="t-erase" onclick="setTool('erase')">
         ✕ Erase &nbsp;<small>(drag rect)</small></button>
+      <button class="tool-btn full" id="t-obstacle" onclick="setTool('obstacle')">
+        <span class="dot" style="background:#e67e22"></span>Obstacle &nbsp;<small>drag / click</small></button>
+      <button class="tool-btn full" id="t-exit" onclick="setTool('exit')">
+        <span class="dot" style="background:#f1c40f"></span>Act 2 Exit &nbsp;<small>click to place</small></button>
     </div>
   </div>
 
@@ -149,7 +166,37 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
     <div class="info">Places a 4×3 zone marker. Click to place.</div>
   </div>
 
-  <!-- SELECT / EDIT PANEL -->
+  <!-- OBSTACLE OPTIONS -->
+  <div class="section" id="obstacle-opts" style="display:none">
+    <h3>Obstacle</h3>
+    <label>Type</label>
+    <select id="obs-type" onchange="onObsTypeChange()">
+      <option value="deer">Deer (roams road)</option>
+      <option value="car">Car (fast, high dmg)</option>
+      <option value="golf_cart">Golf Cart (slow)</option>
+      <option value="bike">Bike Kid (weaves)</option>
+      <option value="golf_ball">Golf Ball Spawner</option>
+    </select>
+    <div class="row2">
+      <div><label>Count</label>
+        <input type="number" id="obs-count" value="1" min="1" max="20"></div>
+      <div><label>Speed (opt)</label>
+        <input type="number" id="obs-speed" placeholder="default"></div>
+    </div>
+    <div class="row2">
+      <div><label>Damage (opt)</label>
+        <input type="number" id="obs-damage" placeholder="default"></div>
+      <div id="obs-angle-wrap"><label>Angle°</label>
+        <input type="number" id="obs-angle" value="0" step="45"></div>
+    </div>
+    <div id="obs-interval-wrap" style="display:none">
+      <label>Interval ms (opt)</label>
+      <input type="number" id="obs-interval" placeholder="3000">
+    </div>
+    <div class="info" id="obs-hint">Drag to draw patrol rectangle.<br>Wide = E-W, tall = N-S.</div>
+  </div>
+
+  <!-- SELECT / EDIT PANEL (map components) -->
   <div id="sel-panel" style="display:none">
     <h4>Selected Component</h4>
     <div id="sel-type" class="info"></div>
@@ -177,6 +224,45 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
     <button class="btn btn-danger" onclick="deleteSelected()">✕ Delete</button>
   </div>
 
+  <!-- OBSTACLE SELECTED PANEL -->
+  <div id="obs-sel-panel" style="display:none">
+    <h4>Obstacle Selected</h4>
+    <div id="obs-sel-info" class="info"></div>
+    <label>Type</label>
+    <select id="obs-sel-type">
+      <option value="deer">Deer</option>
+      <option value="car">Car</option>
+      <option value="golf_cart">Golf Cart</option>
+      <option value="bike">Bike Kid</option>
+      <option value="golf_ball">Golf Ball Spawner</option>
+    </select>
+    <div class="row2">
+      <div><label>Count</label>
+        <input type="number" id="obs-sel-count" min="1" max="20"></div>
+      <div><label>Speed</label>
+        <input type="number" id="obs-sel-speed" placeholder="default"></div>
+    </div>
+    <div class="row2">
+      <div><label>Damage</label>
+        <input type="number" id="obs-sel-damage" placeholder="default"></div>
+      <div id="obs-sel-angle-wrap"><label>Angle°</label>
+        <input type="number" id="obs-sel-angle" step="45"></div>
+    </div>
+    <div id="obs-sel-interval-wrap">
+      <label>Interval ms</label>
+      <input type="number" id="obs-sel-interval" placeholder="3000">
+    </div>
+    <button class="btn" onclick="applyObsFields()">✓ Apply</button>
+    <button class="btn btn-danger" onclick="deleteSelected()">✕ Delete</button>
+  </div>
+
+  <!-- EXIT SELECTED PANEL -->
+  <div id="exit-sel-panel" style="display:none">
+    <h4>Act 2 Exit Zone</h4>
+    <div class="info">Players reach this point to<br>trigger departure to Act 2.</div>
+    <button class="btn btn-danger" onclick="deleteSelected()">✕ Delete Exit</button>
+  </div>
+
   <!-- REFERENCE IMAGE -->
   <div class="section">
     <h3>Reference Image</h3>
@@ -197,20 +283,22 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
       <button class="btn" onclick="jumpTo(40,112)">Leo (40,112)</button>
       <button class="btn" onclick="jumpTo(154,44)">Warren (154,44)</button>
       <button class="btn" onclick="jumpTo(254,62)">MJ (254,62)</button>
-      <button class="btn" onclick="jumpTo(160,80)">Center</button>
+      <button class="btn" onclick="jumpTo(210,52)">Exit Area</button>
     </div>
   </div>
 
   <!-- ACTIONS -->
   <div class="section">
     <h3>Actions</h3>
-    <button class="btn btn-accent" onclick="openExport()">📋 Export Code</button>
+    <button class="btn btn-accent" onclick="openExport('map')">📋 Export Map Code</button>
+    <button class="btn btn-obs"    onclick="openExport('obstacles')">📦 Export Obstacles JSON</button>
     <button class="btn" onclick="loadCurrentMap()">↩ Load Game Map</button>
+    <button class="btn" onclick="loadObstaclesJSON()">↩ Load Obstacles</button>
     <button class="btn btn-danger" onclick="clearMap()">🗑 Clear All</button>
     <div class="status" id="status"></div>
   </div>
 
-  <div class="info" style="margin-top:4px">Right-drag = pan &nbsp;·&nbsp; Scroll = zoom<br>Keys: R H F P W S E</div>
+  <div class="info" style="margin-top:4px">Right-drag = pan &nbsp;·&nbsp; Scroll = zoom<br>Keys: R H F P W S E O X</div>
   <div class="coords" id="coords">col: —  row: —</div>
 </div>
 
@@ -218,10 +306,11 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
 <div id="modal-bg">
   <div id="modal">
     <div id="modal-head">
-      <h2>Export → paste into NeighborhoodScene.js</h2>
+      <h2 id="modal-title">Export</h2>
       <button id="modal-close" onclick="closeExport()">✕</button>
     </div>
     <div id="modal-body"><div id="export-out"></div></div>
+    <div id="modal-note"></div>
     <div id="modal-foot">
       <button class="btn" onclick="copyExport()">Copy to Clipboard</button>
       <button class="btn" onclick="closeExport()">Close</button>
@@ -232,30 +321,38 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MAP_COLS = 320, MAP_ROWS = 160;
-const TYPE = { ROAD:1, HOUSE:2, FRIEND:3, PARK:4, WATER:5 };
-const TYPE_COLOR  = { 1:'#8a8a8a', 2:'#a07840', 3:'#e8d020', 4:'#1e8449', 5:'#1a5276' };
-const TYPE_LABEL  = { 1:'Road', 2:'House', 3:'Friend House', 4:'Park', 5:'Water' };
+const TILE_PX  = 16;  // pixels per tile in the exported map
 
-// FRIEND colors by id
+const TYPE = { ROAD:1, HOUSE:2, FRIEND:3, PARK:4, WATER:5, OBSTACLE:6, EXIT:7 };
+const TYPE_COLOR  = { 1:'#8a8a8a', 2:'#a07840', 3:'#e8d020', 4:'#1e8449', 5:'#1a5276', 7:'#f1c40f' };
+const TYPE_LABEL  = { 1:'Road', 2:'House', 3:'Friend House', 4:'Park', 5:'Water', 6:'Obstacle', 7:'Act 2 Exit' };
+
 const FRIEND_COLOR = {
   warren:'#e74c3c', mj:'#2ecc71', carson:'#3498db', justin:'#9b59b6', custom:'#f39c12'
 };
 const FRIEND_LABEL = { warren:'WARREN', mj:'MJ', carson:'CARSON', justin:'JUSTIN' };
 
+const OBS_COLOR = {
+  deer:'#7d5a1e', car:'#c0392b', golf_cart:'#d4ac0d',
+  bike:'#e67e22', golf_ball:'#bdc3c7'
+};
+const OBS_LABEL = {
+  deer:'DEER', car:'CAR', golf_cart:'GOLF CART',
+  bike:'BIKE KID', golf_ball:'GOLF BALL'
+};
+
 // ─── State ────────────────────────────────────────────────────────────────────
-let components   = [];   // { id, type, col, row, w, h, label, friendId }
+let components   = [];
 let nextId       = 1;
 let selectedTool = 'road';
 let roadWidth    = 4;
-let selectedIds  = new Set(); // set of selected component ids
+let selectedIds  = new Set();
 
 let viewX = 0, viewY = 0, zoom = 5;
 
-// dragMode: 'place' | 'rubber' | 'move' | 'pan'
 let dragMode     = null;
 let isDragging   = false, isPanning = false;
 let dragStartCol = 0, dragStartRow = 0, dragCurCol = 0, dragCurRow = 0;
-// move drag: pixel anchor so we can track sub-tile movement
 let movePxStartX = 0, movePxStartY = 0;
 let moveColOffset = 0, moveRowOffset = 0;
 let panSX = 0, panSY = 0, panVX = 0, panVY = 0;
@@ -263,7 +360,7 @@ let panSX = 0, panSY = 0, panVX = 0, panVY = 0;
 let refImg = null, refOpacity = 0.35, refOX = 0, refOY = 0, refScale = 320;
 let hoverCol = -1, hoverRow = -1;
 let saveTimer = null;
-let undoStack = [];  // each entry: { components: [...], nextId }
+let undoStack = [];
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('canvas');
@@ -289,6 +386,8 @@ function init() {
   );
   window.addEventListener('resize', () => { resizeCanvas(); render(); });
   window.addEventListener('keydown', onKey);
+
+  onObsTypeChange(); // set initial golf_ball visibility
 }
 
 function resizeCanvas() { canvas.width = wrap.clientWidth; canvas.height = wrap.clientHeight; }
@@ -299,11 +398,10 @@ function render() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
-  // BG outside map
   ctx.fillStyle = '#161616';
   ctx.fillRect(0, 0, W, H);
 
-  // Grass (map area)
+  // Grass
   ctx.fillStyle = '#2d6e2d';
   ctx.fillRect(viewX, viewY, MAP_COLS*zoom, MAP_ROWS*zoom);
 
@@ -316,23 +414,26 @@ function render() {
     ctx.globalAlpha = 1;
   }
 
-  // Placed components (back to front); during move, ghost non-selected first
+  // Placed components (back to front); during move, skip selected
   components.forEach(c => {
     const isSel = selectedIds.has(c.id);
-    if (dragMode === 'move' && isSel) return; // drawn below as ghost
+    if (dragMode === 'move' && isSel) return;
     renderComp(c, isSel);
   });
 
-  // Move ghost: draw selected components at offset position
+  // Move ghost
   if (dragMode === 'move' && (moveColOffset !== 0 || moveRowOffset !== 0)) {
     components.forEach(c => {
       if (!selectedIds.has(c.id)) return;
       const gc = { ...c, col: c.col + moveColOffset, row: c.row + moveRowOffset };
-      fillRect(gc.col, gc.row, gc.w, gc.h, TYPE_COLOR[gc.type] ?? '#fff', 0.75);
-      strokeRect(gc.col, gc.row, gc.w, gc.h, '#ffffff99', 1.5);
+      if (gc.type === TYPE.EXIT || (gc.type === TYPE.OBSTACLE && gc.w === 0)) {
+        drawPointMarker(gc.col, gc.row, TYPE_COLOR[gc.type] ?? OBS_COLOR[gc.obstacleType] ?? '#fff', 0.6);
+      } else {
+        fillRect(gc.col, gc.row, gc.w, gc.h, TYPE_COLOR[gc.type] ?? '#fff', 0.5);
+        strokeRect(gc.col, gc.row, gc.w, gc.h, '#ffffff99', 1.5);
+      }
     });
   } else if (dragMode === 'move') {
-    // Moving but no offset yet — still draw them normally with selection outline
     components.forEach(c => { if (selectedIds.has(c.id)) renderComp(c, true); });
   }
 
@@ -359,7 +460,7 @@ function render() {
   ctx.lineWidth = 1;
   ctx.strokeRect(viewX+.5, viewY+.5, MAP_COLS*zoom-1, MAP_ROWS*zoom-1);
 
-  // Rubber-band selection rect
+  // Rubber-band selection
   if (dragMode === 'rubber') {
     const minC = Math.min(dragStartCol, dragCurCol);
     const minR = Math.min(dragStartRow, dragCurRow);
@@ -375,13 +476,18 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Ghost preview during drag (place tools)
+  // Ghost preview during drag
   if (isDragging && dragMode === 'place') {
     const g = ghostRect();
     if (g) {
-      const col = selectedTool === 'erase' ? '#ff4444' : TYPE_COLOR[toolType()] ?? '#fff';
-      fillRect(g.col, g.row, g.w, g.h, col, 0.45);
-      strokeRect(g.col, g.row, g.w, g.h, selectedTool === 'erase' ? '#ff6666' : '#ffffff88', 1);
+      const isObs = selectedTool === 'obstacle';
+      const color = selectedTool === 'erase'
+        ? '#ff4444'
+        : isObs ? (OBS_COLOR[getObsType()] ?? '#e67e22')
+        : (TYPE_COLOR[toolType()] ?? '#fff');
+      fillRect(g.col, g.row, g.w, g.h, color, isObs ? 0.55 : 0.45);
+      strokeRect(g.col, g.row, g.w, g.h,
+        selectedTool === 'erase' ? '#ff6666' : isObs ? '#ff993388' : '#ffffff88', 1);
       // Dimension label
       const px = viewX + g.col * zoom;
       const py = viewY + g.row * zoom;
@@ -394,50 +500,137 @@ function render() {
     }
   }
 
-  // Hover preview for click tools (house / friend)
+  // Hover for click-place tools
   if (!isDragging && (selectedTool === 'house' || selectedTool === 'friend') && hoverCol >= 0) {
-    const col = selectedTool === 'friend'
+    const color = selectedTool === 'friend'
       ? (FRIEND_COLOR[getFriendId()] ?? '#e8d020')
       : '#a07840';
-    fillRect(hoverCol, hoverRow, 4, 3, col, 0.5);
+    fillRect(hoverCol, hoverRow, 4, 3, color, 0.5);
     strokeRect(hoverCol, hoverRow, 4, 3, '#ffffff88', 1);
+  }
+
+  // Hover for exit / golf_ball click placement
+  if (!isDragging && (selectedTool === 'exit' || (selectedTool === 'obstacle' && getObsType() === 'golf_ball')) && hoverCol >= 0) {
+    const color = selectedTool === 'exit' ? '#f1c40f' : '#bdc3c7';
+    drawPointMarker(hoverCol, hoverRow, color, 0.55);
   }
 }
 
 function renderComp(c, selected) {
+  if (c.type === TYPE.EXIT) {
+    drawPointMarker(c.col, c.row, '#f1c40f', 1);
+    if (zoom >= 5) {
+      const px = viewX + c.col * zoom;
+      const py = viewY + c.row * zoom - zoom * 0.7;
+      ctx.save();
+      ctx.font = `bold ${Math.max(7,Math.min(10,zoom))}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+      ctx.fillStyle = '#f1c40f';
+      ctx.fillText('EXIT', px, py);
+      ctx.restore();
+    }
+    if (selected) {
+      ctx.save();
+      ctx.setLineDash([3,2]);
+      strokeRect(c.col - 2, c.row - 2, 4, 4, '#f1c40f', 2);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    return;
+  }
+
+  if (c.type === TYPE.OBSTACLE) {
+    const obsColor = OBS_COLOR[c.obstacleType] ?? '#e67e22';
+    // Golf ball and zero-size = point marker
+    if (c.obstacleType === 'golf_ball' || c.w === 0) {
+      drawPointMarker(c.col, c.row, obsColor, 0.9);
+      if (selected) {
+        ctx.save(); ctx.setLineDash([3,2]);
+        strokeRect(c.col - 2, c.row - 2, 4, 4, obsColor, 2);
+        ctx.setLineDash([]); ctx.restore();
+      }
+    } else {
+      // Draw rect with diagonal hatch to distinguish from map
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = obsColor;
+      ctx.fillRect(viewX+c.col*zoom, viewY+c.row*zoom, c.w*zoom, c.h*zoom);
+      // Hatching
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 0.5;
+      const step = Math.max(4, zoom);
+      const x0 = viewX + c.col * zoom, y0 = viewY + c.row * zoom;
+      const x1 = x0 + c.w * zoom,      y1 = y0 + c.h * zoom;
+      ctx.beginPath();
+      for (let d = -(c.h*zoom); d < c.w*zoom; d += step) {
+        ctx.moveTo(x0 + d, y0); ctx.lineTo(x0 + d + c.h*zoom, y1);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Border
+      ctx.strokeStyle = obsColor;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4,3]);
+      ctx.strokeRect(viewX+c.col*zoom+.5, viewY+c.row*zoom+.5, c.w*zoom-1, c.h*zoom-1);
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Label
+      if (zoom >= 4) {
+        const label = OBS_LABEL[c.obstacleType] || c.obstacleType.toUpperCase();
+        const countStr = c.count > 1 ? ` ×${c.count}` : '';
+        const px = viewX + (c.col + c.w/2) * zoom;
+        const py = viewY + (c.row + c.h/2) * zoom;
+        ctx.save();
+        ctx.font = `bold ${Math.max(8,Math.min(11,zoom))}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+        ctx.fillStyle = '#000';
+        ctx.fillText(label + countStr, px+1, py+1);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label + countStr, px, py);
+        ctx.restore();
+      }
+      if (selected) {
+        ctx.save(); ctx.setLineDash([3,2]);
+        strokeRect(c.col, c.row, c.w, c.h, '#ff9933', 2);
+        ctx.setLineDash([]); ctx.restore();
+      }
+    }
+    return;
+  }
+
+  // Standard map component
   let color = TYPE_COLOR[c.type];
   if (c.type === TYPE.FRIEND) color = FRIEND_COLOR[c.friendId] ?? '#e8d020';
 
   fillRect(c.col, c.row, c.w, c.h, color, 1);
 
-  // Road / park / water: subtle border
   if (c.type !== TYPE.FRIEND) {
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 0.5;
     ctx.strokeRect(viewX+c.col*zoom+.5, viewY+c.row*zoom+.5, c.w*zoom-1, c.h*zoom-1);
   }
 
-  // Label text (roads, houses, parks, water — anything with a label)
   if (c.label && zoom >= 5) {
     const halign  = c.labelAlign  || 'left';
     const valign  = c.labelVAlign || 'bottom';
     const rot     = c.labelRot    || 0;
     const isFriend = c.type === TYPE.FRIEND;
     const fontSize = Math.max(8, Math.min(10, zoom));
-
     const rectPxX = viewX + c.col * zoom;
     const rectPxY = viewY + c.row * zoom;
     const rectPxW = c.w * zoom;
     const rectPxH = c.h * zoom;
-
-    // Anchor point inside the rect (before rotation)
     let ax = halign === 'right'  ? rectPxX + rectPxW - 3 :
              halign === 'center' ? rectPxX + rectPxW / 2 :
                                    rectPxX + 3;
     let ay = valign === 'top'    ? rectPxY + fontSize + 2 :
              valign === 'middle' ? rectPxY + rectPxH / 2 + fontSize / 2 - 1 :
                                    rectPxY + rectPxH - 3;
-
     ctx.save();
     ctx.translate(ax, ay);
     if (rot === 90)  ctx.rotate( Math.PI / 2);
@@ -452,9 +645,8 @@ function renderComp(c, selected) {
     ctx.restore();
   }
 
-  // Friend house: show name centered in the middle only when no custom label is set
   if (c.type === TYPE.FRIEND && !c.label) {
-    const name = c.label || FRIEND_LABEL[c.friendId] || c.friendId?.toUpperCase() || '?';
+    const name = FRIEND_LABEL[c.friendId] || c.friendId?.toUpperCase() || '?';
     const px = viewX + (c.col + c.w/2) * zoom;
     const py = viewY + (c.row + c.h/2) * zoom + 3;
     ctx.save();
@@ -468,7 +660,6 @@ function renderComp(c, selected) {
     ctx.restore();
   }
 
-  // Selection outline
   if (selected) {
     ctx.save();
     ctx.setLineDash([3, 2]);
@@ -476,6 +667,28 @@ function renderComp(c, selected) {
     ctx.setLineDash([]);
     ctx.restore();
   }
+}
+
+function drawPointMarker(col, row, color, alpha) {
+  const px = viewX + col * zoom;
+  const py = viewY + row * zoom;
+  const r  = Math.max(4, zoom * 0.7);
+  ctx.save();
+  ctx.globalAlpha = alpha ?? 1;
+  // Diamond
+  ctx.beginPath();
+  ctx.moveTo(px, py - r);
+  ctx.lineTo(px + r, py);
+  ctx.lineTo(px, py + r);
+  ctx.lineTo(px - r, py);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function fillRect(col, row, w, h, color, alpha) {
@@ -504,11 +717,15 @@ function ghostRect() {
 function toolType() {
   return { road:TYPE.ROAD, house:TYPE.HOUSE, friend:TYPE.FRIEND, park:TYPE.PARK, water:TYPE.WATER }[selectedTool];
 }
-
+function getObsType() { return document.getElementById('obs-type').value; }
 function getFriendId() {
   const sel = document.getElementById('friend-select').value;
   if (sel === 'custom') return document.getElementById('friend-custom').value.toLowerCase() || 'custom';
   return sel;
+}
+function isClickTool() {
+  return selectedTool === 'house' || selectedTool === 'friend' || selectedTool === 'exit'
+    || (selectedTool === 'obstacle' && getObsType() === 'golf_ball');
 }
 
 // ─── Coords ───────────────────────────────────────────────────────────────────
@@ -519,10 +736,14 @@ function inMap(c, r) { return c>=0 && c<MAP_COLS && r>=0 && r<MAP_ROWS; }
 
 // ─── Hit test ─────────────────────────────────────────────────────────────────
 function hitTest(col, row) {
-  // Return topmost component at this tile (search in reverse)
   for (let i = components.length-1; i >= 0; i--) {
     const c = components[i];
-    if (col >= c.col && col < c.col+c.w && row >= c.row && row < c.row+c.h) return c;
+    // Point objects: hit within 2 tiles
+    if (c.type === TYPE.EXIT || (c.type === TYPE.OBSTACLE && (c.w === 0 || c.obstacleType === 'golf_ball'))) {
+      if (Math.abs(col - c.col) <= 2 && Math.abs(row - c.row) <= 2) return c;
+    } else {
+      if (col >= c.col && col < c.col+c.w && row >= c.row && row < c.row+c.h) return c;
+    }
   }
   return null;
 }
@@ -540,34 +761,28 @@ canvas.addEventListener('mousedown', e => {
     if (selectedTool === 'select') {
       const hit = hitTest(col, row);
       if (hit && selectedIds.has(hit.id)) {
-        // Drag the whole selection
-        dragMode = 'move';
-        isDragging = true;
+        dragMode = 'move'; isDragging = true;
         movePxStartX = e.offsetX; movePxStartY = e.offsetY;
         moveColOffset = 0; moveRowOffset = 0;
         wrap.style.cursor = 'move';
       } else if (hit) {
-        // Click on unselected component — select it (Shift = add to group)
         if (!e.shiftKey) selectedIds.clear();
         selectedIds.add(hit.id);
         updateSelPanel();
-        dragMode = 'move';
-        isDragging = true;
+        dragMode = 'move'; isDragging = true;
         movePxStartX = e.offsetX; movePxStartY = e.offsetY;
         moveColOffset = 0; moveRowOffset = 0;
         wrap.style.cursor = 'move';
       } else {
-        // Click on empty space — start rubber-band
         if (!e.shiftKey) selectedIds.clear();
-        dragMode = 'rubber';
-        isDragging = true;
+        dragMode = 'rubber'; isDragging = true;
         dragStartCol = col; dragStartRow = row;
         dragCurCol   = col; dragCurRow   = row;
         updateSelPanel();
       }
       render(); return;
     }
-    if (selectedTool === 'house' || selectedTool === 'friend') {
+    if (isClickTool()) {
       placeClickComp(col, row); return;
     }
     isDragging = true; dragMode = 'place';
@@ -643,6 +858,22 @@ function placeClickComp(col, row) {
       ? document.getElementById('friend-custom').value || 'Friend'
       : (FRIEND_LABEL[fid] || fid.toUpperCase());
     addComp({ type: TYPE.FRIEND, col, row, w: 4, h: 3, label: fname, friendId: fid });
+  } else if (selectedTool === 'exit') {
+    // Remove any existing exit first
+    components = components.filter(c => c.type !== TYPE.EXIT);
+    addComp({ type: TYPE.EXIT, col, row, w: 0, h: 0 });
+    setStatus('Exit placed!');
+  } else if (selectedTool === 'obstacle' && getObsType() === 'golf_ball') {
+    addComp({
+      type: TYPE.OBSTACLE,
+      col, row, w: 0, h: 0,
+      obstacleType: 'golf_ball',
+      count: 1,
+      speed:    numOrNull('obs-speed'),
+      damage:   numOrNull('obs-damage'),
+      angle:    +(document.getElementById('obs-angle').value) || 0,
+      interval: numOrNull('obs-interval'),
+    });
   }
   render();
 }
@@ -656,11 +887,31 @@ function commitDrag() {
     if (next.length !== before) { pushUndo(); components = next; schedSave(); }
     return;
   }
-  if (g.w === 1 && g.h === 1) return; // ignore tiny drags for road/park/water
+  if (g.w === 1 && g.h === 1) return;
+  if (selectedTool === 'obstacle') {
+    const ot = getObsType();
+    if (ot === 'golf_ball') return; // click tool
+    addComp({
+      type: TYPE.OBSTACLE,
+      col: g.col, row: g.row, w: g.w, h: g.h,
+      obstacleType: ot,
+      count:    +(document.getElementById('obs-count').value) || 1,
+      speed:    numOrNull('obs-speed'),
+      damage:   numOrNull('obs-damage'),
+      angle:    null,
+      interval: null,
+    });
+    return;
+  }
   const type = toolType();
   if (!type) return;
   const label = selectedTool === 'road' ? (document.getElementById('road-label').value.trim() || '') : '';
   addComp({ type, col: g.col, row: g.row, w: g.w, h: g.h, label, friendId: null });
+}
+
+function numOrNull(id) {
+  const v = document.getElementById(id).value;
+  return v !== '' ? +v : null;
 }
 
 function commitRubber() {
@@ -669,8 +920,7 @@ function commitRubber() {
   const maxC = Math.max(dragStartCol, dragCurCol);
   const maxR = Math.max(dragStartRow, dragCurRow);
   components.forEach(c => {
-    // Select if the component overlaps the rubber-band rect
-    if (c.col < maxC+1 && c.col+c.w > minC && c.row < maxR+1 && c.row+c.h > minR)
+    if (c.col < maxC+1 && c.col+Math.max(c.w,1) > minC && c.row < maxR+1 && c.row+Math.max(c.h,1) > minR)
       selectedIds.add(c.id);
   });
   updateSelPanel();
@@ -692,16 +942,12 @@ function pushUndo() {
   undoStack.push({ components: components.map(c => ({...c})), nextId });
   if (undoStack.length > 50) undoStack.shift();
 }
-
 function undo() {
   if (!undoStack.length) return;
   const prev = undoStack.pop();
-  components = prev.components;
-  nextId     = prev.nextId;
+  components = prev.components; nextId = prev.nextId;
   selectedIds.clear(); updateSelPanel();
-  schedSave();
-  render();
-  setStatus('Undo.');
+  schedSave(); render(); setStatus('Undo.');
 }
 
 function addComp(comp) {
@@ -709,19 +955,55 @@ function addComp(comp) {
   components.push({ id: nextId++, ...comp });
   schedSave();
 }
-
 function overlaps(a, b) {
-  return a.col < b.col+b.w && a.col+a.w > b.col && a.row < b.row+b.h && a.row+a.h > b.row;
+  return a.col < b.col+b.w && a.col+Math.max(a.w,1) > b.col
+      && a.row < b.row+b.h && a.row+Math.max(a.h,1) > b.row;
 }
 
-// ─── Selection ────────────────────────────────────────────────────────────────
+// ─── Selection panels ─────────────────────────────────────────────────────────
 function updateSelPanel() {
-  const panel = document.getElementById('sel-panel');
-  if (selectedIds.size === 0) { panel.style.display = 'none'; return; }
-  panel.style.display = 'flex';
+  document.getElementById('sel-panel').style.display = 'none';
+  document.getElementById('obs-sel-panel').style.display = 'none';
+  document.getElementById('exit-sel-panel').style.display = 'none';
+
+  if (selectedIds.size === 0) return;
+
+  const comps = components.filter(x => selectedIds.has(x.id));
+  const allObs  = comps.every(c => c.type === TYPE.OBSTACLE);
+  const allExit = comps.every(c => c.type === TYPE.EXIT);
+  const allMap  = comps.every(c => c.type !== TYPE.OBSTACLE && c.type !== TYPE.EXIT);
+
+  if (allExit) {
+    document.getElementById('exit-sel-panel').style.display = 'flex';
+    return;
+  }
+
+  if (allObs && selectedIds.size === 1) {
+    const c = comps[0];
+    document.getElementById('obs-sel-panel').style.display = 'flex';
+    document.getElementById('obs-sel-info').textContent = `Size: ${c.w}×${c.h} tiles`;
+    document.getElementById('obs-sel-type').value     = c.obstacleType || 'deer';
+    document.getElementById('obs-sel-count').value    = c.count ?? 1;
+    document.getElementById('obs-sel-speed').value    = c.speed ?? '';
+    document.getElementById('obs-sel-damage').value   = c.damage ?? '';
+    document.getElementById('obs-sel-angle').value    = c.angle ?? 0;
+    document.getElementById('obs-sel-interval').value = c.interval ?? '';
+    const isGolfBall = c.obstacleType === 'golf_ball';
+    document.getElementById('obs-sel-angle-wrap').style.display    = isGolfBall ? 'block' : 'none';
+    document.getElementById('obs-sel-interval-wrap').style.display = isGolfBall ? 'block' : 'none';
+    return;
+  }
+
+  if (allObs) {
+    document.getElementById('obs-sel-panel').style.display = 'flex';
+    document.getElementById('obs-sel-info').textContent = `${selectedIds.size} obstacles selected`;
+    return;
+  }
+
+  // Map components
+  document.getElementById('sel-panel').style.display = 'flex';
   if (selectedIds.size === 1) {
-    const c = components.find(x => x.id === [...selectedIds][0]);
-    if (!c) { panel.style.display = 'none'; return; }
+    const c = comps[0];
     document.getElementById('sel-type').textContent =
       TYPE_LABEL[c.type] + (c.friendId ? ` (${c.friendId})` : '');
     document.getElementById('sel-label').value = c.label || '';
@@ -744,46 +1026,56 @@ function updateSelPanel() {
     document.getElementById('sel-label').value = '';
     document.getElementById('sel-label').disabled = true;
     document.getElementById('sel-apply').style.display = 'none';
-    document.getElementById('sel-align-row').style.display  = 'flex';
-    document.getElementById('sel-valign-row').style.display = 'flex';
-    document.getElementById('sel-rot-row').style.display    = 'flex';
   }
 }
 
-// Keep old name as alias for single-id select (used in a few places)
 function selectComponent(id) {
   selectedIds.clear();
   if (id != null) selectedIds.add(id);
   updateSelPanel();
 }
 
+function applyObsFields() {
+  if (selectedIds.size !== 1) return;
+  const c = components.find(x => x.id === [...selectedIds][0]);
+  if (!c || c.type !== TYPE.OBSTACLE) return;
+  pushUndo();
+  c.obstacleType = document.getElementById('obs-sel-type').value;
+  c.count    = +(document.getElementById('obs-sel-count').value)    || 1;
+  c.speed    = document.getElementById('obs-sel-speed').value    !== '' ? +document.getElementById('obs-sel-speed').value    : null;
+  c.damage   = document.getElementById('obs-sel-damage').value   !== '' ? +document.getElementById('obs-sel-damage').value   : null;
+  c.angle    = +(document.getElementById('obs-sel-angle').value)    || 0;
+  c.interval = document.getElementById('obs-sel-interval').value !== '' ? +document.getElementById('obs-sel-interval').value : null;
+  const isGB = c.obstacleType === 'golf_ball';
+  document.getElementById('obs-sel-angle-wrap').style.display    = isGB ? 'block' : 'none';
+  document.getElementById('obs-sel-interval-wrap').style.display = isGB ? 'block' : 'none';
+  schedSave(); render(); setStatus('Obstacle updated.');
+}
+
 function setLabelAlign(align) {
   document.querySelectorAll('#sel-align-row .rw-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`align-${align}`)?.classList.add('active');
-  if (selectedIds.size === 0) return;
+  if (!selectedIds.size) return;
   pushUndo();
   components.forEach(c => { if (selectedIds.has(c.id)) c.labelAlign = align; });
   schedSave(); render();
 }
-
 function setLabelVAlign(valign) {
   document.querySelectorAll('#sel-valign-row .rw-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`valign-${valign}`)?.classList.add('active');
-  if (selectedIds.size === 0) return;
+  if (!selectedIds.size) return;
   pushUndo();
   components.forEach(c => { if (selectedIds.has(c.id)) c.labelVAlign = valign; });
   schedSave(); render();
 }
-
 function setLabelRot(deg) {
   document.querySelectorAll('#sel-rot-row .rw-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`rot-${deg}`)?.classList.add('active');
-  if (selectedIds.size === 0) return;
+  if (!selectedIds.size) return;
   pushUndo();
   components.forEach(c => { if (selectedIds.has(c.id)) c.labelRot = deg; });
   schedSave(); render();
 }
-
 function applySelLabel() {
   if (selectedIds.size !== 1) return;
   const c = components.find(x => x.id === [...selectedIds][0]);
@@ -792,14 +1084,13 @@ function applySelLabel() {
   c.label = document.getElementById('sel-label').value.trim();
   schedSave(); render(); setStatus('Label updated.');
 }
-
 function deleteSelected() {
-  if (selectedIds.size === 0) return;
+  if (!selectedIds.size) return;
+  const count = selectedIds.size;
   pushUndo();
   components = components.filter(x => !selectedIds.has(x.id));
-  selectedIds.clear();
-  updateSelPanel();
-  schedSave(); render(); setStatus(`Deleted ${selectedIds.size === 0 ? '' : selectedIds.size + ' '}component(s).`);
+  selectedIds.clear(); updateSelPanel();
+  schedSave(); render(); setStatus(`Deleted ${count} item(s).`);
 }
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
@@ -815,8 +1106,8 @@ function onKey(e) {
     schedSave(); render(); return;
   }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  const map = {r:'road',h:'house',f:'friend',p:'park',w:'water',s:'select',e:'erase',
-               R:'road',H:'house',F:'friend',P:'park',W:'water',S:'select',E:'erase'};
+  const map = {r:'road',h:'house',f:'friend',p:'park',w:'water',s:'select',e:'erase',o:'obstacle',x:'exit',
+               R:'road',H:'house',F:'friend',P:'park',W:'water',S:'select',E:'erase',O:'obstacle',X:'exit'};
   if (map[e.key]) setTool(map[e.key]);
   if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) deleteSelected();
   if (e.key === 'Escape') { selectedIds.clear(); updateSelPanel(); closeExport(); render(); }
@@ -825,10 +1116,16 @@ function onKey(e) {
 // ─── UI ───────────────────────────────────────────────────────────────────────
 function setTool(t) {
   selectedTool = t;
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(`t-${t}`)?.classList.add('active');
-  document.getElementById('road-opts').style.display   = t === 'road'   ? 'flex' : 'none';
-  document.getElementById('friend-opts').style.display = t === 'friend' ? 'flex' : 'none';
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active', 'obs-active', 'exit-active'));
+  const btn = document.getElementById(`t-${t}`);
+  if (btn) {
+    if (t === 'obstacle') btn.classList.add('obs-active');
+    else if (t === 'exit') btn.classList.add('exit-active');
+    else btn.classList.add('active');
+  }
+  document.getElementById('road-opts').style.display     = t === 'road'     ? 'flex' : 'none';
+  document.getElementById('friend-opts').style.display   = t === 'friend'   ? 'flex' : 'none';
+  document.getElementById('obstacle-opts').style.display = t === 'obstacle' ? 'flex' : 'none';
   if (t !== 'select') { selectedIds.clear(); updateSelPanel(); }
   render();
 }
@@ -843,6 +1140,16 @@ function setRW(w) {
 function onFriendSelect() {
   const v = document.getElementById('friend-select').value;
   document.getElementById('friend-custom-wrap').style.display = v === 'custom' ? 'block' : 'none';
+}
+
+function onObsTypeChange() {
+  const t = getObsType();
+  const isGB = t === 'golf_ball';
+  document.getElementById('obs-angle-wrap').style.display    = isGB ? 'block' : 'none';
+  document.getElementById('obs-interval-wrap').style.display = isGB ? 'block' : 'none';
+  document.getElementById('obs-hint').textContent = isGB
+    ? 'Click to place spawner point.'
+    : 'Drag to draw patrol rectangle.\nWide = E-W patrol, tall = N-S.';
 }
 
 function jumpTo(col, row) {
@@ -876,25 +1183,81 @@ function loadCurrentMap() {
       components.push({ id:nextId++, type:TYPE.HOUSE,
         col:col+i*stepCol, row:row+i*stepRow, w:4, h:3, label:'' });
   });
-  // Existing friend zones
   GAME_FRIENDS.forEach(f =>
     components.push({ id:nextId++, type:TYPE.FRIEND,
       col:f.col-2, row:f.row-2, w:4, h:4, label:f.label, friendId:f.id }));
   schedSave(); render(); setStatus('Game map loaded.');
 }
 
+// ─── Load obstacles from served JSON ──────────────────────────────────────────
+async function loadObstaclesJSON() {
+  try {
+    const resp = await fetch('maps/neighborhood_objects.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    pushUndo();
+    // Remove existing obstacles and exits
+    components = components.filter(c => c.type !== TYPE.OBSTACLE && c.type !== TYPE.EXIT);
+
+    const dynLayer = data.layers?.find(l => l.name === 'DynamicObstacles');
+    if (dynLayer) {
+      dynLayer.objects.forEach(obj => {
+        const prop = name => obj.properties?.find(p => p.name === name)?.value;
+        const w = Math.round((obj.width  || 0) / TILE_PX);
+        const h = Math.round((obj.height || 0) / TILE_PX);
+        components.push({
+          id: nextId++,
+          type: TYPE.OBSTACLE,
+          col: Math.round(obj.x / TILE_PX),
+          row: Math.round(obj.y / TILE_PX),
+          w, h,
+          obstacleType: obj.type || 'deer',
+          count:    prop('count')    ?? 1,
+          speed:    prop('speed')    ?? null,
+          damage:   prop('damage')   ?? null,
+          angle:    prop('angle')    ?? 0,
+          interval: prop('interval') ?? null,
+        });
+      });
+    }
+
+    const spawnsLayer = data.layers?.find(l => l.name === 'Spawns');
+    if (spawnsLayer) {
+      spawnsLayer.objects.forEach(obj => {
+        if (obj.name === 'act2_exit') {
+          components.push({
+            id: nextId++, type: TYPE.EXIT,
+            col: Math.round(obj.x / TILE_PX),
+            row: Math.round(obj.y / TILE_PX),
+            w: 0, h: 0,
+          });
+        }
+      });
+    }
+
+    schedSave(); render();
+    const obsCount = components.filter(c => c.type === TYPE.OBSTACLE).length;
+    const hasExit  = components.some(c => c.type === TYPE.EXIT);
+    setStatus(`Loaded: ${obsCount} obstacles${hasExit ? ' + exit' : ''}`);
+  } catch (err) {
+    setStatus('Load failed: ' + err.message);
+    console.error(err);
+  }
+}
+
 // ─── Persistence ──────────────────────────────────────────────────────────────
 function schedSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    localStorage.setItem('leo-editor-v3', JSON.stringify({ components, nextId }));
+    localStorage.setItem('leo-editor-v4', JSON.stringify({ components, nextId }));
     setStatus('Saved.');
   }, 500);
 }
-
 function loadFromStorage() {
   try {
-    const raw = localStorage.getItem('leo-editor-v3');
+    // Try v4 first, fall back to v3 (migrates old data)
+    const raw = localStorage.getItem('leo-editor-v4') || localStorage.getItem('leo-editor-v3');
     if (!raw) return;
     const data = JSON.parse(raw);
     components = data.components || [];
@@ -909,8 +1272,20 @@ function setStatus(msg) {
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────
-function openExport() {
-  document.getElementById('export-out').textContent = buildExport();
+let currentExportMode = 'map';
+
+function openExport(mode) {
+  currentExportMode = mode || 'map';
+  if (mode === 'obstacles') {
+    document.getElementById('modal-title').textContent = 'Export Obstacles JSON → neighborhood_objects.json';
+    document.getElementById('export-out').textContent = buildObstaclesJSON();
+    document.getElementById('modal-note').textContent =
+      'Copy → paste into a Claude session with: "Please save this as public/maps/neighborhood_objects.json"';
+  } else {
+    document.getElementById('modal-title').textContent = 'Export Map Code → paste into NeighborhoodScene.js';
+    document.getElementById('export-out').textContent = buildMapExport();
+    document.getElementById('modal-note').textContent = '';
+  }
   document.getElementById('modal-bg').classList.add('open');
 }
 function closeExport() { document.getElementById('modal-bg').classList.remove('open'); }
@@ -919,7 +1294,77 @@ function copyExport() {
     .then(() => setStatus('Copied!'));
 }
 
-function buildExport() {
+// ─── Obstacles JSON (Tiled format) ────────────────────────────────────────────
+function buildObstaclesJSON() {
+  const obstacles = components.filter(c => c.type === TYPE.OBSTACLE);
+  const exits     = components.filter(c => c.type === TYPE.EXIT);
+  let nextObjId   = 1;
+
+  const obstacleObjects = obstacles.map(c => {
+    const obj = {
+      height: c.h * TILE_PX,
+      id:     nextObjId++,
+      name:   `${c.obstacleType}_${nextObjId}`,
+      rotation: 0,
+      type:   c.obstacleType,
+      visible: true,
+      width:  c.w * TILE_PX,
+      x:      c.col * TILE_PX,
+      y:      c.row * TILE_PX,
+    };
+    const props = [];
+    if ((c.count ?? 1) > 1) props.push({ name:'count', type:'int', value: c.count });
+    if (c.speed  != null)   props.push({ name:'speed', type:'float', value: +c.speed });
+    if (c.damage != null)   props.push({ name:'damage', type:'int', value: +c.damage });
+    if (c.obstacleType === 'golf_ball') {
+      props.push({ name:'angle', type:'float', value: +(c.angle ?? 0) });
+      if (c.interval != null) props.push({ name:'interval', type:'int', value: +c.interval });
+    }
+    obj.properties = props;
+    return obj;
+  });
+
+  const spawnObjects = exits.map(c => ({
+    height: 0,
+    id:     nextObjId++,
+    name:   'act2_exit',
+    properties: [],
+    rotation: 0,
+    type:   'exit',
+    visible: true,
+    width:  0,
+    x:      c.col * TILE_PX,
+    y:      c.row * TILE_PX,
+  }));
+
+  const json = {
+    compressionlevel: -1,
+    height: 160,
+    infinite: false,
+    layers: [
+      { draworder:'topdown', id:1, name:'DynamicObstacles',
+        objects: obstacleObjects, opacity:1, type:'objectgroup', visible:true, x:0, y:0 },
+      { draworder:'topdown', id:2, name:'Spawns',
+        objects: spawnObjects, opacity:1, type:'objectgroup', visible:true, x:0, y:0 },
+    ],
+    nextlayerid: 3,
+    nextobjectid: nextObjId,
+    orientation: 'orthogonal',
+    renderorder: 'right-down',
+    tiledversion: '1.10.2',
+    tileheight: 16,
+    tilesets: [],
+    tilewidth: 16,
+    type: 'map',
+    version: '1.10',
+    width: 320,
+  };
+
+  return JSON.stringify(json, null, 2);
+}
+
+// ─── Map code export (existing) ───────────────────────────────────────────────
+function buildMapExport() {
   const roads   = components.filter(c => c.type === TYPE.ROAD);
   const houses  = components.filter(c => c.type === TYPE.HOUSE);
   const friends = components.filter(c => c.type === TYPE.FRIEND);
@@ -940,30 +1385,26 @@ function buildExport() {
     out += `  { col: ${c.col}, row: ${c.row}, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },\n`);
   out += '];\n\n';
 
-  out += '// ── Friend Zones (update FRIEND_ZONES in NeighborhoodScene.js) ──────────────\n';
-  out += '// col/row below = center of the placed marker\n';
+  out += '// ── Friend Zones ──────────────────────────────────────────────────────────────\n';
   friends.forEach(c => {
     const centerCol = c.col + Math.floor(c.w/2);
     const centerRow = c.row + Math.floor(c.h/2);
     const fid = c.friendId || 'unknown';
     const name = c.label || FRIEND_LABEL[fid] || fid;
-    out += `//\n// ${name}:\n`;
-    out += `//   col: ${centerCol}, row: ${centerRow}\n`;
-    out += `//   id:  PARTY_${fid.toUpperCase()}\n`;
-    out += `//   meetScript: '${fid}_meet',  joinScript: '${fid}_join'\n`;
+    out += `//\n// ${name}:  col: ${centerCol}, row: ${centerRow}\n`;
+    out += `//   id: PARTY_${fid.toUpperCase()}  meetScript: '${fid}_meet'  joinScript: '${fid}_join'\n`;
   });
 
   if (parks.length) {
     out += '\n// Parks:\n';
     parks.forEach(c =>
-      out += `// const PARK_C=${c.col}, PARK_R=${c.row}, PARK_W=${c.w}, PARK_H=${c.h}; // ${c.label||'park'}\n`);
+      out += `// { col:${c.col}, row:${c.row}, w:${c.w}, h:${c.h} } // ${c.label||'park'}\n`);
   }
   if (water.length) {
     out += '\n// Water:\n';
     water.forEach(c =>
-      out += `// { col: ${c.col}, row: ${c.row}, w: ${c.w}, h: ${c.h} }\n`);
+      out += `// { col:${c.col}, row:${c.row}, w:${c.w}, h:${c.h} }\n`);
   }
-
   return out;
 }
 
