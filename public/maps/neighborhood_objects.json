@@ -1,0 +1,124 @@
+{
+  "compressionlevel": -1,
+  "height": 160,
+  "infinite": false,
+  "layers": [
+    {
+      "draworder": "topdown",
+      "id": 1,
+      "name": "DynamicObstacles",
+      "objects": [
+        {
+          "height": 32,
+          "id": 1,
+          "name": "TegaCay_Upper_Deer",
+          "properties": [
+            { "name": "count", "type": "int",   "value": 4 }
+          ],
+          "rotation": 0,
+          "type": "deer",
+          "visible": true,
+          "width": 2688,
+          "x": 720,
+          "y": 752
+        },
+        {
+          "height": 32,
+          "id": 2,
+          "name": "TegaCay_Lower_Deer",
+          "properties": [
+            { "name": "count", "type": "int",   "value": 4 }
+          ],
+          "rotation": 0,
+          "type": "deer",
+          "visible": true,
+          "width": 2688,
+          "x": 720,
+          "y": 896
+        },
+        {
+          "height": 32,
+          "id": 3,
+          "name": "TaraTea_Deer",
+          "properties": [
+            { "name": "count", "type": "int",   "value": 4 }
+          ],
+          "rotation": 0,
+          "type": "deer",
+          "visible": true,
+          "width": 1168,
+          "x": 896,
+          "y": 1024
+        },
+        {
+          "height": 1120,
+          "id": 4,
+          "name": "Windward_NS_Deer",
+          "properties": [
+            { "name": "count", "type": "int",   "value": 4 }
+          ],
+          "rotation": 0,
+          "type": "deer",
+          "visible": true,
+          "width": 112,
+          "x": 720,
+          "y": 960
+        },
+        {
+          "height": 32,
+          "id": 5,
+          "name": "MarianaLn_Deer",
+          "properties": [
+            { "name": "count", "type": "int",   "value": 2 }
+          ],
+          "rotation": 0,
+          "type": "deer",
+          "visible": true,
+          "width": 448,
+          "x": 896,
+          "y": 1344
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "draworder": "topdown",
+      "id": 2,
+      "name": "Spawns",
+      "objects": [
+        {
+          "height": 0,
+          "id": 100,
+          "name": "act2_exit",
+          "properties": [],
+          "rotation": 0,
+          "type": "exit",
+          "visible": true,
+          "width": 0,
+          "x": 3360,
+          "y": 816
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "nextlayerid": 3,
+  "nextobjectid": 101,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.10.2",
+  "tileheight": 16,
+  "tilesets": [],
+  "tilewidth": 16,
+  "type": "map",
+  "version": "1.10",
+  "width": 320
+}

@@ -286,15 +286,33 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 294 * T, 74 * T, "CARSON'S",  { fontSize: '8px', color: '#88aaff' });
     txt(this, 314 * T, 119 * T, "JUSTIN'S", { fontSize: '8px', color: '#cc88ff' });
 
-    // ── Act 2 exit zone — position driven by Tiled 'act2_exit' object ────────────
-    // Place a Point object named 'act2_exit' in the Spawns layer of neighborhood.json.
-    // Until placed, the exit zone is inactive (no silent fallback).
+    // ── Act 2 exit zone + obstacles — driven by Tiled neighborhood_objects.json ───
     this._exitX = null;
     this._exitY = null;
     this._exitRadius = 50;
-    // (Tiled map reading will be wired in once the map has a DynamicObstacles/Spawns layer.
-    //  For now the exit is inactive; use cheat key "2" to test Act 2.)
-    // TODO: this._map.findObject('Spawns', o => o.name === 'act2_exit') once map is loaded via Tiled
+    // Parse Spawns layer from the object map
+    try {
+      const objMap = this.make.tilemap({ key: 'neighborhood-objects' });
+      const spawnsLayer = objMap.getObjectLayer('Spawns');
+      if (spawnsLayer) {
+        const exitObj = spawnsLayer.objects.find(o => o.name === 'act2_exit');
+        if (exitObj) {
+          this._exitX = exitObj.x;
+          this._exitY = exitObj.y;
+        }
+      }
+      // Store for obstacle spawning (done later in _spawnObstaclesFromMap)
+      this._objectMap = objMap;
+    } catch (e) {
+      console.warn('[NeighborhoodScene] Failed to load neighborhood-objects map:', e.message);
+    }
+
+    // Exit zone visual marker (if position was found in the Tiled map)
+    if (this._exitX !== null) {
+      const em = this.add.rectangle(this._exitX, this._exitY, 20, 20, 0xf5e642, 0.85).setDepth(3);
+      this.tweens.add({ targets: em, alpha: 0.15, yoyo: true, repeat: -1, duration: 500 });
+      txt(this, this._exitX, this._exitY - 18, 'ACT 2 →', { fontSize: '8px', color: '#f5e642' }).setOrigin(0.5).setDepth(3);
+    }
 
     // Zone markers — flashing indicators so the player can see where to go
     FRIEND_ZONES.forEach(zone => {
@@ -576,71 +594,78 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   // ── Obstacle factory ───────────────────────────────────────────────────────────
-  // When the neighborhood uses a Tiled map, replace DEFAULT_OBSTACLES with:
-  //   const layer = this._map.getObjectLayer('DynamicObstacles');
-  //   const defs  = layer ? layer.objects.map(o => ({ ... })) : DEFAULT_OBSTACLES;
+  // Reads obstacle objects from the 'DynamicObstacles' layer in neighborhood_objects.json.
+  // Each Tiled rectangle object defines one obstacle group:
+  //   type      = 'deer' | 'car' | 'golf_cart' | 'bike' | 'golf_ball'
+  //   width ≥ height → horizontal patrol (E-W); height > width → vertical patrol (N-S)
+  //   bounding box → patrol range (minBound = obj.x or obj.y, maxBound = opposite edge)
+  //   center of bbox → evenly-distributed spawn points (if count > 1)
   //
-  // Each entry: { type, x, y, min, max, isH, speed?, damage?, interval?, angle? }
-  //   type  = 'deer' | 'car' | 'golf_cart' | 'bike' | 'golf_ball'
-  //   x, y  = center spawn (pixels)
-  //   min, max = patrol range (pixels) on the patrol axis; ignored for golf_ball
-  //   isH   = true (E-W) | false (N-S); ignored for golf_ball
-  //   angle = degrees for golf_ball direction (0=right, 90=down, 180=left, 270=up)
-  //   interval = ms between golf_ball shots
+  // Custom properties supported on all types:
+  //   count    (int)   — spawn N obstacles evenly distributed across the rect (default 1)
+  //   speed    (float) — override default speed
+  //   damage   (int)   — override default bike damage
+  // golf_ball extras:
+  //   angle    (float) — direction in degrees (0=right, 90=down, 180=left, 270=up)
+  //   interval (int)   — ms between shots (default 3000)
 
   _spawnObstaclesFromMap() {
-    const T = TILE_SIZE;
     const cb = (dmg) => this._onObstacleHit(dmg);
+    this._obstacles = [];
 
-    // Pixel-coord conversion helper: tc() converts tile col/row to pixel center
-    const tc = (n) => n * T + T / 2;
-    const tp = (n) => n * T; // tile edge → pixel
+    const layer = this._objectMap?.getObjectLayer('DynamicObstacles');
+    if (!layer) {
+      console.warn('[NeighborhoodScene] DynamicObstacles layer not found — no obstacles spawned');
+      return;
+    }
 
-    // Default obstacle set — mirrors the original hardcoded deer positions.
-    // Replace/extend this list by placing objects in the Tiled DynamicObstacles layer.
-    const DEFAULT_OBSTACLES = [
-      // ── Deer: Tega Cay Drive upper (E-W) ───────────────────────────────────────
-      { type:'deer', x:tc(70),  y:tc(48), min:tp(45), max:tp(213), isH:true  },
-      { type:'deer', x:tc(110), y:tc(47), min:tp(45), max:tp(213), isH:true  },
-      { type:'deer', x:tc(155), y:tc(48), min:tp(45), max:tp(213), isH:true  },
-      { type:'deer', x:tc(195), y:tc(47), min:tp(45), max:tp(213), isH:true  },
-      // ── Deer: Tega Cay Drive lower (E-W) ───────────────────────────────────────
-      { type:'deer', x:tc(80),  y:tc(57), min:tp(45), max:tp(213), isH:true  },
-      { type:'deer', x:tc(130), y:tc(56), min:tp(45), max:tp(213), isH:true  },
-      { type:'deer', x:tc(170), y:tc(57), min:tp(45), max:tp(213), isH:true  },
-      { type:'deer', x:tc(205), y:tc(56), min:tp(45), max:tp(213), isH:true  },
-      // ── Deer: Tara Tea Dr (E-W) ─────────────────────────────────────────────────
-      { type:'deer', x:tc(70),  y:tc(64), min:tp(56), max:tp(129), isH:true  },
-      { type:'deer', x:tc(90),  y:tc(65), min:tp(56), max:tp(129), isH:true  },
-      { type:'deer', x:tc(108), y:tc(64), min:tp(56), max:tp(129), isH:true  },
-      { type:'deer', x:tc(120), y:tc(65), min:tp(56), max:tp(129), isH:true  },
-      // ── Deer: Windward Dr (N-S) ──────────────────────────────────────────────────
-      { type:'deer', x:tc(47), y:tc(75),  min:tp(60), max:tp(130), isH:false },
-      { type:'deer', x:tc(48), y:tc(95),  min:tp(60), max:tp(130), isH:false },
-      { type:'deer', x:tc(53), y:tc(85),  min:tp(60), max:tp(130), isH:false },
-      { type:'deer', x:tc(54), y:tc(110), min:tp(60), max:tp(130), isH:false },
-      // ── Deer: Mariana Ln (E-W) ──────────────────────────────────────────────────
-      { type:'deer', x:tc(65), y:tc(84), min:tp(56), max:tp(84), isH:true },
-      { type:'deer', x:tc(75), y:tc(85), min:tp(56), max:tp(84), isH:true },
-    ];
+    const prop = (obj, name) => obj.properties?.find(p => p.name === name)?.value;
 
-    this._obstacles = DEFAULT_OBSTACLES.map(d => {
-      switch (d.type) {
-        case 'deer':
-          return new DeerObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed);
-        case 'car':
-          return new CarObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed, d.damage);
-        case 'golf_cart':
-          return new GolfCartObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed, d.damage);
-        case 'bike':
-          return new BikeObstacle(this, d.x, d.y, d.min, d.max, d.isH, cb, d.speed, d.damage);
-        case 'golf_ball':
-          return new GolfBallSpawner(this, d.x, d.y, d.angle ?? 0, d.interval, d.speed, d.damage, cb);
-        default:
-          console.warn('[NeighborhoodScene] Unknown obstacle type:', d.type);
-          return null;
+    layer.objects.forEach(obj => {
+      const w    = obj.width  ?? 0;
+      const h    = obj.height ?? 0;
+      const isH  = w >= h;
+      const minB = isH ? obj.x         : obj.y;
+      const maxB = isH ? obj.x + w     : obj.y + h;
+      const cx   = obj.x + w / 2;
+      const cy   = obj.y + h / 2;
+      const count = prop(obj, 'count') ?? 1;
+      const speed   = prop(obj, 'speed');
+      const damage  = prop(obj, 'damage');
+      const angle   = prop(obj, 'angle')   ?? 0;
+      const interval = prop(obj, 'interval');
+
+      // Distribute spawn points evenly across the patrol range
+      for (let i = 0; i < count; i++) {
+        let spawnX = cx, spawnY = cy;
+        if (count > 1) {
+          const t = count === 1 ? 0.5 : (i + 0.5) / count;
+          if (isH) spawnX = minB + t * (maxB - minB);
+          else     spawnY = minB + t * (maxB - minB);
+        }
+
+        switch (obj.type) {
+          case 'deer':
+            this._obstacles.push(new DeerObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed));
+            break;
+          case 'car':
+            this._obstacles.push(new CarObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed, damage));
+            break;
+          case 'golf_cart':
+            this._obstacles.push(new GolfCartObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed, damage));
+            break;
+          case 'bike':
+            this._obstacles.push(new BikeObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed, damage));
+            break;
+          case 'golf_ball':
+            // Golf ball spawner uses center of object as fire position; only spawns once
+            this._obstacles.push(new GolfBallSpawner(this, cx, cy, angle, interval, speed, damage, cb));
+            break;
+          default:
+            console.warn('[NeighborhoodScene] Unknown obstacle type:', obj.type);
+        }
       }
-    }).filter(Boolean);
+    });
   }
 
   _doDepart() {
