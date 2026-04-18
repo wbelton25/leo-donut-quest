@@ -32,10 +32,34 @@ export default class DialogueScene extends Phaser.Scene {
   // ── Public API ────────────────────────────────────────────────────────────────
 
   // Show a dialogue script by key. onComplete fires when the last line is dismissed.
+  // Lines whose speaker matches a party member not currently present are skipped.
   showScript(scriptKey, onComplete) {
-    const script = this._scripts[scriptKey];
-    if (!script || script.length === 0) {
+    const raw = this._scripts[scriptKey];
+    if (!raw || raw.length === 0) {
       console.warn(`[DialogueScene] No script found for key: "${scriptKey}"`);
+      if (onComplete) onComplete();
+      return;
+    }
+
+    // Filter out lines that require a party member who isn't present.
+    // Any line whose 'requiresMember' value isn't in the current party is skipped.
+    // Lines with no requiresMember (or speaker is 'leo') always show.
+    const party = this.game.registry.get('party');
+    const partyIds = party ? new Set(party.getParty()) : new Set();
+    const PARTY_SPEAKERS = new Set(['warren', 'mj', 'carson', 'justin']);
+
+    const script = raw.filter(line => {
+      // Explicit requiresMember field takes precedence
+      if (line.requiresMember) return partyIds.has(line.requiresMember);
+      // Auto-filter: if speaker is a known party member, only show if they're present
+      if (line.speaker && PARTY_SPEAKERS.has(line.speaker.toLowerCase())) {
+        return partyIds.has(line.speaker.toLowerCase());
+      }
+      return true;
+    });
+
+    // If all lines were filtered out, skip entirely
+    if (script.length === 0) {
       if (onComplete) onComplete();
       return;
     }

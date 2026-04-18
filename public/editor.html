@@ -82,6 +82,15 @@ input[type=file] { color: #777; font-size: 10px; width: 100%; }
 
 hr.sep { border:none; border-top:1px solid #222; margin: 2px 0; }
 
+/* Direction compass grid */
+.dir-grid { display:grid; grid-template-columns:repeat(3,22px); gap:2px; margin-top:3px; }
+.dir-btn { width:22px; height:22px; background:#1a1a1a; border:1px solid #333; color:#ccc;
+  font-size:12px; line-height:1; cursor:pointer; border-radius:2px; padding:0;
+  display:flex; align-items:center; justify-content:center; }
+.dir-btn:hover { background:#2a2a2a; border-color:#f5a623; }
+.dir-btn.active { background:#2a3a1a; border-color:#88ff88; color:#88ff88; }
+.dir-btn.dir-center { background:#0a0a0a; color:#556; cursor:default; font-size:9px; }
+
 /* Modal */
 #modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.82);
   z-index:100; align-items:center; justify-content:center; }
@@ -186,8 +195,20 @@ hr.sep { border:none; border-top:1px solid #222; margin: 2px 0; }
     <div class="row2">
       <div><label>Damage (opt)</label>
         <input type="number" id="obs-damage" placeholder="default"></div>
-      <div id="obs-angle-wrap"><label>Angle°</label>
-        <input type="number" id="obs-angle" value="0" step="45"></div>
+      <div id="obs-angle-wrap"><label>Direction</label>
+        <div class="dir-grid" id="obs-dir-grid">
+          <button class="dir-btn" onclick="setObsAngle(225)">↖</button>
+          <button class="dir-btn" onclick="setObsAngle(270)">↑</button>
+          <button class="dir-btn" onclick="setObsAngle(315)">↗</button>
+          <button class="dir-btn" onclick="setObsAngle(180)">←</button>
+          <button class="dir-btn dir-center" title="angle">·</button>
+          <button class="dir-btn" onclick="setObsAngle(0)">→</button>
+          <button class="dir-btn" onclick="setObsAngle(135)">↙</button>
+          <button class="dir-btn" onclick="setObsAngle(90)">↓</button>
+          <button class="dir-btn" onclick="setObsAngle(45)">↘</button>
+        </div>
+        <input type="hidden" id="obs-angle" value="0">
+      </div>
     </div>
     <div id="obs-interval-wrap" style="display:none">
       <label>Interval ms (opt)</label>
@@ -229,7 +250,7 @@ hr.sep { border:none; border-top:1px solid #222; margin: 2px 0; }
     <h4>Obstacle Selected</h4>
     <div id="obs-sel-info" class="info"></div>
     <label>Type</label>
-    <select id="obs-sel-type">
+    <select id="obs-sel-type" onchange="onObsSelTypeChange()">
       <option value="deer">Deer</option>
       <option value="car">Car</option>
       <option value="golf_cart">Golf Cart</option>
@@ -245,8 +266,21 @@ hr.sep { border:none; border-top:1px solid #222; margin: 2px 0; }
     <div class="row2">
       <div><label>Damage</label>
         <input type="number" id="obs-sel-damage" placeholder="default"></div>
-      <div id="obs-sel-angle-wrap"><label>Angle°</label>
-        <input type="number" id="obs-sel-angle" step="45"></div>
+    </div>
+    <div id="obs-sel-angle-wrap">
+      <label>Shot direction</label>
+      <div class="dir-grid" id="obs-sel-dir-grid">
+        <button class="dir-btn" onclick="setSelAngle(225)">↖</button>
+        <button class="dir-btn" onclick="setSelAngle(270)">↑</button>
+        <button class="dir-btn" onclick="setSelAngle(315)">↗</button>
+        <button class="dir-btn" onclick="setSelAngle(180)">←</button>
+        <button class="dir-btn dir-center" id="obs-sel-angle-label">·</button>
+        <button class="dir-btn" onclick="setSelAngle(0)">→</button>
+        <button class="dir-btn" onclick="setSelAngle(135)">↙</button>
+        <button class="dir-btn" onclick="setSelAngle(90)">↓</button>
+        <button class="dir-btn" onclick="setSelAngle(45)">↘</button>
+      </div>
+      <input type="hidden" id="obs-sel-angle" value="0">
     </div>
     <div id="obs-sel-interval-wrap">
       <label>Interval ms</label>
@@ -290,10 +324,8 @@ hr.sep { border:none; border-top:1px solid #222; margin: 2px 0; }
   <!-- ACTIONS -->
   <div class="section">
     <h3>Actions</h3>
-    <button class="btn btn-accent" onclick="openExport('map')">📋 Export Map Code</button>
-    <button class="btn btn-obs"    onclick="openExport('obstacles')">📦 Export Obstacles JSON</button>
-    <button class="btn" onclick="loadCurrentMap()">↩ Load Game Map</button>
-    <button class="btn" onclick="loadObstaclesJSON()">↩ Load Obstacles</button>
+    <button class="btn btn-accent" onclick="openExport()">📋 Export Map JSON</button>
+    <button class="btn" onclick="loadCurrentMap()">↩ Load Map</button>
     <button class="btn btn-danger" onclick="clearMap()">🗑 Clear All</button>
     <div class="status" id="status"></div>
   </div>
@@ -542,9 +574,42 @@ function renderComp(c, selected) {
 
   if (c.type === TYPE.OBSTACLE) {
     const obsColor = OBS_COLOR[c.obstacleType] ?? '#e67e22';
-    // Golf ball and zero-size = point marker
+    // Golf ball and zero-size = point marker with directional arrow
     if (c.obstacleType === 'golf_ball' || c.w === 0) {
       drawPointMarker(c.col, c.row, obsColor, 0.9);
+      // Draw direction arrow from the golfer point
+      if (zoom >= 4) {
+        const angle = (c.angle ?? 0) * Math.PI / 180;
+        const px = viewX + c.col * zoom;
+        const py = viewY + c.row * zoom;
+        const len = zoom * 3.5;
+        const ax = px + Math.cos(angle) * len;
+        const ay = py + Math.sin(angle) * len;
+        ctx.save();
+        ctx.strokeStyle = obsColor;
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ax, ay); ctx.stroke();
+        // Arrowhead
+        const hw = 0.4;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax - Math.cos(angle - hw) * zoom * 1.2, ay - Math.sin(angle - hw) * zoom * 1.2);
+        ctx.lineTo(ax - Math.cos(angle + hw) * zoom * 1.2, ay - Math.sin(angle + hw) * zoom * 1.2);
+        ctx.closePath(); ctx.fillStyle = obsColor; ctx.fill();
+        ctx.restore();
+      }
+      if (zoom >= 6) {
+        const px = viewX + c.col * zoom;
+        const py = viewY + c.row * zoom - zoom * 0.8;
+        ctx.save();
+        ctx.font = `bold ${Math.max(7, Math.min(9, zoom))}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+        ctx.fillStyle = obsColor;
+        ctx.fillText('⛳', px, py);
+        ctx.restore();
+      }
       if (selected) {
         ctx.save(); ctx.setLineDash([3,2]);
         strokeRect(c.col - 2, c.row - 2, 4, 4, obsColor, 2);
@@ -741,6 +806,11 @@ function hitTest(col, row) {
     // Point objects: hit within 2 tiles
     if (c.type === TYPE.EXIT || (c.type === TYPE.OBSTACLE && (c.w === 0 || c.obstacleType === 'golf_ball'))) {
       if (Math.abs(col - c.col) <= 2 && Math.abs(row - c.row) <= 2) return c;
+    } else if (c.type === TYPE.OBSTACLE) {
+      // Obstacles get a minimum 3-tile hit margin on thin axes (deer rows are h=2)
+      const margin = 1;
+      if (col >= c.col - margin && col < c.col + c.w + margin &&
+          row >= c.row - margin && row < c.row + c.h + margin) return c;
     } else {
       if (col >= c.col && col < c.col+c.w && row >= c.row && row < c.row+c.h) return c;
     }
@@ -871,7 +941,7 @@ function placeClickComp(col, row) {
       count: 1,
       speed:    numOrNull('obs-speed'),
       damage:   numOrNull('obs-damage'),
-      angle:    +(document.getElementById('obs-angle').value) || 0,
+      angle:    +(document.getElementById('obs-angle').value ?? 0),
       interval: numOrNull('obs-interval'),
     });
   }
@@ -912,6 +982,48 @@ function commitDrag() {
 function numOrNull(id) {
   const v = document.getElementById(id).value;
   return v !== '' ? +v : null;
+}
+
+// Compass angle buttons — placement panel
+// angle→arrow: 0=right, 45=↘, 90=down, 135=↙, 180=left, 225=↖, 270=up, 315=↗
+const ANGLE_ARROWS = {0:'→',45:'↘',90:'↓',135:'↙',180:'←',225:'↖',270:'↑',315:'↗'};
+function setObsAngle(deg) {
+  document.getElementById('obs-angle').value = deg;
+  document.getElementById('obs-dir-grid').querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+  // find which button — match by onclick content
+  document.getElementById('obs-dir-grid').querySelectorAll('.dir-btn[onclick]').forEach(b => {
+    if (b.getAttribute('onclick') === `setObsAngle(${deg})`) b.classList.add('active');
+  });
+}
+// Compass angle buttons — selection panel (immediately applies + re-renders)
+function setSelAngle(deg) {
+  document.getElementById('obs-sel-angle').value = deg;
+  const label = ANGLE_ARROWS[deg] ?? `${deg}°`;
+  document.getElementById('obs-sel-angle-label').textContent = label;
+  document.getElementById('obs-sel-dir-grid').querySelectorAll('.dir-btn[onclick]').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('onclick') === `setSelAngle(${deg})`);
+  });
+  // Immediately write angle to the component so the map arrow updates live
+  if (selectedIds.size === 1) {
+    const c = components.find(x => x.id === [...selectedIds][0]);
+    if (c && c.type === TYPE.OBSTACLE) {
+      c.angle = deg;
+      schedSave(); render();
+    }
+  }
+}
+function onObsSelTypeChange() {
+  const isGB = document.getElementById('obs-sel-type').value === 'golf_ball';
+  document.getElementById('obs-sel-angle-wrap').style.display    = isGB ? 'block' : 'none';
+  document.getElementById('obs-sel-interval-wrap').style.display = isGB ? 'block' : 'none';
+}
+function refreshSelAngleGrid(deg) {
+  document.getElementById('obs-sel-angle').value = deg;
+  const label = ANGLE_ARROWS[deg] ?? `${deg}°`;
+  document.getElementById('obs-sel-angle-label').textContent = label;
+  document.getElementById('obs-sel-dir-grid').querySelectorAll('.dir-btn[onclick]').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('onclick') === `setSelAngle(${deg})`);
+  });
 }
 
 function commitRubber() {
@@ -986,11 +1098,11 @@ function updateSelPanel() {
     document.getElementById('obs-sel-count').value    = c.count ?? 1;
     document.getElementById('obs-sel-speed').value    = c.speed ?? '';
     document.getElementById('obs-sel-damage').value   = c.damage ?? '';
-    document.getElementById('obs-sel-angle').value    = c.angle ?? 0;
     document.getElementById('obs-sel-interval').value = c.interval ?? '';
     const isGolfBall = c.obstacleType === 'golf_ball';
     document.getElementById('obs-sel-angle-wrap').style.display    = isGolfBall ? 'block' : 'none';
     document.getElementById('obs-sel-interval-wrap').style.display = isGolfBall ? 'block' : 'none';
+    if (isGolfBall) refreshSelAngleGrid(c.angle ?? 0);
     return;
   }
 
@@ -1044,11 +1156,12 @@ function applyObsFields() {
   c.count    = +(document.getElementById('obs-sel-count').value)    || 1;
   c.speed    = document.getElementById('obs-sel-speed').value    !== '' ? +document.getElementById('obs-sel-speed').value    : null;
   c.damage   = document.getElementById('obs-sel-damage').value   !== '' ? +document.getElementById('obs-sel-damage').value   : null;
-  c.angle    = +(document.getElementById('obs-sel-angle').value)    || 0;
+  c.angle    = +(document.getElementById('obs-sel-angle').value) || 0;
   c.interval = document.getElementById('obs-sel-interval').value !== '' ? +document.getElementById('obs-sel-interval').value : null;
   const isGB = c.obstacleType === 'golf_ball';
   document.getElementById('obs-sel-angle-wrap').style.display    = isGB ? 'block' : 'none';
   document.getElementById('obs-sel-interval-wrap').style.display = isGB ? 'block' : 'none';
+  if (isGB) refreshSelAngleGrid(c.angle);
   schedSave(); render(); setStatus('Obstacle updated.');
 }
 
@@ -1171,75 +1284,71 @@ function clearMap() {
   components = []; selectedIds.clear(); updateSelPanel(); schedSave(); render(); setStatus('Cleared.');
 }
 
-function loadCurrentMap() {
-  if (components.length && !confirm('Replace current map with the game map?')) return;
-  pushUndo();
-  components = []; nextId = 1;
-  GAME_ROADS.forEach(([col,row,w,h,label]) =>
-    components.push({ id:nextId++, type:TYPE.ROAD, col, row, w, h, label:label||'' }));
-  components.push({ id:nextId++, type:TYPE.PARK, col:56, row:22, w:24, h:26, label:'Runde Park' });
-  GAME_HOUSES.forEach(({ col, row, n, stepCol, stepRow }) => {
-    for (let i=0; i<n; i++)
-      components.push({ id:nextId++, type:TYPE.HOUSE,
-        col:col+i*stepCol, row:row+i*stepRow, w:4, h:3, label:'' });
-  });
-  GAME_FRIENDS.forEach(f =>
-    components.push({ id:nextId++, type:TYPE.FRIEND,
-      col:f.col-2, row:f.row-2, w:4, h:4, label:f.label, friendId:f.id }));
-  schedSave(); render(); setStatus('Game map loaded.');
-}
-
-// ─── Load obstacles from served JSON ──────────────────────────────────────────
-async function loadObstaclesJSON() {
+// ─── Load full map from neighborhood_map.json ─────────────────────────────────
+async function loadCurrentMap() {
+  if (components.length && !confirm('Replace current editor contents with the saved map?')) return;
   try {
-    const resp = await fetch('maps/neighborhood_objects.json');
+    const resp = await fetch('maps/neighborhood_map.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
 
     pushUndo();
-    // Remove existing obstacles and exits
-    components = components.filter(c => c.type !== TYPE.OBSTACLE && c.type !== TYPE.EXIT);
+    components = []; nextId = 1;
 
-    const dynLayer = data.layers?.find(l => l.name === 'DynamicObstacles');
-    if (dynLayer) {
-      dynLayer.objects.forEach(obj => {
-        const prop = name => obj.properties?.find(p => p.name === name)?.value;
-        const w = Math.round((obj.width  || 0) / TILE_PX);
-        const h = Math.round((obj.height || 0) / TILE_PX);
-        components.push({
-          id: nextId++,
-          type: TYPE.OBSTACLE,
-          col: Math.round(obj.x / TILE_PX),
-          row: Math.round(obj.y / TILE_PX),
-          w, h,
-          obstacleType: obj.type || 'deer',
-          count:    prop('count')    ?? 1,
-          speed:    prop('speed')    ?? null,
-          damage:   prop('damage')   ?? null,
-          angle:    prop('angle')    ?? 0,
-          interval: prop('interval') ?? null,
-        });
-      });
+    // Roads
+    (data.roads ?? []).forEach(r =>
+      components.push({ id:nextId++, type:TYPE.ROAD, col:r.col, row:r.row, w:r.w, h:r.h, label:r.label||'' }));
+
+    // Park
+    if (data.park) {
+      const p = data.park;
+      components.push({ id:nextId++, type:TYPE.PARK, col:p.col, row:p.row, w:p.w, h:p.h, label:'Runde Park' });
     }
 
-    const spawnsLayer = data.layers?.find(l => l.name === 'Spawns');
-    if (spawnsLayer) {
-      spawnsLayer.objects.forEach(obj => {
-        if (obj.name === 'act2_exit') {
-          components.push({
-            id: nextId++, type: TYPE.EXIT,
-            col: Math.round(obj.x / TILE_PX),
-            row: Math.round(obj.y / TILE_PX),
-            w: 0, h: 0,
-          });
-        }
-      });
-    }
+    // Houses
+    (data.houses ?? []).forEach(h =>
+      components.push({ id:nextId++, type:TYPE.HOUSE, col:h.col, row:h.row, w:4, h:3, label:'' }));
+
+    // Friend zones — center coords in JSON, editor stores top-left of 4×4 marker
+    (data.friendZones ?? []).forEach(fz =>
+      components.push({
+        id: nextId++, type: TYPE.FRIEND,
+        col: fz.col - 2, row: fz.row - 2, w: 4, h: 4,
+        friendId: fz.id,
+        label: fz.label,
+        zoneData: {
+          radius: fz.radius, colorHex: fz.colorHex,
+          meetScript: fz.meetScript, joinScript: fz.joinScript,
+          hasBoss: fz.hasBoss, bossScene: fz.bossScene, defeatedFlag: fz.defeatedFlag,
+        },
+      }));
+
+    // Obstacles
+    (data.obstacles ?? []).forEach(d =>
+      components.push({
+        id: nextId++, type: TYPE.OBSTACLE,
+        col: d.col, row: d.row, w: d.w ?? 0, h: d.h ?? 0,
+        obstacleType: d.type,
+        count:    d.count    ?? 1,
+        speed:    d.speed    ?? null,
+        damage:   d.damage   ?? null,
+        angle:    d.angle    ?? 0,
+        interval: d.interval ?? null,
+      }));
+
+    // Exit
+    if (data.exit)
+      components.push({ id:nextId++, type:TYPE.EXIT, col:data.exit.col, row:data.exit.row, w:0, h:0 });
 
     schedSave(); render();
-    const obsCount = components.filter(c => c.type === TYPE.OBSTACLE).length;
-    const hasExit  = components.some(c => c.type === TYPE.EXIT);
-    setStatus(`Loaded: ${obsCount} obstacles${hasExit ? ' + exit' : ''}`);
+    const summary = [
+      `${components.filter(c=>c.type===TYPE.ROAD).length} roads`,
+      `${components.filter(c=>c.type===TYPE.HOUSE).length} houses`,
+      `${components.filter(c=>c.type===TYPE.FRIEND).length} friends`,
+      `${components.filter(c=>c.type===TYPE.OBSTACLE).length} obstacles`,
+      components.some(c=>c.type===TYPE.EXIT) ? 'exit' : '',
+    ].filter(Boolean).join(' · ');
+    setStatus('Loaded: ' + summary);
   } catch (err) {
     setStatus('Load failed: ' + err.message);
     console.error(err);
@@ -1272,20 +1381,11 @@ function setStatus(msg) {
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────
-let currentExportMode = 'map';
-
-function openExport(mode) {
-  currentExportMode = mode || 'map';
-  if (mode === 'obstacles') {
-    document.getElementById('modal-title').textContent = 'Export Obstacles JSON → neighborhood_objects.json';
-    document.getElementById('export-out').textContent = buildObstaclesJSON();
-    document.getElementById('modal-note').textContent =
-      'Copy → paste into a Claude session with: "Please save this as public/maps/neighborhood_objects.json"';
-  } else {
-    document.getElementById('modal-title').textContent = 'Export Map Code → paste into NeighborhoodScene.js';
-    document.getElementById('export-out').textContent = buildMapExport();
-    document.getElementById('modal-note').textContent = '';
-  }
+function openExport() {
+  document.getElementById('modal-title').textContent = 'Export Map JSON → neighborhood_map.json';
+  document.getElementById('export-out').textContent = buildMapJSON();
+  document.getElementById('modal-note').textContent =
+    'Copy → paste into Claude with: "Please save this as public/maps/neighborhood_map.json"';
   document.getElementById('modal-bg').classList.add('open');
 }
 function closeExport() { document.getElementById('modal-bg').classList.remove('open'); }
@@ -1294,155 +1394,64 @@ function copyExport() {
     .then(() => setStatus('Copied!'));
 }
 
-// ─── Obstacles JSON (Tiled format) ────────────────────────────────────────────
-function buildObstaclesJSON() {
+// ─── Map JSON export (single source of truth) ────────────────────────────────
+function buildMapJSON() {
+  const roads     = components.filter(c => c.type === TYPE.ROAD);
+  const houses    = components.filter(c => c.type === TYPE.HOUSE);
+  const friends   = components.filter(c => c.type === TYPE.FRIEND);
+  const parks     = components.filter(c => c.type === TYPE.PARK);
   const obstacles = components.filter(c => c.type === TYPE.OBSTACLE);
-  const exits     = components.filter(c => c.type === TYPE.EXIT);
-  let nextObjId   = 1;
+  const exitComp  = components.find(c => c.type === TYPE.EXIT);
 
-  const obstacleObjects = obstacles.map(c => {
-    const obj = {
-      height: c.h * TILE_PX,
-      id:     nextObjId++,
-      name:   `${c.obstacleType}_${nextObjId}`,
-      rotation: 0,
-      type:   c.obstacleType,
-      visible: true,
-      width:  c.w * TILE_PX,
-      x:      c.col * TILE_PX,
-      y:      c.row * TILE_PX,
-    };
-    const props = [];
-    if ((c.count ?? 1) > 1) props.push({ name:'count', type:'int', value: c.count });
-    if (c.speed  != null)   props.push({ name:'speed', type:'float', value: +c.speed });
-    if (c.damage != null)   props.push({ name:'damage', type:'int', value: +c.damage });
-    if (c.obstacleType === 'golf_ball') {
-      props.push({ name:'angle', type:'float', value: +(c.angle ?? 0) });
-      if (c.interval != null) props.push({ name:'interval', type:'int', value: +c.interval });
-    }
-    obj.properties = props;
-    return obj;
-  });
+  const out = { version: 1 };
 
-  const spawnObjects = exits.map(c => ({
-    height: 0,
-    id:     nextObjId++,
-    name:   'act2_exit',
-    properties: [],
-    rotation: 0,
-    type:   'exit',
-    visible: true,
-    width:  0,
-    x:      c.col * TILE_PX,
-    y:      c.row * TILE_PX,
-  }));
-
-  const json = {
-    compressionlevel: -1,
-    height: 160,
-    infinite: false,
-    layers: [
-      { draworder:'topdown', id:1, name:'DynamicObstacles',
-        objects: obstacleObjects, opacity:1, type:'objectgroup', visible:true, x:0, y:0 },
-      { draworder:'topdown', id:2, name:'Spawns',
-        objects: spawnObjects, opacity:1, type:'objectgroup', visible:true, x:0, y:0 },
-    ],
-    nextlayerid: 3,
-    nextobjectid: nextObjId,
-    orientation: 'orthogonal',
-    renderorder: 'right-down',
-    tiledversion: '1.10.2',
-    tileheight: 16,
-    tilesets: [],
-    tilewidth: 16,
-    type: 'map',
-    version: '1.10',
-    width: 320,
-  };
-
-  return JSON.stringify(json, null, 2);
-}
-
-// ─── Map code export (existing) ───────────────────────────────────────────────
-function buildMapExport() {
-  const roads   = components.filter(c => c.type === TYPE.ROAD);
-  const houses  = components.filter(c => c.type === TYPE.HOUSE);
-  const friends = components.filter(c => c.type === TYPE.FRIEND);
-  const parks   = components.filter(c => c.type === TYPE.PARK);
-  const water   = components.filter(c => c.type === TYPE.WATER);
-
-  let out = '// ── Exported from Level Editor ─────────────────────────────────────────────\n\n';
-
-  out += 'const ROADS = [\n';
-  roads.forEach(c => {
-    const lbl = c.label ? `'${c.label}'` : 'null';
-    out += `  [${c.col}, ${c.row}, ${c.w}, ${c.h}, ${lbl}],\n`;
-  });
-  out += '];\n\n';
-
-  out += 'const HOUSE_GROUPS = [\n';
-  houses.forEach(c =>
-    out += `  { col: ${c.col}, row: ${c.row}, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },\n`);
-  out += '];\n\n';
-
-  out += '// ── Friend Zones ──────────────────────────────────────────────────────────────\n';
-  friends.forEach(c => {
-    const centerCol = c.col + Math.floor(c.w/2);
-    const centerRow = c.row + Math.floor(c.h/2);
-    const fid = c.friendId || 'unknown';
-    const name = c.label || FRIEND_LABEL[fid] || fid;
-    out += `//\n// ${name}:  col: ${centerCol}, row: ${centerRow}\n`;
-    out += `//   id: PARTY_${fid.toUpperCase()}  meetScript: '${fid}_meet'  joinScript: '${fid}_join'\n`;
+  out.roads = roads.map(c => {
+    const r = { col: c.col, row: c.row, w: c.w, h: c.h };
+    if (c.label) r.label = c.label;
+    return r;
   });
 
   if (parks.length) {
-    out += '\n// Parks:\n';
-    parks.forEach(c =>
-      out += `// { col:${c.col}, row:${c.row}, w:${c.w}, h:${c.h} } // ${c.label||'park'}\n`);
+    const p = parks[0];
+    out.park = { col: p.col, row: p.row, w: p.w, h: p.h };
   }
-  if (water.length) {
-    out += '\n// Water:\n';
-    water.forEach(c =>
-      out += `// { col:${c.col}, row:${c.row}, w:${c.w}, h:${c.h} }\n`);
-  }
-  return out;
-}
 
-// ─── Game data (mirrors current NeighborhoodScene.js) ─────────────────────────
-const GAME_ROADS = [
-  [30,109,4,16,'Topsail Cir'],[42,109,4,16,null],[30,123,16,4,null],[36,105,4,6,null],
-  [17,105,60,4,'Anchorage Ln'],
-  [72,78,6,27,'Windward Dr'],[72,74,14,4,null],[78,50,6,28,null],[78,46,14,4,null],[84,18,6,32,null],
-  [80,18,4,24,'Woodhaven Dr'],[80,18,10,4,null],
-  [52,6,4,18,'Catamaran Dr'],[52,6,30,4,null],
-  [84,42,74,4,'Tara Tea Dr'],
-  [102,6,4,22,'Tega Cay Dr'],[102,26,10,4,null],[108,24,4,52,null],
-  [84,62,28,4,'Mariana Ln'],
-  [76,84,20,4,'Marquesas Ave'],
-  [84,14,26,4,null],
-  [108,10,150,4,'Molokai Dr'],[254,10,4,36,null],
-  [92,46,4,52,'Timberlake Dr'],[92,46,18,4,null],[92,94,18,4,null],
-  [114,18,4,18,null],[128,18,4,18,null],[114,18,16,4,'Riley Ln'],[114,34,16,4,null],
-  [158,42,100,4,null],
-  [208,46,4,18,null],[222,46,4,18,null],[208,46,16,4,null],[208,62,16,4,null],
-  [254,42,4,26,'Samar Ct'],
-];
-const GAME_HOUSES = [
-  {col:34,row:112,n:1,stepCol:0,stepRow:0},{col:20,row:110,n:2,stepCol:0,stepRow:8},
-  {col:20,row:122,n:3,stepCol:8,stepRow:0},{col:18,row:96,n:5,stepCol:7,stepRow:0},
-  {col:18,row:88,n:5,stepCol:7,stepRow:0},{col:48,row:110,n:2,stepCol:7,stepRow:0},
-  {col:57,row:11,n:4,stepCol:6,stepRow:0},{col:86,row:11,n:3,stepCol:6,stepRow:0},
-  {col:62,row:50,n:3,stepCol:0,stepRow:9},{col:62,row:68,n:2,stepCol:0,stepRow:9},
-  {col:91,row:34,n:5,stepCol:8,stepRow:0},{col:91,row:49,n:5,stepCol:8,stepRow:0},
-  {col:152,row:36,n:1,stepCol:0,stepRow:0},{col:162,row:35,n:5,stepCol:10,stepRow:0},
-  {col:162,row:48,n:5,stepCol:10,stepRow:0},{col:118,row:4,n:4,stepCol:10,stepRow:0},
-  {col:170,row:4,n:4,stepCol:10,stepRow:0},{col:222,row:4,n:3,stepCol:10,stepRow:0},
-  {col:246,row:35,n:2,stepCol:0,stepRow:9},{col:252,row:60,n:1,stepCol:0,stepRow:0},
-];
-const GAME_FRIENDS = [
-  { id:'warren', label:'WARREN', col:154, row:44 },
-  { id:'mj',     label:'MJ',     col:254, row:62 },
-];
+  out.houses = houses.map(c => ({ col: c.col, row: c.row }));
+
+  out.friendZones = friends.map(c => {
+    const fid = c.friendId || 'unknown';
+    const zd  = c.zoneData || {};
+    return {
+      id:           fid,
+      col:          c.col + Math.floor((c.w || 4) / 2),
+      row:          c.row + Math.floor((c.h || 4) / 2),
+      radius:       zd.radius       ?? 72,
+      label:        c.label         || fid.toUpperCase(),
+      colorHex:     zd.colorHex     || 'aaaaaa',
+      meetScript:   zd.meetScript   || `${fid}_meet`,
+      joinScript:   zd.joinScript   || `${fid}_join`,
+      hasBoss:      zd.hasBoss      ?? false,
+      bossScene:    zd.bossScene    || null,
+      defeatedFlag: zd.defeatedFlag || null,
+    };
+  });
+
+  out.obstacles = obstacles.map(c => {
+    const o = { type: c.obstacleType, col: c.col, row: c.row, w: c.w, h: c.h };
+    if ((c.count ?? 1) > 1) o.count = c.count;
+    if (c.speed  != null)   o.speed  = +c.speed;
+    if (c.damage != null)   o.damage = +c.damage;
+    if (c.obstacleType === 'golf_ball') {
+      o.angle = +(c.angle ?? 0);
+      if (c.interval != null) o.interval = +c.interval;
+    }
+    return o;
+  });
+
+  if (exitComp) out.exit = { col: exitComp.col, row: exitComp.row };
+
+  return JSON.stringify(out, null, 2);
+}
 
 init();
 </script>

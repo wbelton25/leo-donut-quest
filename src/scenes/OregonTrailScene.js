@@ -286,7 +286,9 @@ export default class OregonTrailScene extends Phaser.Scene {
         const secsToArrive = distRemaining / currentSpeed;
         // Time drains 1 unit/sec passively; project what time resource will be at arrival
         const projectedTime = this._resources.time - secsToArrive;
-        const minsPast = Math.round((100 - Math.max(0, projectedTime)) * 1.2);
+        // Clamp to [0,100] — time > 100 means "before 3 PM" (show 3:00), time < 0 means "after 5 PM"
+        const clampedTime = Math.min(100, Math.max(0, projectedTime));
+        const minsPast = Math.round((100 - clampedTime) * 1.2);
         const h = 3 + Math.floor(minsPast / 60);
         const m = (minsPast % 60).toString().padStart(2, '0');
         const etaColor = projectedTime > 15 ? '#44cc44' : projectedTime > 0 ? '#f5a623' : '#ff3333';

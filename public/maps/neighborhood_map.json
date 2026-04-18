@@ -1,0 +1,518 @@
+{
+  "version": 1,
+  "roads": [
+    {
+      "col": 56,
+      "row": 63,
+      "w": 74,
+      "h": 4,
+      "label": "Tara Tea Dr"
+    },
+    {
+      "col": 56,
+      "row": 83,
+      "w": 28,
+      "h": 4,
+      "label": "Mariana Ln"
+    },
+    {
+      "col": 64,
+      "row": 115,
+      "w": 18,
+      "h": 4
+    },
+    {
+      "col": 10,
+      "row": 147,
+      "w": 5,
+      "h": 4
+    },
+    {
+      "col": 10,
+      "row": 145,
+      "w": 5,
+      "h": 4
+    },
+    {
+      "col": 15,
+      "row": 146,
+      "w": 8,
+      "h": 4
+    },
+    {
+      "col": 20,
+      "row": 146,
+      "w": 16,
+      "h": 4
+    },
+    {
+      "col": 21,
+      "row": 137,
+      "w": 4,
+      "h": 10
+    },
+    {
+      "col": 24,
+      "row": 137,
+      "w": 12,
+      "h": 4
+    },
+    {
+      "col": 32,
+      "row": 139,
+      "w": 4,
+      "h": 8
+    },
+    {
+      "col": 34,
+      "row": 137,
+      "w": 16,
+      "h": 4
+    },
+    {
+      "col": 56,
+      "row": 115,
+      "w": 10,
+      "h": 4,
+      "label": "Marquesas Ave"
+    },
+    {
+      "col": 45,
+      "row": 131,
+      "w": 4,
+      "h": 8
+    },
+    {
+      "col": 48,
+      "row": 131,
+      "w": 8,
+      "h": 4
+    },
+    {
+      "col": 52,
+      "row": 134,
+      "w": 4,
+      "h": 7
+    },
+    {
+      "col": 46,
+      "row": 137,
+      "w": 9,
+      "h": 4
+    },
+    {
+      "col": 45,
+      "row": 60,
+      "w": 4,
+      "h": 71
+    },
+    {
+      "col": 52,
+      "row": 59,
+      "w": 4,
+      "h": 72,
+      "label": "Windward"
+    },
+    {
+      "col": 45,
+      "row": 59,
+      "w": 4,
+      "h": 5,
+      "label": "Windward"
+    },
+    {
+      "col": 80,
+      "row": 67,
+      "w": 4,
+      "h": 19
+    },
+    {
+      "col": 122,
+      "row": 66,
+      "w": 4,
+      "h": 17
+    },
+    {
+      "col": 108,
+      "row": 79,
+      "w": 17,
+      "h": 4
+    },
+    {
+      "col": 108,
+      "row": 65,
+      "w": 4,
+      "h": 14,
+      "label": "Suwarrow Ct."
+    },
+    {
+      "col": 45,
+      "row": 55,
+      "w": 169,
+      "h": 4,
+      "label": "Tega Cay Drive"
+    },
+    {
+      "col": 45,
+      "row": 46,
+      "w": 168,
+      "h": 4,
+      "label": "Tega Cay Drive"
+    },
+    {
+      "col": 45,
+      "row": 49,
+      "w": 4,
+      "h": 11
+    },
+    {
+      "col": 52,
+      "row": 47,
+      "w": 4,
+      "h": 14
+    },
+    {
+      "col": 209,
+      "row": 46,
+      "w": 4,
+      "h": 38
+    },
+    {
+      "col": 188,
+      "row": 80,
+      "w": 22,
+      "h": 4
+    },
+    {
+      "col": 188,
+      "row": 69,
+      "w": 4,
+      "h": 12
+    },
+    {
+      "col": 209,
+      "row": 55,
+      "w": 103,
+      "h": 4
+    },
+    {
+      "col": 211,
+      "row": 46,
+      "w": 100,
+      "h": 4
+    },
+    {
+      "col": 311,
+      "row": 46,
+      "w": 4,
+      "h": 36
+    },
+    {
+      "col": 273,
+      "row": 78,
+      "w": 38,
+      "h": 4
+    },
+    {
+      "col": 273,
+      "row": 82,
+      "w": 4,
+      "h": 19
+    },
+    {
+      "col": 275,
+      "row": 97,
+      "w": 40,
+      "h": 4
+    },
+    {
+      "col": 311,
+      "row": 79,
+      "w": 4,
+      "h": 48
+    },
+    {
+      "col": 238,
+      "row": 57,
+      "w": 4,
+      "h": 99
+    },
+    {
+      "col": 240,
+      "row": 152,
+      "w": 75,
+      "h": 4
+    },
+    {
+      "col": 311,
+      "row": 124,
+      "w": 4,
+      "h": 30
+    },
+    {
+      "col": 283,
+      "row": 151,
+      "w": 1,
+      "h": 4
+    }
+  ],
+  "park": {
+    "col": 19,
+    "row": 65,
+    "w": 24,
+    "h": 26
+  },
+  "houses": [
+    {
+      "col": 126,
+      "row": 78
+    },
+    {
+      "col": 117,
+      "row": 70
+    },
+    {
+      "col": 79,
+      "row": 111
+    },
+    {
+      "col": 80,
+      "row": 120
+    },
+    {
+      "col": 71,
+      "row": 120
+    },
+    {
+      "col": 71,
+      "row": 111
+    },
+    {
+      "col": 64,
+      "row": 111
+    },
+    {
+      "col": 65,
+      "row": 120
+    }
+  ],
+  "friendZones": [
+    {
+      "id": "warren",
+      "col": 128,
+      "row": 72,
+      "radius": 80,
+      "label": "WARREN",
+      "colorHex": "e74c3c",
+      "meetScript": "warren_meet",
+      "joinScript": "warren_join",
+      "hasBoss": true,
+      "bossScene": "GraceBossScene",
+      "defeatedFlag": "graceDefeated"
+    },
+    {
+      "id": "mj",
+      "col": 190,
+      "row": 67,
+      "radius": 72,
+      "label": "MJ",
+      "colorHex": "2ecc71",
+      "meetScript": "mj_meet",
+      "joinScript": "mj_join",
+      "hasBoss": true,
+      "bossScene": "MaxBossScene",
+      "defeatedFlag": "maxDefeated"
+    },
+    {
+      "id": "carson",
+      "col": 296,
+      "row": 76,
+      "radius": 72,
+      "label": "CARSON",
+      "colorHex": "3498db",
+      "meetScript": "carson_meet",
+      "joinScript": "carson_join",
+      "hasBoss": true,
+      "bossScene": "NoraBossScene",
+      "defeatedFlag": "noraDefeated"
+    },
+    {
+      "id": "justin",
+      "col": 317,
+      "row": 122,
+      "radius": 72,
+      "label": "JUSTIN",
+      "colorHex": "9b59b6",
+      "meetScript": "justin_meet",
+      "joinScript": "justin_join",
+      "hasBoss": true,
+      "bossScene": "JustinMaxBossScene",
+      "defeatedFlag": "justinMaxDefeated"
+    }
+  ],
+  "obstacles": [
+    {
+      "type": "deer",
+      "col": 45,
+      "row": 47,
+      "w": 168,
+      "h": 2,
+      "count": 4
+    },
+    {
+      "type": "deer",
+      "col": 45,
+      "row": 56,
+      "w": 168,
+      "h": 2,
+      "count": 4
+    },
+    {
+      "type": "deer",
+      "col": 56,
+      "row": 64,
+      "w": 73,
+      "h": 2,
+      "count": 4
+    },
+    {
+      "type": "deer",
+      "col": 45,
+      "row": 60,
+      "w": 7,
+      "h": 70,
+      "count": 4
+    },
+    {
+      "type": "deer",
+      "col": 56,
+      "row": 84,
+      "w": 28,
+      "h": 2,
+      "count": 2
+    },
+    {
+      "type": "bike",
+      "col": 53,
+      "row": 111,
+      "w": 3,
+      "h": 18
+    },
+    {
+      "type": "bike",
+      "col": 80,
+      "row": 67,
+      "w": 4,
+      "h": 16
+    },
+    {
+      "type": "golf_ball",
+      "col": 139,
+      "row": 66,
+      "w": 0,
+      "h": 0,
+      "angle": 270
+    },
+    {
+      "type": "golf_ball",
+      "col": 159,
+      "row": 65,
+      "w": 0,
+      "h": 0,
+      "angle": 315
+    },
+    {
+      "type": "golf_ball",
+      "col": 179,
+      "row": 64,
+      "w": 0,
+      "h": 0,
+      "angle": 270
+    },
+    {
+      "type": "golf_ball",
+      "col": 211,
+      "row": 63,
+      "w": 0,
+      "h": 0,
+      "angle": 0
+    },
+    {
+      "type": "golf_ball",
+      "col": 211,
+      "row": 73,
+      "w": 0,
+      "h": 0,
+      "angle": 0
+    },
+    {
+      "type": "golf_ball",
+      "col": 152,
+      "row": 41,
+      "w": 0,
+      "h": 0,
+      "angle": 45
+    },
+    {
+      "type": "golf_ball",
+      "col": 186,
+      "row": 43,
+      "w": 0,
+      "h": 0,
+      "angle": 90
+    },
+    {
+      "type": "car",
+      "col": 61,
+      "row": 56,
+      "w": 26,
+      "h": 3
+    },
+    {
+      "type": "car",
+      "col": 53,
+      "row": 70,
+      "w": 3,
+      "h": 14
+    },
+    {
+      "type": "golf_cart",
+      "col": 96,
+      "row": 64,
+      "w": 9,
+      "h": 2
+    },
+    {
+      "type": "golf_cart",
+      "col": 53,
+      "row": 51,
+      "w": 3,
+      "h": 10
+    },
+    {
+      "type": "golf_cart",
+      "col": 52,
+      "row": 94,
+      "w": 4,
+      "h": 12
+    },
+    {
+      "type": "golf_cart",
+      "col": 45,
+      "row": 73,
+      "w": 4,
+      "h": 9
+    },
+    {
+      "type": "golf_cart",
+      "col": 254,
+      "row": 46,
+      "w": 17,
+      "h": 4
+    }
+  ],
+  "exit": {
+    "col": 313,
+    "row": 49
+  }
+}

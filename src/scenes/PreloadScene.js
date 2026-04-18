@@ -11,8 +11,8 @@ export default class PreloadScene extends Phaser.Scene {
       if (this._bar) this._bar.scaleX = value;
     });
 
-    // Object-only Tiled map: DynamicObstacles + Spawns layers for Act 1
-    this.load.tilemapTiledJSON('neighborhood-objects', 'maps/neighborhood_objects.json');
+    // Single source-of-truth map: roads, houses, friend zones, obstacles, exit
+    this.load.json('neighborhood-map', 'maps/neighborhood_map.json');
   }
 
   create() {

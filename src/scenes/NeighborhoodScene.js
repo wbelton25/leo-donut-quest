@@ -45,118 +45,13 @@ function darken(hex) {
   return (r << 16) | (g << 8) | b;
 }
 
-// ── Road segments [col, row, width, height, label] ────────────────────────────
-const ROADS = [
-  [56, 63, 74, 4, 'Tara Tea Dr'],
-  [56, 83, 28, 4, 'Mariana Ln'],
-  [64, 115, 18, 4, null],
-  [10, 147, 5, 4, null],
-  [10, 145, 5, 4, null],
-  [15, 146, 8, 4, null],
-  [20, 146, 16, 4, null],
-  [21, 137, 4, 10, null],
-  [24, 137, 12, 4, null],
-  [32, 139, 4, 8, null],
-  [34, 137, 16, 4, null],
-  [56, 115, 10, 4, 'Marquesas Ave'],
-  [45, 131, 4, 8, null],
-  [48, 131, 8, 4, null],
-  [52, 134, 4, 7, null],
-  [46, 137, 9, 4, null],
-  [45, 60, 4, 71, null],
-  [52, 59, 4, 72, 'Windward'],
-  [45, 59, 4, 5, 'Windward'],
-  [80, 67, 4, 19, null],
-  [122, 66, 4, 17, null],
-  [108, 79, 17, 4, null],
-  [108, 65, 4, 14, 'Suwarrow Ct.'],
-  [45, 55, 169, 4, 'Tega Cay Drive'],
-  [45, 46, 168, 4, 'Tega Cay Drive'],
-  [45, 49, 4, 11, null],
-  [52, 47, 4, 14, null],
-  [209, 46, 4, 38, null],
-  [188, 80, 22, 4, null],
-  [188, 69, 4, 12, null],
-  // ── Eastern extension — Carson and Justin's neighborhood ─────────────────
-  [209, 55, 103, 4, null],
-  [211, 46, 100, 4, null],
-  [311, 46, 4, 36, null],
-  [273, 78, 38, 4, null],
-  [273, 82, 4, 19, null],
-  [275, 97, 40, 4, null],
-  [311, 79, 4, 48, null],
-  [238, 57, 4, 99, null],
-  [240, 152, 75, 4, null],
-  [311, 124, 4, 30, null],
-  [283, 151, 1, 4, null],
-];
-
-// ── Runde Park ────────────────────────────────────────────────────────────────
-const PARK_C = 19, PARK_R = 65, PARK_W = 24, PARK_H = 26;
-
-// ── House clusters ────────────────────────────────────────────────────────────
-const HOUSE_GROUPS = [
-  { col: 126, row: 78,  n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-  { col: 117, row: 70,  n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-  { col: 79,  row: 111, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-  { col: 80,  row: 120, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-  { col: 71,  row: 120, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-  { col: 71,  row: 111, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-  { col: 64,  row: 111, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-  { col: 65,  row: 120, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 },
-];
-
-// ── Friend house interaction zones ────────────────────────────────────────────
-const FRIEND_ZONES = [
-  {
-    id:          PARTY_WARREN,
-    col:         128, row: 72,
-    radius:      80,
-    meetScript:  'warren_meet',
-    joinScript:  'warren_join',
-    color:       0xe74c3c,
-    label:       'WARREN',
-    hasBoss:     true,
-    bossScene:   'GraceBossScene',
-    defeatedFlag:'graceDefeated',
-  },
-  {
-    id:          PARTY_MJ,
-    col:         190, row: 67,
-    radius:      72,
-    meetScript:  'mj_meet',
-    joinScript:  'mj_join',
-    color:       0x2ecc71,
-    label:       'MJ',
-    hasBoss:     true,
-    bossScene:   'MaxBossScene',
-    defeatedFlag:'maxDefeated',
-  },
-  {
-    id:          PARTY_CARSON,
-    col:         296, row: 76,
-    radius:      72,
-    meetScript:  'carson_meet',
-    joinScript:  'carson_join',
-    color:       0x3498db,
-    label:       'CARSON',
-    hasBoss:     true,
-    bossScene:   'NoraBossScene',
-    defeatedFlag:'noraDefeated',
-  },
-  {
-    id:          PARTY_JUSTIN,
-    col:         317, row: 122,
-    radius:      72,
-    meetScript:  'justin_meet',
-    joinScript:  'justin_join',
-    color:       0x9b59b6,
-    label:       'JUSTIN',
-    hasBoss:     true,
-    bossScene:   'JustinMaxBossScene',
-    defeatedFlag:'justinMaxDefeated',
-  },
-];
+// ── Map data — loaded from neighborhood_map.json in _createImpl() ────────────
+// These are module-level so they're accessible everywhere in the file.
+// Values are populated from the JSON at scene startup.
+let ROADS        = [];
+let PARK_C = 19, PARK_R = 65, PARK_W = 24, PARK_H = 26;
+let HOUSE_GROUPS = [];
+let FRIEND_ZONES = [];
 
 export default class NeighborhoodScene extends Phaser.Scene {
   constructor() {
@@ -183,6 +78,29 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _createImpl() {
     const worldW = MAP_COLS * T;
     const worldH = MAP_ROWS * T;
+
+    // ── Load map data from JSON ───────────────────────────────────────────────
+    const mapData = this.cache.json.get('neighborhood-map');
+    if (mapData) {
+      ROADS        = (mapData.roads ?? []).map(r => [r.col, r.row, r.w, r.h, r.label ?? null]);
+      HOUSE_GROUPS = (mapData.houses ?? []).map(h => ({ col: h.col, row: h.row, n: 1, stepCol: 0, stepRow: 0, color: 0x8b7355 }));
+      if (mapData.park) { PARK_C = mapData.park.col; PARK_R = mapData.park.row; PARK_W = mapData.park.w; PARK_H = mapData.park.h; }
+      FRIEND_ZONES = (mapData.friendZones ?? []).map(fz => ({
+        id:           fz.id,
+        col:          fz.col,
+        row:          fz.row,
+        radius:       fz.radius,
+        meetScript:   fz.meetScript,
+        joinScript:   fz.joinScript,
+        color:        parseInt(fz.colorHex, 16),
+        label:        fz.label,
+        hasBoss:      fz.hasBoss ?? false,
+        bossScene:    fz.bossScene,
+        defeatedFlag: fz.defeatedFlag,
+      }));
+    } else {
+      console.warn('[NeighborhoodScene] neighborhood-map JSON not found — map will be empty');
+    }
 
     // ── Systems ───────────────────────────────────────────────────────────────
     this._resources = new ResourceSystem(this.game);
@@ -286,25 +204,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 294 * T, 74 * T, "CARSON'S",  { fontSize: '8px', color: '#88aaff' });
     txt(this, 314 * T, 119 * T, "JUSTIN'S", { fontSize: '8px', color: '#cc88ff' });
 
-    // ── Act 2 exit zone + obstacles — driven by Tiled neighborhood_objects.json ───
+    // ── Act 2 exit zone — position from neighborhood_map.json ───────────────
     this._exitX = null;
     this._exitY = null;
     this._exitRadius = 50;
-    // Parse Spawns layer from the object map
-    try {
-      const objMap = this.make.tilemap({ key: 'neighborhood-objects' });
-      const spawnsLayer = objMap.getObjectLayer('Spawns');
-      if (spawnsLayer) {
-        const exitObj = spawnsLayer.objects.find(o => o.name === 'act2_exit');
-        if (exitObj) {
-          this._exitX = exitObj.x;
-          this._exitY = exitObj.y;
-        }
-      }
-      // Store for obstacle spawning (done later in _spawnObstaclesFromMap)
-      this._objectMap = objMap;
-    } catch (e) {
-      console.warn('[NeighborhoodScene] Failed to load neighborhood-objects map:', e.message);
+    if (mapData?.exit) {
+      this._exitX = mapData.exit.col * T;
+      this._exitY = mapData.exit.row * T;
     }
 
     // Exit zone visual marker (if position was found in the Tiled map)
@@ -526,25 +432,22 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _updateProximityPrompt() {
     const px = this._player.x, py = this._player.y;
 
-    // ── Exit zone — position read from Tiled map (act2_exit object in Spawns layer)
-    // Always active; no full-party requirement.
+    // ── Exit zone — auto-show choice overlay on entry (no SPACE needed)
     if (this._exitX !== null && !this._departurePlayed) {
       const edx = px - this._exitX;
       const edy = py - this._exitY;
       if (edx * edx + edy * edy < this._exitRadius * this._exitRadius) {
-        if (!this._departurePromptShown) {
+        if (!this._departurePromptShown && !this._dialoguePlayed) {
           this._departurePromptShown = true;
-          this._proximityPrompt.setText('SPACE: DEPART').setVisible(true);
-        }
-        if (Phaser.Input.Keyboard.JustDown(this._spaceKey) && !this._dialoguePlayed) {
           this._dialoguePlayed = true;
           this._proximityPrompt.setVisible(false);
-          this.scene.get(SCENE_DIALOGUE).showScript('departure', () => this._doDepart());
+          this._showDepartureChoice();
         }
         return;
       } else if (this._departurePromptShown) {
+        // Leo walked out of the exit zone — allow the overlay to show again on re-entry
         this._departurePromptShown = false;
-        this._proximityPrompt.setVisible(false);
+        this._dialoguePlayed = false;
       }
     }
 
@@ -594,75 +497,60 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   // ── Obstacle factory ───────────────────────────────────────────────────────────
-  // Reads obstacle objects from the 'DynamicObstacles' layer in neighborhood_objects.json.
-  // Each Tiled rectangle object defines one obstacle group:
-  //   type      = 'deer' | 'car' | 'golf_cart' | 'bike' | 'golf_ball'
-  //   width ≥ height → horizontal patrol (E-W); height > width → vertical patrol (N-S)
-  //   bounding box → patrol range (minBound = obj.x or obj.y, maxBound = opposite edge)
-  //   center of bbox → evenly-distributed spawn points (if count > 1)
-  //
-  // Custom properties supported on all types:
-  //   count    (int)   — spawn N obstacles evenly distributed across the rect (default 1)
-  //   speed    (float) — override default speed
-  //   damage   (int)   — override default bike damage
-  // golf_ball extras:
-  //   angle    (float) — direction in degrees (0=right, 90=down, 180=left, 270=up)
-  //   interval (int)   — ms between shots (default 3000)
+  // Reads the 'obstacles' array from neighborhood_map.json.
+  // Each entry: { type, col, row, w, h, count?, speed?, damage?, angle?, interval? }
+  //   type  = 'deer' | 'car' | 'golf_cart' | 'bike' | 'golf_ball'
+  //   w ≥ h → horizontal patrol (E-W); h > w → vertical patrol (N-S)
+  //   bounding box (col/row/w/h in tiles) → patrol range in pixels
+  //   count → N evenly-distributed instances across the rect
 
   _spawnObstaclesFromMap() {
     const cb = (dmg) => this._onObstacleHit(dmg);
     this._obstacles = [];
 
-    const layer = this._objectMap?.getObjectLayer('DynamicObstacles');
-    if (!layer) {
-      console.warn('[NeighborhoodScene] DynamicObstacles layer not found — no obstacles spawned');
+    const mapData = this.cache.json.get('neighborhood-map');
+    const defs = mapData?.obstacles;
+    if (!defs?.length) {
+      console.warn('[NeighborhoodScene] No obstacles in neighborhood-map JSON');
       return;
     }
 
-    const prop = (obj, name) => obj.properties?.find(p => p.name === name)?.value;
+    defs.forEach(d => {
+      const dw    = d.w ?? 0;
+      const dh    = d.h ?? 0;
+      const isH   = dw >= dh;
+      const minB  = (isH ? d.col : d.row) * T;
+      const maxB  = (isH ? d.col + dw : d.row + dh) * T;
+      const cx    = (d.col + dw / 2) * T;
+      const cy    = (d.row + dh / 2) * T;
+      const count = d.count ?? 1;
 
-    layer.objects.forEach(obj => {
-      const w    = obj.width  ?? 0;
-      const h    = obj.height ?? 0;
-      const isH  = w >= h;
-      const minB = isH ? obj.x         : obj.y;
-      const maxB = isH ? obj.x + w     : obj.y + h;
-      const cx   = obj.x + w / 2;
-      const cy   = obj.y + h / 2;
-      const count = prop(obj, 'count') ?? 1;
-      const speed   = prop(obj, 'speed');
-      const damage  = prop(obj, 'damage');
-      const angle   = prop(obj, 'angle')   ?? 0;
-      const interval = prop(obj, 'interval');
-
-      // Distribute spawn points evenly across the patrol range
       for (let i = 0; i < count; i++) {
         let spawnX = cx, spawnY = cy;
         if (count > 1) {
-          const t = count === 1 ? 0.5 : (i + 0.5) / count;
+          const t = (i + 0.5) / count;
           if (isH) spawnX = minB + t * (maxB - minB);
           else     spawnY = minB + t * (maxB - minB);
         }
 
-        switch (obj.type) {
+        switch (d.type) {
           case 'deer':
-            this._obstacles.push(new DeerObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed));
+            this._obstacles.push(new DeerObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, d.speed));
             break;
           case 'car':
-            this._obstacles.push(new CarObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed, damage));
+            this._obstacles.push(new CarObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, d.speed, d.damage));
             break;
           case 'golf_cart':
-            this._obstacles.push(new GolfCartObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed, damage));
+            this._obstacles.push(new GolfCartObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, d.speed, d.damage));
             break;
           case 'bike':
-            this._obstacles.push(new BikeObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, speed, damage));
+            this._obstacles.push(new BikeObstacle(this, spawnX, spawnY, minB, maxB, isH, cb, d.speed, d.damage));
             break;
           case 'golf_ball':
-            // Golf ball spawner uses center of object as fire position; only spawns once
-            this._obstacles.push(new GolfBallSpawner(this, cx, cy, angle, interval, speed, damage, cb));
+            this._obstacles.push(new GolfBallSpawner(this, cx, cy, d.angle ?? 0, d.interval, d.speed, d.damage, cb));
             break;
           default:
-            console.warn('[NeighborhoodScene] Unknown obstacle type:', obj.type);
+            console.warn('[NeighborhoodScene] Unknown obstacle type:', d.type);
         }
       }
     });
@@ -677,6 +565,41 @@ export default class NeighborhoodScene extends Phaser.Scene {
         resources: this._resources.getAll(),
       })
     );
+  }
+
+  _showDepartureChoice() {
+    const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
+    const objs = [];
+
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setScrollFactor(0).setDepth(50));
+    objs.push(txt(this, cx, cy - 38, 'READY TO DEPART?', { fontSize: '12px', color: '#f5e642' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+
+    const partyNames = this._party.getParty();
+    const crewLine = partyNames.length > 0
+      ? `CREW: Leo + ${partyNames.map(id => id.charAt(0).toUpperCase() + id.slice(1)).join(', ')}`
+      : 'CREW: Leo (solo)';
+    objs.push(txt(this, cx, cy - 20, crewLine, { fontSize: '8px', color: '#aaccee' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+
+    const btn1 = this.add.rectangle(cx, cy + 2, 160, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    objs.push(btn1);
+    objs.push(txt(this, cx, cy + 2, 'GO TO ACT 2 (RIDE TO DONUTS)', { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+
+    const btn2 = this.add.rectangle(cx, cy + 24, 160, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    objs.push(btn2);
+    objs.push(txt(this, cx, cy + 24, 'KEEP EXPLORING ACT 1', { fontSize: '8px', color: '#4fc3f7' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+
+    const dismiss = () => {
+      objs.forEach(o => o.destroy());
+      // Keep _departurePromptShown and _dialoguePlayed true so the overlay
+      // doesn't immediately re-trigger while Leo is still standing on the exit.
+      // Both flags reset when Leo walks out of the exit radius.
+    };
+
+    btn1.on('pointerdown', () => {
+      objs.forEach(o => o.destroy());
+      this._doDepart();
+    });
+    btn2.on('pointerdown', dismiss);
   }
 
   _showBikeBrokenOverlay() {

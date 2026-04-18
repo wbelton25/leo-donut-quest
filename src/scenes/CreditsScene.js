@@ -97,7 +97,7 @@ export default class CreditsScene extends Phaser.Scene {
     }
     this._refreshBoxes();
 
-    txt(this, cx, 220, 'UP/DN CHANGE   LT/RT MOVE   ENTER CONFIRM',
+    txt(this, cx, 220, 'TYPE LETTERS  ←→ MOVE  ENTER CONFIRM',
       { fontSize: '8px', color: '#445566' }).setOrigin(0.5);
 
     this.input.keyboard.on('keydown', (e) => this._handleInitialsKey(e));
@@ -106,6 +106,15 @@ export default class CreditsScene extends Phaser.Scene {
   _handleInitialsKey(e) {
     if (this._initialsConfirmed) return;
     const KC = Phaser.Input.Keyboard.KeyCodes;
+
+    // Direct letter input (A–Z)
+    if (e.keyCode >= 65 && e.keyCode <= 90) {
+      this._initials[this._cursor] = String.fromCharCode(e.keyCode);
+      this._cursor = Math.min(this._cursor + 1, 2);
+      this._refreshBoxes();
+      return;
+    }
+
     switch (e.keyCode) {
       case KC.UP:
         this._initials[this._cursor] = this._shiftLetter(this._initials[this._cursor], 1);
@@ -118,6 +127,10 @@ export default class CreditsScene extends Phaser.Scene {
         this._refreshBoxes(); break;
       case KC.RIGHT:
         this._cursor = (this._cursor + 1) % 3;
+        this._refreshBoxes(); break;
+      case KC.BACKSPACE:
+        this._cursor = Math.max(this._cursor - 1, 0);
+        this._initials[this._cursor] = 'A';
         this._refreshBoxes(); break;
       case KC.ENTER:
       case KC.SPACE:
