@@ -275,6 +275,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const startX = this._initData.spawnCol ? this._initData.spawnCol * T : 30 * T;
     const startY = this._initData.spawnRow ? this._initData.spawnRow * T : 142 * T;
     this._player = new Player(this, startX, startY);
+    this._player.setDepth(6);
+    // Fallback rectangle (used when sprite atlas isn't loaded yet)
+    if (this._player._visual)        this._player._visual.setDepth(6);
+    if (this._player._dirIndicator)  this._player._dirIndicator.setDepth(6);
     this.physics.add.collider(this._player, this._walls);
 
     // ── Recruited set (must init before Grace / deer which read it) ──────────
@@ -714,6 +718,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const spriteKey   = `sprite-${zone.id}`;
     const displaySize = zone.id === PARTY_WARREN ? Math.round(TILE_SIZE * 3.2) : TILE_SIZE * 3;
     const follower    = new Follower(this, this._posBuffer, slotIndex, zone.color, zone.label, spriteKey, displaySize);
+    follower.setDepth(5);
     this._followers.push(follower);
   }
 

@@ -60,10 +60,10 @@ export default class BikeObstacle {
     });
 
     // Visuals — rider (blue) on a bike (orange)
-    this._bikeBody = scene.add.rectangle(x, y, TILE_SIZE * 1.4, TILE_SIZE * 0.6, 0xff8800).setDepth(2);
-    this._rider    = scene.add.rectangle(x, y - 5, TILE_SIZE * 0.7, TILE_SIZE * 0.9, 0x336699).setDepth(3);
-    this._wheelF   = scene.add.circle(x + (this._isH ? 8 : 0), y + (this._isH ? 0 : 8), 4, 0x222222).setDepth(2);
-    this._wheelB   = scene.add.circle(x - (this._isH ? 8 : 0), y - (this._isH ? 0 : 8), 4, 0x222222).setDepth(2);
+    this._bikeBody = scene.add.rectangle(x, y, TILE_SIZE * 1.4, TILE_SIZE * 0.6, 0xff8800).setDepth(3);
+    this._rider    = scene.add.rectangle(x, y - 5, TILE_SIZE * 0.7, TILE_SIZE * 0.9, 0x336699).setDepth(4);
+    this._wheelF   = scene.add.circle(x + (this._isH ? 8 : 0), y + (this._isH ? 0 : 8), 4, 0x222222).setDepth(3);
+    this._wheelB   = scene.add.circle(x - (this._isH ? 8 : 0), y - (this._isH ? 0 : 8), 4, 0x222222).setDepth(3);
   }
 
   update(player) {

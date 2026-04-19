@@ -74,30 +74,78 @@ function makeTextureRGBA(fn, w = W, h = H) {
 
 // ── Surface definitions ───────────────────────────────────────────────────
 
-// Grass — vertical blade structure.
-// Each column has a different phase offset so blade tips land at staggered
-// heights, creating an organic irregular feel rather than horizontal bands.
+// Grass — explicit blade-cluster geometry.
+//
+// The texture is divided into a 16×16 grid of "tuft cells" (8px each).
+// Each cell has a jittered center and 5-8 blades radiating outward in random
+// directions.  For each output pixel we test whether it lands on any blade
+// from nearby tufts.  Blades are dark at the base and bright at the tip.
+// The tuft grid wraps toroidally so the texture tiles seamlessly.
 const GRASS_PAL = [
-  [14,  44, 14],   // 0 deep shadow  (ground between blades)
-  [34,  88, 34],   // 1 dark         (blade base)
-  [50, 122, 50],   // 2 mid-dark     (lower blade body)
-  [65, 150, 55],   // 3 mid          (upper blade — slight yellow shift)
-  [84, 175, 58],   // 4 upper        (blade tip)
-  [108, 208, 68],  // 5 bright       (sun-caught tip highlight, rare)
+  [ 8,  32,  8],   // 0 dark ground (between blades)
+  [20,  62, 20],   // 1 blade base
+  [38, 100, 32],   // 2 lower blade
+  [58, 140, 40],   // 3 upper blade
+  [80, 178, 50],   // 4 blade tip
+  [102, 210, 62],  // 5 sun-caught highlight
 ];
 
-const BLADE_H = 6;
-const BLADE_GRAD = [1.0, 0.78, 0.56, 0.36, 0.18, 0.02];
+const TCOLS = 16, TROWS = 16;  // tuft grid (W/TCOLS = 8px per cell)
+const TSIZ  = W / TCOLS;       // 8px
+
+// Deterministic hash [0,1) from two ints — avoids degenerate 0,0 case
+const hsh = (a, b) => {
+  const n = Math.sin((a + 1.3) * 127.1 + (b + 0.7) * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+};
 
 const grass = (x, y) => {
-  const patch    = noise(x, y, 0);
-  const colPhase = Math.floor(sn(x, 0, 10, 1.8) * BLADE_H);
-  const bp       = (y + colPhase) % BLADE_H;
-  const bladeV   = BLADE_GRAD[bp];
-  const colDense = sn(x, 0, 6, 3.2) > 0.55 ? 0.08 : 0.0;
-  const v = bladeV * 0.62 + patch * 0.30 + colDense + grain(x, y, 1) * 0.08;
-  if (bp === 0 && patch > 0.60 && grain(x, y, 4) > 0.74) return GRASS_PAL[5];
-  return quantise(Math.max(0, Math.min(1, v)), GRASS_PAL, x, y, 0.18);
+  const cx = Math.floor(x / TSIZ);
+  const cy = Math.floor(y / TSIZ);
+
+  // Background: near-black ground with subtle low-freq variation
+  let bladeV = noise(x, y, 0) * 0.15;
+
+  // Check 3×3 neighbourhood of tuft cells
+  for (let di = -1; di <= 1; di++) {
+    for (let dj = -1; dj <= 1; dj++) {
+      // Wrapped grid index for deterministic tuft properties
+      const tci = ((cx + di) % TCOLS + TCOLS) % TCOLS;
+      const tcj = ((cy + dj) % TROWS + TROWS) % TROWS;
+
+      // Tuft center: cell origin + deterministic jitter [0, TSIZ*0.65]
+      const jx = hsh(tci,       tcj * 7) * TSIZ * 0.65;
+      const jy = hsh(tci * 13, tcj    ) * TSIZ * 0.65;
+
+      // Pixel → tuft center offset (unwrapped coords keep distance correct)
+      const ddx = x - ((cx + di) * TSIZ + jx);
+      const ddy = y - ((cy + dj) * TSIZ + jy);
+
+      // Skip tufts that are clearly out of reach (max blade ~9px)
+      if (ddx * ddx + ddy * ddy > 11 * 11) continue;
+
+      // Blades: 5-8 per tuft, random angles, random lengths (4-9px)
+      const nBlades = 5 + Math.floor(hsh(tci * 3 + 0.1, tcj + 5.7) * 4);
+      for (let b = 0; b < nBlades; b++) {
+        const angle = hsh(tci + b * 1.7, tcj + b * 2.9) * Math.PI * 2;
+        const bLen  = 4 + hsh(tci * 0.5 + b + 3, tcj * 2 + b) * 5;
+        const bc = Math.cos(angle), bs = Math.sin(angle);
+
+        const along = ddx * bc + ddy * bs;          // 0=base, bLen=tip
+        const perp  = Math.abs(-ddx * bs + ddy * bc); // distance from blade axis
+
+        if (along >= -0.5 && along <= bLen + 0.5 && perp < 0.95) {
+          const t  = Math.max(0, along) / bLen;
+          bladeV = Math.max(bladeV, 0.15 + t * 0.85);  // dark base → bright tip
+        }
+      }
+    }
+  }
+
+  // Occasional sun-caught bright highlight at blade tips
+  if (bladeV > 0.84 && grain(x, y, 5) > 0.76) return GRASS_PAL[5];
+
+  return quantise(Math.max(0, Math.min(1, bladeV)), GRASS_PAL, x, y, 0.12);
 };
 
 // Park / golf rough — darker, more saturated

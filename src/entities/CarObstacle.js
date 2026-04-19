@@ -43,12 +43,12 @@ export default class CarObstacle {
     const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
     const bw = this._isH ? TILE_SIZE * 2.5 : TILE_SIZE * 1.5;
     const bh = this._isH ? TILE_SIZE * 1.5 : TILE_SIZE * 2.5;
-    this._body   = scene.add.rectangle(x, y, bw, bh, color).setDepth(2);
-    this._roof   = scene.add.rectangle(x, y, bw * 0.6, bh * 0.55, 0x000000, 0.35).setDepth(3);
+    this._body   = scene.add.rectangle(x, y, bw, bh, color).setDepth(3);
+    this._roof   = scene.add.rectangle(x, y, bw * 0.6, bh * 0.55, 0x000000, 0.35).setDepth(4);
     const wOff = this._isH ? bw * 0.35 : 0;
     const hOff = this._isH ? 0 : bh * 0.35;
-    this._wheelL = scene.add.circle(x - wOff, y + hOff, 3, 0x111111).setDepth(2);
-    this._wheelR = scene.add.circle(x + wOff, y - hOff, 3, 0x111111).setDepth(2);
+    this._wheelL = scene.add.circle(x - wOff, y + hOff, 3, 0x111111).setDepth(3);
+    this._wheelR = scene.add.circle(x + wOff, y - hOff, 3, 0x111111).setDepth(3);
   }
 
   update(player) {

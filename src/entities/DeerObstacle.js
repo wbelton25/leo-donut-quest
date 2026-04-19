@@ -39,9 +39,9 @@ export default class DeerObstacle {
     this._vy = this._isH ? 0 : this._speed * dir;
 
     // Visuals
-    this._body = scene.add.rectangle(x, y, TILE_SIZE * 1.5, TILE_SIZE, 0x8b5e3c);
-    this._earL = scene.add.rectangle(x - 4, y - 6, 3, 5, 0x6b3a1f);
-    this._earR = scene.add.rectangle(x + 4, y - 6, 3, 5, 0x6b3a1f);
+    this._body = scene.add.rectangle(x, y, TILE_SIZE * 1.5, TILE_SIZE, 0x8b5e3c).setDepth(3);
+    this._earL = scene.add.rectangle(x - 4, y - 6, 3, 5, 0x6b3a1f).setDepth(3);
+    this._earR = scene.add.rectangle(x + 4, y - 6, 3, 5, 0x6b3a1f).setDepth(3);
 
     scene.time.addEvent({
       delay: Phaser.Math.Between(3000, 7000),

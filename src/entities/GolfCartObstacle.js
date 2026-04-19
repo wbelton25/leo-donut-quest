@@ -53,12 +53,12 @@ export default class GolfCartObstacle {
     // Visuals — cream body with green canopy
     const bw = this._isH ? TILE_SIZE * 2 : TILE_SIZE * 1.5;
     const bh = this._isH ? TILE_SIZE * 1.5 : TILE_SIZE * 2;
-    this._body   = scene.add.rectangle(x, y, bw, bh, 0xf0e8c0).setDepth(2);
-    this._canopy = scene.add.rectangle(x, y - 3, bw * 0.8, bh * 0.45, 0x336633).setDepth(3);
+    this._body   = scene.add.rectangle(x, y, bw, bh, 0xf0e8c0).setDepth(3);
+    this._canopy = scene.add.rectangle(x, y - 3, bw * 0.8, bh * 0.45, 0x336633).setDepth(4);
     this._wheelL = scene.add.circle(x - (this._isH ? bw * 0.35 : 0),
-                                    y + (this._isH ? 0 : bh * 0.35), 3, 0x333333).setDepth(2);
+                                    y + (this._isH ? 0 : bh * 0.35), 3, 0x333333).setDepth(3);
     this._wheelR = scene.add.circle(x + (this._isH ? bw * 0.35 : 0),
-                                    y - (this._isH ? 0 : bh * 0.35), 3, 0x333333).setDepth(2);
+                                    y - (this._isH ? 0 : bh * 0.35), 3, 0x333333).setDepth(3);
   }
 
   update(player) {

@@ -98,6 +98,13 @@ export default class Follower {
     if (this._label) this._label.setPosition(pos.x, pos.y - 22);
   }
 
+  setDepth(d) {
+    this._visual.setDepth(d);
+    if (this._dot)   this._dot.setDepth(d);
+    if (this._label) this._label.setDepth(d + 1);
+    return this;
+  }
+
   destroy() {
     this._visual.destroy();
     if (this._dot)   this._dot.destroy();

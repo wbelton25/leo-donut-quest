@@ -31,7 +31,7 @@ export default class GolfBallSpawner {
     this._dirY = Math.sin(rad);
 
     // Show a small tee marker at the spawn point
-    this._marker = scene.add.circle(x, y, 5, 0xffffff, 0.5).setDepth(1);
+    this._marker = scene.add.circle(x, y, 5, 0xffffff, 0.5).setDepth(3);
 
     this._timer = scene.time.addEvent({
       delay:    interval ?? DEFAULT_INTERVAL,
