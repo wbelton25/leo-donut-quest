@@ -146,34 +146,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._addWall(MAP_COLS - 1, 0, 1, MAP_ROWS, false);
 
     // ── Roads (visual only — collision is handled by off-road walls above) ────
-    // Draw sidewalk curb strips first (behind road), then road on top, then edge shadows
     ROADS.forEach(([c, r, w, h, label]) => {
       const px = c * T + (w * T) / 2;
       const py = r * T + (h * T) / 2;
       const pw = w * T, ph = h * T;
-      const isHoriz = w >= h;
-
-      // Sidewalk border: 1 tile wide strip on each side of the road
-      if (isHoriz) {
-        this._ts(px, r * T - T / 2,       pw, T, 'tex-sidewalk', -1);
-        this._ts(px, (r + h) * T + T / 2, pw, T, 'tex-sidewalk', -1);
-      } else {
-        this._ts(c * T - T / 2,       py, T, ph, 'tex-sidewalk', -1);
-        this._ts((c + w) * T + T / 2, py, T, ph, 'tex-sidewalk', -1);
-      }
-
-      // Road surface
       this._ts(px, py, pw, ph, 'tex-road');
-
-      // Dark curb shadow at road edges (creates depth/boundary)
-      if (isHoriz) {
-        this.add.rectangle(px, r * T + 3,       pw, 5, 0x000000, 0.45).setDepth(1);
-        this.add.rectangle(px, (r + h) * T - 3, pw, 5, 0x000000, 0.45).setDepth(1);
-      } else {
-        this.add.rectangle(c * T + 3,       py, 5, ph, 0x000000, 0.45).setDepth(1);
-        this.add.rectangle((c + w) * T - 3, py, 5, ph, 0x000000, 0.45).setDepth(1);
-      }
-
       // Centre line only on Tega Cay Drive (the main through-road)
       if (label === 'Tega Cay Drive') {
         this.add.rectangle(px, py, pw, 1, 0xffff88, 0.25);

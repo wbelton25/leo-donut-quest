@@ -73,29 +73,42 @@ function makeTexture(fn) {
 
 // ── Surface definitions ───────────────────────────────────────────────────
 
-// Grass — 6-shade palette with blade-tip highlights
-// Lighter pixels tend to appear in small vertical clusters (like blades)
+// Grass — vertical blade structure gives a clearly different look from road.
+// Blade cycle: 6px tall; per-column phase offset staggers tips so they
+// don't all land on the same scanline, creating an organic irregular edge.
 const GRASS_PAL = [
-  [28,  82, 28],   // 0 very dark shadow
-  [40, 100, 40],   // 1 dark
-  [54, 124, 54],   // 2 medium-dark  ← most common
-  [66, 145, 66],   // 3 medium
-  [80, 168, 80],   // 4 light
-  [96, 194, 96],   // 5 bright blade-tip
+  [14,  44, 14],   // 0 deep shadow  (ground between blades)
+  [34,  88, 34],   // 1 dark         (blade base)
+  [50, 122, 50],   // 2 mid-dark     (lower blade body)
+  [65, 150, 55],   // 3 mid          (upper blade body — slight yellow shift)
+  [84, 175, 58],   // 4 upper        (blade tip)
+  [108, 208, 68],  // 5 bright       (sun-caught tip highlight, rare)
 ];
 
+const BLADE_H = 6;  // pixels per blade cycle
+
 const grass = (x, y) => {
-  const base  = noise(x, y, 0);           // large-patch variation
-  const fine  = grain(x, y, 0);           // per-pixel detail
-  // Bias toward middle of palette (2-3); fine grain shifts ±1
-  const v = base * 0.65 + fine * 0.35;
-  const c = quantise(v, GRASS_PAL, x, y, 0.55);
-  // Occasional bright blade-tip: only on pixels whose noise is already high
-  // and where the pixel "above" (y-1 wraps) is also in the light range —
-  // creates short vertical streaks that read as individual grass blades.
-  if (fine > 0.80 && noise(x, y - 1, 0) + grain(x, y - 1, 0) * 0.35 > 0.70) {
-    return GRASS_PAL[5];
-  }
+  // Large-area variation — some patches darker (shaded ground), some brighter
+  const patch = noise(x, y, 0);
+
+  // Per-column phase: shifts where this column's blade tip lands vertically.
+  // sn(x, 0, ...) varies only with x (y=0 → y-term constant), stays seamless.
+  const colPhase = Math.floor(sn(x, 0, 10, 1.8) * BLADE_H);
+  const bp = (y + colPhase) % BLADE_H;  // position within blade cycle
+
+  // Brightness gradient across the blade: 1.0 at tip (bp=0) → 0.0 at base
+  const BLADE_GRAD = [1.0, 0.78, 0.56, 0.36, 0.18, 0.02];
+  const bladeV = BLADE_GRAD[bp];
+
+  // Column density: some columns feel "thicker" (brighter blades)
+  const colDense = sn(x, 0, 6, 3.2) > 0.55 ? 0.08 : 0.0;
+
+  const v = bladeV * 0.62 + patch * 0.30 + colDense + grain(x, y, 1) * 0.08;
+  const c = quantise(Math.max(0, Math.min(1, v)), GRASS_PAL, x, y, 0.18);
+
+  // Rare sun-caught blade-tip glint (yellow-green)
+  if (bp === 0 && patch > 0.60 && grain(x, y, 4) > 0.74) return GRASS_PAL[5];
+
   return c;
 };
 
