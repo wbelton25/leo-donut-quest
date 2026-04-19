@@ -146,17 +146,43 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._addWall(MAP_COLS - 1, 0, 1, MAP_ROWS, false);
 
     // ── Roads (visual only — collision is handled by off-road walls above) ────
+    // Edge strips (road-edge-h / road-edge-v) are 20px RGBA strips placed
+    // straddling each road boundary: transparent on the grass side, opaque road
+    // texture on the road side, with a noise-driven organic profile in between.
+    // They sit at depth 2, above both the grass (depth 0) and road (depth 1).
+    const EDGE = 20;  // matches EDGE_SIZE in generate-world-textures.js
     ROADS.forEach(([c, r, w, h, label]) => {
       const px = c * T + (w * T) / 2;
       const py = r * T + (h * T) / 2;
       const pw = w * T, ph = h * T;
-      this._ts(px, py, pw, ph, 'tex-road');
+      const isHoriz = w >= h;
+
+      // Road surface (depth 1)
+      this._ts(px, py, pw, ph, 'tex-road', 1);
+
+      // Organic edge strips (depth 2) — straddle each road boundary
+      if (isHoriz) {
+        // Top edge: grass side (transparent) at top, road texture at bottom
+        const et = this.add.tileSprite(px, r * T, pw, EDGE, 'tex-road-edge-h').setDepth(2);
+        et.setTilePosition(c * T % 128, 0);
+        // Bottom edge: same strip flipped — now transparent at bottom
+        const eb = this.add.tileSprite(px, (r + h) * T, pw, EDGE, 'tex-road-edge-h').setDepth(2).setFlipY(true);
+        eb.setTilePosition(c * T % 128, 0);
+      } else {
+        // Left edge: grass side (transparent) at left, road at right
+        const el = this.add.tileSprite(c * T, py, EDGE, ph, 'tex-road-edge-v').setDepth(2);
+        el.setTilePosition(0, r * T % 128);
+        // Right edge: flipped — transparent at right
+        const er = this.add.tileSprite((c + w) * T, py, EDGE, ph, 'tex-road-edge-v').setDepth(2).setFlipX(true);
+        er.setTilePosition(0, r * T % 128);
+      }
+
       // Centre line only on Tega Cay Drive (the main through-road)
       if (label === 'Tega Cay Drive') {
-        this.add.rectangle(px, py, pw, 1, 0xffff88, 0.25);
+        this.add.rectangle(px, py, pw, 1, 0xffff88, 0.25).setDepth(1);
       }
       if (label) {
-        txt(this, c * T + 2, r * T + 2, label, { fontSize: '8px', color: '#888899' });
+        txt(this, c * T + 2, r * T + 2, label, { fontSize: '8px', color: '#888899' }).setDepth(3);
       }
     });
 

@@ -39,9 +39,14 @@ export default class PreloadScene extends Phaser.Scene {
     );
 
     // Seamless 128×128 surface textures — used for large tileSprite fills
-    // (grass, road, water, etc.) where repeating a 16px tile would show a grid
     ['grass', 'park', 'golf', 'road', 'sidewalk', 'water', 'water-lt', 'shore']
       .forEach(id => this.load.image(`tex-${id}`, `assets/textures/${id}.png`));
+
+    // RGBA road edge strips — transparent on grass side, opaque road on other side.
+    // Placed straddling each road boundary to replace the hard rectangular edge
+    // with an organic noise-driven profile.
+    this.load.image('tex-road-edge-h', 'assets/textures/road-edge-h.png');
+    this.load.image('tex-road-edge-v', 'assets/textures/road-edge-v.png');
   }
 
   create() {
