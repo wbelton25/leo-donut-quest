@@ -49,7 +49,10 @@ export default class DialogueScene extends Phaser.Scene {
     const PARTY_SPEAKERS = new Set(['warren', 'mj', 'carson', 'justin']);
 
     const script = raw.filter(line => {
-      // Explicit requiresMember field takes precedence
+      // requiresMember: null means "always show" — used in meet scripts where
+      // the NPC speaks before they've been recruited (so party check would filter them out)
+      if ('requiresMember' in line && line.requiresMember === null) return true;
+      // requiresMember: string → must be in party
       if (line.requiresMember) return partyIds.has(line.requiresMember);
       // Auto-filter: if speaker is a known party member, only show if they're present
       if (line.speaker && PARTY_SPEAKERS.has(line.speaker.toLowerCase())) {

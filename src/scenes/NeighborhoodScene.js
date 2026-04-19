@@ -257,14 +257,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._followers = [];
 
     // ── Boss return handling ──────────────────────────────────────────────────
-    // If returning from a boss scene with a win, recruit the friend immediately
+    // If returning from a boss scene with a win, recruit the friend (party + money).
+    // Follower spawning is handled in one consolidated loop below so that all
+    // previously-recruited members are also re-spawned after a scene restart.
     this._graceDefeated = this._recruited.has(PARTY_WARREN) || !!this._initData.graceDefeated;
     if (this._initData.graceDefeated && !this._recruited.has(PARTY_WARREN)) {
       this._recruited.add(PARTY_WARREN);
       this._party.addMember(PARTY_WARREN);
       this._resources.applyChanges({ money: 10 });
-      const zone = FRIEND_ZONES.find(z => z.id === PARTY_WARREN);
-      if (zone) this._spawnFollower(zone);
     }
 
     this._maxDefeated = this._recruited.has(PARTY_MJ) || !!this._initData.maxDefeated;
@@ -272,8 +272,6 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this._recruited.add(PARTY_MJ);
       this._party.addMember(PARTY_MJ);
       this._resources.applyChanges({ money: 10 });
-      const zone = FRIEND_ZONES.find(z => z.id === PARTY_MJ);
-      if (zone) this._spawnFollower(zone);
     }
 
     this._noraDefeated = this._recruited.has(PARTY_CARSON) || !!this._initData.noraDefeated;
@@ -281,8 +279,6 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this._recruited.add(PARTY_CARSON);
       this._party.addMember(PARTY_CARSON);
       this._resources.applyChanges({ money: 10 });
-      const zone = FRIEND_ZONES.find(z => z.id === PARTY_CARSON);
-      if (zone) this._spawnFollower(zone);
     }
 
     this._justinMaxDefeated = this._recruited.has(PARTY_JUSTIN) || !!this._initData.justinMaxDefeated;
@@ -290,9 +286,17 @@ export default class NeighborhoodScene extends Phaser.Scene {
       this._recruited.add(PARTY_JUSTIN);
       this._party.addMember(PARTY_JUSTIN);
       this._resources.applyChanges({ money: 10 });
-      const zone = FRIEND_ZONES.find(z => z.id === PARTY_JUSTIN);
-      if (zone) this._spawnFollower(zone);
     }
+
+    // Spawn followers for every recruited member in a fixed chain order.
+    // This runs on every scene start — handles both the initial recruitment
+    // session and restarts after boss fights where prior followers were lost.
+    [PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN].forEach(id => {
+      if (this._recruited.has(id)) {
+        const zone = FRIEND_ZONES.find(z => z.id === id);
+        if (zone) this._spawnFollower(zone);
+      }
+    });
 
     // Boss retry dialog — if returning from a loss with bossLost flag set
     if (this._initData.bossLost) {
@@ -386,11 +390,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
 
-    // ── Act 1 clock drain (constant real-time rate) ───────────────────────────────
+    // ── Act 1 clock drain (only while Leo is moving) ─────────────────────────────
     // ACT1_TIME_RATE: time-units per second. 0.5 = ~9 min real time to drain Act 1 budget.
-    // Tune this so optimal full-party route feels like ~2-3 min of real play.
+    // Time pauses when Leo stops — rewards exploration but punishes long detours.
     const ACT1_TIME_RATE = 0.5;
-    if (!this._departurePlayed) {
+    const leoMoving = Math.abs(this._player.body.velocity.x) > 2
+                   || Math.abs(this._player.body.velocity.y) > 2;
+    if (!this._departurePlayed && leoMoving) {
       this._act1TimeAccum = (this._act1TimeAccum ?? 0) + delta;
       if (this._act1TimeAccum >= 1000) {
         this._resources.applyChanges({ time: -Math.round(ACT1_TIME_RATE * this._act1TimeAccum / 1000) });
@@ -674,8 +680,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   _spawnFollower(zone) {
-    const slotIndex = this._followers.length;
-    const follower = new Follower(this, this._posBuffer, slotIndex, zone.color, zone.label);
+    const slotIndex   = this._followers.length;
+    const spriteKey   = `sprite-${zone.id}`;
+    const displaySize = zone.id === PARTY_WARREN ? Math.round(TILE_SIZE * 3.2) : TILE_SIZE * 3;
+    const follower    = new Follower(this, this._posBuffer, slotIndex, zone.color, zone.label, spriteKey, displaySize);
     this._followers.push(follower);
   }
 

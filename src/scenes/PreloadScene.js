@@ -13,6 +13,24 @@ export default class PreloadScene extends Phaser.Scene {
 
     // Single source-of-truth map: roads, houses, friend zones, obstacles, exit
     this.load.json('neighborhood-map', 'maps/neighborhood_map.json');
+
+    // ── Sprite atlases (Aseprite PNG + JSON export) ───────────────────────────
+    // Files go in src/assets/sprites/<id>.png + <id>.json.
+    // Missing files log a 404 warning but do NOT crash — entities fall back to
+    // colored rectangles automatically via scene.textures.exists() checks.
+    //
+    // Frame naming convention expected from Aseprite:
+    //   down-0, down-1, down-2, up-0, up-1, up-2, left-0..., right-0...
+    //
+    // Character walk sprites (32×32 px, 12 frames each: 4 dirs × 3 walk frames)
+    ['leo', 'warren', 'mj', 'carson', 'justin'].forEach(id => {
+      this.load.atlas(`sprite-${id}`, `assets/sprites/${id}.png`, `assets/sprites/${id}.json`);
+    });
+
+    // Boss sprites (32×32 px — idle, attack, hit frames; exact frame names TBD)
+    ['grace', 'max', 'nora'].forEach(id => {
+      this.load.atlas(`sprite-${id}-boss`, `assets/sprites/${id}_boss.png`, `assets/sprites/${id}_boss.json`);
+    });
   }
 
   create() {

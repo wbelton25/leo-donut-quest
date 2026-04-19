@@ -1,7 +1,8 @@
 import {
   SCENE_NORA_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
-  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, txt,
+  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt,
 } from '../constants.js';
+import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
 import PartySystem from '../systems/PartySystem.js';
@@ -226,8 +227,32 @@ export default class NoraBossScene extends Phaser.Scene {
   // ─── Leo visual ───────────────────────────────────────────────────────────
 
   _buildLeo() {
-    this._leoBody = this.add.rectangle(this._leoX, this._leoY, T * 2, T * 2.5, 0x4488ff).setDepth(6);
-    this._leoDot  = this.add.rectangle(this._leoX, this._leoY - 12, 6, 4, 0xffffff).setDepth(6);
+    if (this.textures.exists(SPRITE_LEO)) {
+      registerCharacterAnims(this.anims, SPRITE_LEO);
+      this._leoSprite = this.add.sprite(this._leoX, this._leoY, SPRITE_LEO, 'down-0')
+        .setDisplaySize(T * 3, T * 3).setDepth(6);
+      this._leoBody = null;
+      this._leoDot  = null;
+    } else {
+      this._leoSprite = null;
+      this._leoBody = this.add.rectangle(this._leoX, this._leoY, T * 2, T * 2.5, 0x4488ff).setDepth(6);
+      this._leoDot  = this.add.rectangle(this._leoX, this._leoY - 12, 6, 4, 0xffffff).setDepth(6);
+    }
+    this._leoFacing = 'down';
+  }
+
+  _moveLeoVisual(vx, vy) {
+    if (this._leoSprite) {
+      this._leoSprite.setPosition(this._leoX, this._leoY);
+      if (Math.abs(vx) >= Math.abs(vy)) { if (vx > 0) this._leoFacing = 'right'; else if (vx < 0) this._leoFacing = 'left'; }
+      else                              { if (vy > 0) this._leoFacing = 'down';  else if (vy < 0) this._leoFacing = 'up'; }
+      const moving  = vx !== 0 || vy !== 0;
+      const animKey = moving ? `${SPRITE_LEO}-walk-${this._leoFacing}` : `${SPRITE_LEO}-idle-${this._leoFacing}`;
+      if (this._leoSprite.anims?.currentAnim?.key !== animKey) this._leoSprite.play(animKey);
+    } else {
+      this._leoBody.setPosition(this._leoX, this._leoY);
+      this._leoDot.setPosition(this._leoX, this._leoY - 12);
+    }
   }
 
   // ─── HUD ──────────────────────────────────────────────────────────────────
@@ -363,8 +388,7 @@ export default class NoraBossScene extends Phaser.Scene {
     this._leoX = Phaser.Math.Clamp(this._leoX + vx * dt, 12, ARENA_W - 12);
     this._leoY = Phaser.Math.Clamp(this._leoY + vy * dt, BAR_Y + BAR_H / 2 + 8, ARENA_H - 12);
 
-    this._leoBody.setPosition(this._leoX, this._leoY);
-    this._leoDot.setPosition(this._leoX, this._leoY - 12);
+    this._moveLeoVisual(vx, vy);
 
     // Fart
     if (Phaser.Input.Keyboard.JustDown(this._fartKey) && this._fartReady) {
