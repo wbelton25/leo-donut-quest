@@ -27,6 +27,14 @@ export default class PreloadScene extends Phaser.Scene {
       this.load.atlas(`sprite-${id}`, `assets/sprites/${id}.png`, `assets/sprites/${id}.json`);
     });
 
+    // Obstacle sprites (48×48, 12 frames: 4 dirs × 3)
+    this.load.atlas('sprite-deer',      'assets/sprites/deer.png',      'assets/sprites/deer.json');
+    this.load.atlas('sprite-car-red',   'assets/sprites/car-red.png',   'assets/sprites/car-red.json');
+    this.load.atlas('sprite-car-blue',  'assets/sprites/car-blue.png',  'assets/sprites/car-blue.json');
+    this.load.atlas('sprite-car-silver','assets/sprites/car-silver.png','assets/sprites/car-silver.json');
+    this.load.atlas('sprite-car-green', 'assets/sprites/car-green.png', 'assets/sprites/car-green.json');
+    this.load.atlas('sprite-golf-cart', 'assets/sprites/golf-cart.png', 'assets/sprites/golf-cart.json');
+
     // Boss sprites (32×32 px — idle, attack, hit frames; exact frame names TBD)
     ['grace', 'max', 'nora'].forEach(id => {
       this.load.atlas(`sprite-${id}-boss`, `assets/sprites/${id}_boss.png`, `assets/sprites/${id}_boss.json`);
