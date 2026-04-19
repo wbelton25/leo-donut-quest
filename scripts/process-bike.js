@@ -4,15 +4,18 @@
 // Usage:
 //   node scripts/process-bike.js <path-to-source-image.png|.jpg>
 //
-// Source image layout (3 cols × 2 rows):
-//   (row 0, col 0) — front-left diagonal view
-//   (row 0, col 1) — BACK view  (kid riding away / up direction)
-//   (row 0, col 2) — RIGHT side profile
-//   (row 1, col 0) — FRONT view (kid riding toward camera / down direction)
-//   (row 1, col 1) — front view variant
-//   (row 1, col 2) — right side variant
+// Source image layout (3 cols × 3 rows, labelled in image):
+//   (row 0, col 0) — UP   front  (facing camera  → game DOWN direction)
+//   (row 0, col 1) — UP   back   (facing away     → game UP direction)
+//   (row 0, col 2) — Right side profile
+//   (row 1, col 0) — Left side profile
+//   (row 1, col 1) — Left back variant
+//   (row 1, col 2) — Right side variant
+//   (row 2, col 0) — Down / angled
+//   (row 2, col 1) — 3D variant
+//   (row 2, col 2) — Right side variant 2
 //
-// Source has a BLACK background — uses dark-flood-fill removal.
+// Source has a CHECKERBOARD (transparent) background — light flood-fill removal.
 //
 // Output → public/assets/sprites/bike.png + bike.json
 
@@ -26,25 +29,21 @@ const OUT_DIR = join(__dirname, '..', 'public', 'assets', 'sprites');
 const FRAME_SIZE = 48;
 
 const FRAMES = [
-  ['right-0', 0, 2],
-  ['right-1', 1, 2],
-  ['right-2', 0, 2],
-  ['left-0',  0, 2, { flop: true }],
-  ['left-1',  1, 2, { flop: true }],
-  ['left-2',  0, 2, { flop: true }],
-  ['down-0',  1, 0],           // front view
-  ['down-1',  1, 1],
-  ['down-2',  1, 0],
-  ['up-0',    0, 1],           // back view
+  ['right-0', 0, 2],           // right side
+  ['right-1', 1, 2],           // right side variant
+  ['right-2', 2, 2],           // right side variant 2
+  ['left-0',  1, 0],           // left side
+  ['left-1',  1, 0],
+  ['left-2',  1, 0],
+  ['down-0',  0, 0],           // UP front = facing camera = game DOWN
+  ['down-1',  0, 0],
+  ['down-2',  0, 0],
+  ['up-0',    0, 1],           // UP back = facing away = game UP
   ['up-1',    0, 1],
   ['up-2',    0, 1],
 ];
 
-// ── Background removal — BLACK background flood fill ──────────────────────
-// Dark and colour-neutral pixels seeded from edges are marked transparent.
-// Sprite colours (orange skin, blue jeans, dark bike) must be distinguishable
-// from pure black — the threshold gives enough headroom for near-black colours
-// on the sprite without swallowing them.
+// ── Background removal — checkerboard / light neutral background ──────────
 async function removeBackground(imageBuffer) {
   const { data, info } = await sharp(imageBuffer)
     .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -55,8 +54,7 @@ async function removeBackground(imageBuffer) {
   function isBgLike(r, g, b) {
     const brightness = (r + g + b) / 3;
     const saturation = Math.max(r, g, b) - Math.min(r, g, b);
-    // Pure / near-pure black background; sprite darkest pixels ~20-30 brightness
-    return brightness < 28 && saturation < 18;
+    return brightness > 140 && saturation < 50;
   }
 
   const transparent = new Uint8Array(total);
@@ -100,7 +98,7 @@ async function run() {
 
   const meta  = await sharp(srcPath).metadata();
   const cellW = Math.floor(meta.width  / 3);
-  const cellH = Math.floor(meta.height / 2);
+  const cellH = Math.floor(meta.height / 3);
   console.log(`Source: ${meta.width}×${meta.height}  cells: ${cellW}×${cellH}  output: ${FRAME_SIZE}×${FRAME_SIZE}`);
 
   const cache = {};

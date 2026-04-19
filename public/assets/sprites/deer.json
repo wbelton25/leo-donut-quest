@@ -242,7 +242,7 @@
     }
   },
   "meta": {
-    "app": "generate-obstacle-sprites.js",
+    "app": "process-deer.js",
     "image": "deer.png",
     "format": "RGBA8888",
     "size": {

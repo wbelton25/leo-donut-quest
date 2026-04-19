@@ -242,8 +242,8 @@
     }
   },
   "meta": {
-    "app": "process-golf-cart.js",
-    "image": "golf-cart.png",
+    "app": "process-bike.js",
+    "image": "bike.png",
     "format": "RGBA8888",
     "size": {
       "w": 576,
