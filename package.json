@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "sprites:leo": "node scripts/process-leo.js",
-    "sprites:mj": "node scripts/process-mj.js"
+    "sprites:mj": "node scripts/process-mj.js",
+    "tileset": "node scripts/generate-tileset.js",
+    "textures": "node scripts/generate-world-textures.js"
   },
   "devDependencies": {
     "sharp": "^0.34.5",

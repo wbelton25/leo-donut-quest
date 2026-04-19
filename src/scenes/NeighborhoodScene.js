@@ -38,12 +38,17 @@ const MAP_ROWS = 160;
 
 const T = TILE_SIZE;
 
-function darken(hex) {
-  const r = Math.floor((hex >> 16 & 0xff) * 0.58);
-  const g = Math.floor((hex >> 8  & 0xff) * 0.58);
-  const b = Math.floor((hex       & 0xff) * 0.58);
-  return (r << 16) | (g << 8) | b;
-}
+// Tile indices in tileset-neighborhood (8 cols × 4 rows, 16×16px each)
+const TILE = {
+  GRASS:     0,  GRASS2:    1,  GRASS_DK:  2,  SIDEWALK:  3,
+  DIRT:      4,  WATER_DK:  5,  WATER_LT:  6,  SHORE:     7,
+  ROAD:      8,  ROAD_H:    9,  ROAD_V:   10,  ROAD_ET:  11,
+  ROAD_EB:  12,  ROAD_EL:  13,  ROAD_ER:  14,  ROAD_X:   15,
+  WALL:     16,  ROOF:     17,  WINDOW:   18,  DOOR:     19,
+  FENCE_H:  20,  FENCE_V:  21,  FENCE_C:  22,
+  TREE_DK:  24,  TREE_LT:  25,  TRUNK:    26,  BUSH:     27,
+  FLOWERS:  28,  GOLF:     29,  GOLF_HOLE:30,  BENCH:    31,
+};
 
 // ── Map data — loaded from neighborhood_map.json in _createImpl() ────────────
 // These are module-level so they're accessible everywhere in the file.
@@ -123,16 +128,8 @@ export default class NeighborhoodScene extends Phaser.Scene {
     });
 
     // ── Ground ────────────────────────────────────────────────────────────────
-    const CHUNK = 8;
-    for (let r = 0; r < MAP_ROWS; r += CHUNK) {
-      for (let c = 0; c < MAP_COLS; c += CHUNK) {
-        const even = ((r / CHUNK) + (c / CHUNK)) % 2 === 0;
-        this.add.rectangle(
-          c * T + (CHUNK * T) / 2, r * T + (CHUNK * T) / 2,
-          CHUNK * T, CHUNK * T, even ? 0x2d5a1b : 0x336b20
-        );
-      }
-    }
+    // Single seamless grass texture covering the whole world — no visible grid
+    this._ts(worldW / 2, worldH / 2, worldW, worldH, 'tex-grass');
 
     // ── Lake Wylie ────────────────────────────────────────────────────────────
     this._buildLake();
@@ -149,15 +146,37 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._addWall(MAP_COLS - 1, 0, 1, MAP_ROWS, false);
 
     // ── Roads (visual only — collision is handled by off-road walls above) ────
+    // Draw sidewalk curb strips first (behind road), then road on top, then edge shadows
     ROADS.forEach(([c, r, w, h, label]) => {
       const px = c * T + (w * T) / 2;
       const py = r * T + (h * T) / 2;
       const pw = w * T, ph = h * T;
-      this.add.rectangle(px, py, pw, ph, 0x4a4a55);
-      if (w >= h) {
-        this.add.rectangle(px, py, pw, 1, 0xffff88, 0.25);
+      const isHoriz = w >= h;
+
+      // Sidewalk border: 1 tile wide strip on each side of the road
+      if (isHoriz) {
+        this._ts(px, r * T - T / 2,       pw, T, 'tex-sidewalk', -1);
+        this._ts(px, (r + h) * T + T / 2, pw, T, 'tex-sidewalk', -1);
       } else {
-        this.add.rectangle(px, py, 1, ph, 0xffff88, 0.25);
+        this._ts(c * T - T / 2,       py, T, ph, 'tex-sidewalk', -1);
+        this._ts((c + w) * T + T / 2, py, T, ph, 'tex-sidewalk', -1);
+      }
+
+      // Road surface
+      this._ts(px, py, pw, ph, 'tex-road');
+
+      // Dark curb shadow at road edges (creates depth/boundary)
+      if (isHoriz) {
+        this.add.rectangle(px, r * T + 3,       pw, 5, 0x000000, 0.45).setDepth(1);
+        this.add.rectangle(px, (r + h) * T - 3, pw, 5, 0x000000, 0.45).setDepth(1);
+      } else {
+        this.add.rectangle(c * T + 3,       py, 5, ph, 0x000000, 0.45).setDepth(1);
+        this.add.rectangle((c + w) * T - 3, py, 5, ph, 0x000000, 0.45).setDepth(1);
+      }
+
+      // Centre line only on Tega Cay Drive (the main through-road)
+      if (label === 'Tega Cay Drive') {
+        this.add.rectangle(px, py, pw, 1, 0xffff88, 0.25);
       }
       if (label) {
         txt(this, c * T + 2, r * T + 2, label, { fontSize: '8px', color: '#888899' });
@@ -167,36 +186,43 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Runde Park ────────────────────────────────────────────────────────────
     const parkPx = PARK_C * T + (PARK_W * T) / 2;
     const parkPy = PARK_R * T + (PARK_H * T) / 2;
-    this.add.rectangle(parkPx, parkPy, PARK_W * T, PARK_H * T, 0x1e7a1e);
-    this.add.rectangle(parkPx, parkPy, PARK_W * T, PARK_H * T, 0, 0)
-      .setStrokeStyle(2, 0x22aa22);
+    this._ts(parkPx, parkPy, PARK_W * T, PARK_H * T, 'tex-park');
+    // Fence border along top and left edges
+    this._ts(parkPx, PARK_R * T + T / 2,        PARK_W * T, T, TILE.FENCE_H);
+    this._ts(PARK_C * T + T / 2, parkPy,         T, PARK_H * T, TILE.FENCE_V);
     txt(this, PARK_C * T + 8, PARK_R * T + 8, 'RUNDE\nPARK', {
       fontSize: '8px', color: '#88ff88',
     });
-    this.add.rectangle(parkPx, parkPy, PARK_W * T, 2, 0x4a7a2a);
-    this.add.rectangle(parkPx, parkPy, 2, PARK_H * T, 0x4a7a2a);
 
     // ── Golf course (east side, above Tega Cay Drive) ─────────────────────────
     const GC_C = 220, GC_R = 0, GC_W = 70, GC_H = 44;
     const gcPx = GC_C * T + (GC_W * T) / 2;
     const gcPy = GC_R * T + (GC_H * T) / 2;
-    this.add.rectangle(gcPx, gcPy, GC_W * T, GC_H * T, 0x1a6b1a);
-    this.add.rectangle(gcPx, gcPy, GC_W * T, GC_H * T, 0, 0).setStrokeStyle(2, 0x22aa22);
+    this._ts(gcPx, gcPy, GC_W * T, GC_H * T, 'tex-golf');
+    // Fairway strips with darker rough grass + hole flag markers
     for (let i = 0; i < 4; i++) {
-      this.add.rectangle((GC_C + 5 + i * 15) * T, gcPy, 10 * T, (GC_H - 4) * T, 0x1f7a1f);
+      const fwX = (GC_C + 5 + i * 15) * T + 5 * T;
+      const fwH = (GC_H - 4) * T;
+      this._ts(fwX, gcPy, 10 * T, fwH, 'tex-park');
+      // One hole flag per fairway
+      this._ts(fwX, gcPy - fwH / 4, T, T, TILE.GOLF_HOLE);
     }
     txt(this, GC_C * T + 8, 4, 'TEGA CAY\nGOLF CLUB', { fontSize: '8px', color: '#88ff88' });
 
     // ── Houses ────────────────────────────────────────────────────────────────
-    HOUSE_GROUPS.forEach(({ col, row, n, stepCol, stepRow, color }) => {
+    HOUSE_GROUPS.forEach(({ col, row, n, stepCol, stepRow }) => {
       for (let i = 0; i < n; i++) {
         const hc = col + i * stepCol;
         const hr = row + i * stepRow;
-        const hw = 4 * T, hh = 3 * T;
-        const hx = hc * T + 2 * T;
-        const hy = hr * T + 1.5 * T;
-        this.add.rectangle(hx, hy, hw, hh, color);
-        this.add.rectangle(hx, hr * T + 0.5 * T, hw, T, darken(color));
+        const hx = hc * T + 2 * T;         // centre x of 4-tile-wide house
+        // Roof — top row
+        this._ts(hx, hr * T + T / 2,  4 * T, T,     TILE.ROOF);
+        // Wall — bottom two rows
+        this._ts(hx, hr * T + 2 * T,  4 * T, 2 * T, TILE.WALL);
+        // Window — left side of wall
+        this._ts(hc * T + T,       hr * T + 1.5 * T, T, T, TILE.WINDOW);
+        // Door — right-centre of bottom wall row
+        this._ts(hc * T + 2.5 * T, hr * T + 2.5 * T, T, T, TILE.DOOR);
       }
     });
     txt(this, 126 * T, 75 * T, "WARREN'S",  { fontSize: '8px', color: '#ff8888' });
@@ -229,16 +255,17 @@ export default class NeighborhoodScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(3);
     });
 
-    // ── Trees (rectangles — circles are too expensive at volume) ─────────────
+    // ── Trees ─────────────────────────────────────────────────────────────────
     this._generateTrees().forEach(([tc, tr]) => {
       const tx = tc * T + T / 2, ty = tr * T + T / 2;
-      this.add.rectangle(tx, ty, T, T, 0x1a5c1a);          // dark outer
-      this.add.rectangle(tx, ty, T * 0.6, T * 0.6, 0x228b22); // lighter inner
+      this._ts(tx, ty, T, T, TILE.TRUNK);       // trunk (behind canopy)
+      this._ts(tx, ty, T, T, TILE.TREE_DK);     // dark outer canopy
+      this._ts(tx, ty, T, T, TILE.TREE_LT);     // light inner highlight
     });
 
     // ── Boat docks — on left lake shore ───────────────────────────────────────
     [[10, 40], [10, 60], [10, 90], [10, 120]].forEach(([dc, dr]) => {
-      this.add.rectangle(dc * T, dr * T, T * 2, T * 4, 0x8b6914);
+      this._ts(dc * T, dr * T, T * 2, T * 4, TILE.DIRT);
     });
 
     // ── Player ────────────────────────────────────────────────────────────────
@@ -687,20 +714,43 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._followers.push(follower);
   }
 
+  // Shorthand: fill an area with a repeating texture.
+  // key: a 'tex-*' image key (seamless 128px textures for large surfaces) OR
+  //      a number (tile index from the 16×16 tileset spritesheet).
+  // x/y are the centre of the filled area (same convention as add.rectangle).
+  //
+  // For 'tex-*' textures the tile position is world-anchored: every sprite
+  // using the same texture samples the exact same pixel at any world coordinate.
+  // This means overlapping road/ground sprites blend seamlessly at intersections
+  // instead of showing a seam where their independent offsets don't match.
+  _ts(x, y, w, h, key, depth = 0) {
+    let sp;
+    if (typeof key === 'number') {
+      sp = this.add.tileSprite(x, y, w, h, 'tileset-neighborhood', key);
+    } else {
+      sp = this.add.tileSprite(x, y, w, h, key);
+      // World-anchor: tilePositionX = spriteLeft % 128, same for Y
+      const sl = x - w / 2, st = y - h / 2;
+      sp.setTilePosition(sl % 128, st % 128);
+    }
+    return sp.setDepth(depth);
+  }
+
   _buildLake() {
+    const worldH = MAP_ROWS * T;
     // Left water strip (col 0-8, full height) — Lake Wylie inlet / marina
-    this.add.rectangle(4 * T, MAP_ROWS * T / 2, 8 * T, MAP_ROWS * T, 0x1a5f8a);
-    this.add.rectangle(8 * T, MAP_ROWS * T / 2, 2 * T, MAP_ROWS * T, 0x2980b9); // shallow edge
-    this.add.rectangle(9 * T, MAP_ROWS * T / 2, T,     MAP_ROWS * T, 0xc8a870); // sandy shore
+    this._ts(4 * T,       worldH / 2, 8 * T, worldH, 'tex-water');
+    this._ts(8 * T + T/2, worldH / 2, 2 * T, worldH, 'tex-water-lt');
+    this._ts(9 * T + T/2, worldH / 2, T,     worldH, 'tex-shore');
 
     // South water strip (col 1-109, rows 152-160)
-    this.add.rectangle(55 * T, 156 * T, 109 * T, 8 * T, 0x1a5f8a);
-    this.add.rectangle(55 * T, 152 * T, 109 * T, T,     0x2980b9); // shallow north edge
-    this.add.rectangle(55 * T, 151 * T, 109 * T, T,     0xc8a870); // sandy shore
+    this._ts(55 * T, 156 * T, 109 * T, 8 * T, 'tex-water');
+    this._ts(55 * T, 152 * T, 109 * T, T,     'tex-water-lt');
+    this._ts(55 * T, 151 * T, 109 * T, T,     'tex-shore');
 
-    txt(this, 2 * T,  80 * T, 'LAKE\nWYLIE', { fontSize: '8px', color: '#7cc8e8' });
-    txt(this, 30 * T, 156 * T, 'LAKE WYLIE', { fontSize: '8px', color: '#7cc8e8' });
-    txt(this, 2 * T,  10 * T, 'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
+    txt(this, 2 * T,  80 * T, 'LAKE\nWYLIE',    { fontSize: '8px', color: '#7cc8e8' });
+    txt(this, 30 * T, 156 * T, 'LAKE WYLIE',     { fontSize: '8px', color: '#7cc8e8' });
+    txt(this, 2 * T,  10 * T,  'TEGA CAY\nMARINA', { fontSize: '8px', color: '#4db8e8' });
   }
 
   // Returns true if a chunk at (c,r) overlaps any road (i.e. is walkable).

@@ -31,6 +31,17 @@ export default class PreloadScene extends Phaser.Scene {
     ['grace', 'max', 'nora'].forEach(id => {
       this.load.atlas(`sprite-${id}-boss`, `assets/sprites/${id}_boss.png`, `assets/sprites/${id}_boss.json`);
     });
+
+    // World tileset — 16×16 tiles used for single-tile decorations (trees, houses, etc.)
+    this.load.spritesheet('tileset-neighborhood',
+      'assets/tilesets/neighborhood.png',
+      { frameWidth: 16, frameHeight: 16 }
+    );
+
+    // Seamless 128×128 surface textures — used for large tileSprite fills
+    // (grass, road, water, etc.) where repeating a 16px tile would show a grid
+    ['grass', 'park', 'golf', 'road', 'sidewalk', 'water', 'water-lt', 'shore']
+      .forEach(id => this.load.image(`tex-${id}`, `assets/textures/${id}.png`));
   }
 
   create() {
