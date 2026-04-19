@@ -1,7 +1,7 @@
 import { TILE_SIZE } from '../constants.js';
 
 // BikeObstacle: a kid on a bike weaving unpredictably along a path.
-// Sinusoidal weave on the perpendicular axis + occasional speed bursts.
+// Uses sprite-bike atlas when loaded; falls back to colored rectangles.
 //
 // Constructor (pixel coords):
 //   scene, x, y      — center spawn position in pixels
@@ -14,8 +14,10 @@ import { TILE_SIZE } from '../constants.js';
 const DEFAULT_SPEED  = 85;
 const DEFAULT_DAMAGE = 10;
 const HIT_COOLDOWN   = 1500;
-const WEAVE_AMP      = 8;   // pixels of perpendicular weave
-const WEAVE_PERIOD   = 2.2; // seconds per full weave cycle
+const WEAVE_AMP      = 8;
+const WEAVE_PERIOD   = 2.2;
+const T = TILE_SIZE;
+const SPRITE_KEY = 'sprite-bike';
 
 export default class BikeObstacle {
   constructor(scene, x, y, minBound, maxBound, isHorizontal = true, onHitPlayer, speed, damage) {
@@ -26,12 +28,12 @@ export default class BikeObstacle {
     this._baseSpeed   = speed ?? DEFAULT_SPEED;
     this._speed       = this._baseSpeed;
     this._damage      = damage ?? DEFAULT_DAMAGE;
-    this._waveTimer   = Math.random() * Math.PI * 2; // random phase start
-    this._baseY       = y;  // centre Y (for H patrol)
-    this._baseX       = x;  // centre X (for V patrol)
-
+    this._waveTimer   = Math.random() * Math.PI * 2;
+    this._baseY       = y;
+    this._baseX       = x;
     this._x = x;
     this._y = y;
+    this._lastDir = null;
 
     if (this._isH) {
       this._minX = minBound; this._maxX = maxBound;
@@ -59,11 +61,44 @@ export default class BikeObstacle {
       },
     });
 
-    // Visuals — rider (blue) on a bike (orange)
-    this._bikeBody = scene.add.rectangle(x, y, TILE_SIZE * 1.4, TILE_SIZE * 0.6, 0xff8800).setDepth(3);
-    this._rider    = scene.add.rectangle(x, y - 5, TILE_SIZE * 0.7, TILE_SIZE * 0.9, 0x336699).setDepth(4);
-    this._wheelF   = scene.add.circle(x + (this._isH ? 8 : 0), y + (this._isH ? 0 : 8), 4, 0x222222).setDepth(3);
-    this._wheelB   = scene.add.circle(x - (this._isH ? 8 : 0), y - (this._isH ? 0 : 8), 4, 0x222222).setDepth(3);
+    const hasSprite = scene.textures.exists(SPRITE_KEY);
+    if (hasSprite) {
+      this._sprite    = scene.add.sprite(x, y, SPRITE_KEY, 'right-0')
+        .setDisplaySize(T * 3, T * 3)
+        .setDepth(4);
+      this._parts = null;
+    } else {
+      this._sprite = null;
+      this._parts  = {
+        bikeBody: scene.add.rectangle(x, y, T * 1.4, T * 0.6, 0xff8800).setDepth(3),
+        rider:    scene.add.rectangle(x, y - 5, T * 0.7, T * 0.9, 0x336699).setDepth(4),
+        wheelF:   scene.add.circle(x + (isHorizontal ? 8 : 0), y + (isHorizontal ? 0 : 8), 4, 0x222222).setDepth(3),
+        wheelB:   scene.add.circle(x - (isHorizontal ? 8 : 0), y - (isHorizontal ? 0 : 8), 4, 0x222222).setDepth(3),
+      };
+    }
+  }
+
+  _getDir() {
+    if (this._isH) return this._vx >= 0 ? 'right' : 'left';
+    return this._vy >= 0 ? 'down' : 'up';
+  }
+
+  _updateFrame() {
+    const dir = this._getDir();
+    if (dir !== this._lastDir) {
+      this._lastDir = dir;
+      this._sprite.setFrame(`${dir}-0`);
+    }
+    this._sprite.setPosition(this._x, this._y);
+  }
+
+  _updateParts() {
+    const p = this._parts;
+    p.bikeBody.setPosition(this._x, this._y);
+    p.rider.setPosition(this._x, this._y - 5);
+    const fOff = this._isH ? 8 : 0, bOff = this._isH ? 0 : 8;
+    p.wheelF.setPosition(this._x + fOff, this._y + bOff);
+    p.wheelB.setPosition(this._x - fOff, this._y - bOff);
   }
 
   update(player) {
@@ -73,7 +108,6 @@ export default class BikeObstacle {
     this._x += this._vx * dt;
     this._y += this._vy * dt;
 
-    // Apply weave on perpendicular axis
     if (this._isH) {
       this._y = this._baseY + Math.sin(this._waveTimer) * WEAVE_AMP;
       if (this._x <= this._minX || this._x >= this._maxX) {
@@ -88,15 +122,12 @@ export default class BikeObstacle {
       }
     }
 
-    this._bikeBody.setPosition(this._x, this._y);
-    this._rider.setPosition(this._x, this._y - 5);
-    const fOff = this._isH ? 8 : 0, bOff = this._isH ? 0 : 8;
-    this._wheelF.setPosition(this._x + fOff, this._y + bOff);
-    this._wheelB.setPosition(this._x - fOff, this._y - bOff);
+    if (this._sprite) this._updateFrame();
+    else              this._updateParts();
 
     const dx = Math.abs(player.x - this._x);
     const dy = Math.abs(player.y - this._y);
-    if (dx < TILE_SIZE * 1.2 && dy < TILE_SIZE) {
+    if (dx < T * 1.2 && dy < T) {
       const now = Date.now();
       if (now - this._lastHit > HIT_COOLDOWN) {
         this._lastHit = now;
@@ -105,10 +136,18 @@ export default class BikeObstacle {
     }
   }
 
+  setDepth(d) {
+    if (this._sprite) { this._sprite.setDepth(d); return this; }
+    const p = this._parts;
+    p.bikeBody.setDepth(d); p.rider.setDepth(d + 1);
+    p.wheelF.setDepth(d); p.wheelB.setDepth(d);
+    return this;
+  }
+
   destroy() {
-    this._bikeBody.destroy();
-    this._rider.destroy();
-    this._wheelF.destroy();
-    this._wheelB.destroy();
+    if (this._sprite) { this._sprite.destroy(); return; }
+    const p = this._parts;
+    p.bikeBody.destroy(); p.rider.destroy();
+    p.wheelF.destroy(); p.wheelB.destroy();
   }
 }
