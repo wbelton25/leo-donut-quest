@@ -63,11 +63,16 @@ export const UI_LOADING_BG = 'ui-loading-bg';
 export const UI_LOADING_BAR = 'ui-loading-bar';
 
 // Audio
-export const MUSIC_TITLE = 'music-title';
+export const MUSIC_TITLE        = 'music-title';
 export const MUSIC_NEIGHBORHOOD = 'music-neighborhood';
-export const MUSIC_BOSS = 'music-boss';
-export const SFX_FART = 'sfx-fart';
-export const SFX_SLINGSHOT = 'sfx-slingshot';
+export const MUSIC_BOSS         = 'music-boss';
+export const MUSIC_CREDITS      = 'music-credits';
+export const SFX_DEER_GRUNT     = 'sfx-deer-grunt';
+export const SFX_CAR_HIT        = 'sfx-car-hit';
+export const SFX_GOLF_CART_HIT  = 'sfx-golf-cart-hit';
+export const SFX_BIKE_HIT       = 'sfx-bike-hit';
+export const SFX_FART           = 'sfx-fart';
+export const SFX_SLINGSHOT      = 'sfx-slingshot';
 
 // ─── Scene Keys ───────────────────────────────────────────────────────────────
 export const SCENE_BOOT = 'BootScene';

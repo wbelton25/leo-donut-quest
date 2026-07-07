@@ -1,4 +1,5 @@
-import { TILE_SIZE } from '../constants.js';
+import { TILE_SIZE, SFX_CAR_HIT } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 
 // CarObstacle: a car driving along a road at speed.
 // Uses a randomly-chosen color sprite atlas when loaded; falls back to primitives.
@@ -165,6 +166,8 @@ export default class CarObstacle {
         this._lastHit = now;
         this._onHitPlayer(this._damage);
         this._scene.cameras.main.flash(100, 255, 140, 0);
+        if (this._scene.cache.audio.exists(SFX_CAR_HIT))
+          AudioManager.playSfx(this._scene, SFX_CAR_HIT, { volume: 0.8 });
       }
     }
   }

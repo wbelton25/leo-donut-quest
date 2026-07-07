@@ -1,4 +1,5 @@
-import { TILE_SIZE } from '../constants.js';
+import { TILE_SIZE, SFX_BIKE_HIT } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 
 // BikeObstacle: a kid on a bike weaving unpredictably along a path.
 // Uses sprite-bike atlas when loaded; falls back to colored rectangles.
@@ -132,6 +133,8 @@ export default class BikeObstacle {
       if (now - this._lastHit > HIT_COOLDOWN) {
         this._lastHit = now;
         this._onHitPlayer(this._damage);
+        if (this._scene.cache.audio.exists(SFX_BIKE_HIT))
+          AudioManager.playSfx(this._scene, SFX_BIKE_HIT, { volume: 0.8 });
       }
     }
   }

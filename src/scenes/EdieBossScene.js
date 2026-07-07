@@ -1,7 +1,8 @@
 import {
   SCENE_EDIE_BOSS, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_CREDITS,
-  BASE_WIDTH, BASE_HEIGHT, txt,
+  BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_BOSS,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 
 // EdieBossScene: Leo's sister Edie — the final boss of the gauntlet.
 // She throws household items (books, shoes) and charges at Leo.
@@ -32,6 +33,7 @@ export default class EdieBossScene extends Phaser.Scene {
   }
 
   create() {
+    AudioManager.playMusic(this, MUSIC_BOSS);
     // ── Arena — Leo's living room ──────────────────────────────────────────────
     this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a2a1a);
     // Walls
@@ -210,6 +212,7 @@ export default class EdieBossScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this._fartKey) && this._fartReady) {
       this._fartReady = false;
       this._fartCooldown = FART_CD;
+      AudioManager.playFart(this);
       const ring = this.add.circle(this._leoX, this._leoY, 6, 0xf5e642, 0.9).setDepth(6);
       this.tweens.add({ targets: ring, displayWidth: FART_RADIUS * 2, displayHeight: FART_RADIUS * 2, alpha: 0, duration: 350, onComplete: () => ring.destroy() });
 
@@ -222,6 +225,7 @@ export default class EdieBossScene extends Phaser.Scene {
   }
 
   _hitEdie() {
+    AudioManager.playSfx(this, 'sfx-girly-edie', { volume: 0.9 });
     this._edieHP--;
     this._hitFlashTimer = 500;
     this._hpFill.setSize(Math.max(0, (116 / EDIE_HP) * this._edieHP), 6);

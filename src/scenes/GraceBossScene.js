@@ -1,7 +1,8 @@
 import {
   SCENE_GRACE_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
-  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt,
+  SCENE_HUD, BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -32,16 +33,28 @@ const T = TILE_SIZE;
 const ARENA_W   = BASE_WIDTH;
 const ARENA_H   = BASE_HEIGHT;
 
-// Pool (hazard rectangle)
-const POOL_X    = ARENA_W / 2;
-const POOL_Y    = ARENA_H / 2 - 10;
-const POOL_W    = 200;
-const POOL_H    = 70;
+// Pool (hazard rectangle) — matches grace_pool.png (1536×1024 → 480×270)
+// Scanned blue pixel bounds: x=292–1371, y=374–818 in source image
+const POOL_X    = 260;
+const POOL_Y    = 158;
+const POOL_W    = 337;
+const POOL_H    = 117;
+
+// Deck bounds — restricts Leo to the paved pool deck (keeps him out of bushes/fence)
+const DECK_LEFT   = 38;
+const DECK_RIGHT  = 442;
+const DECK_TOP    = 50;
+const DECK_BOTTOM = 252;
+
+// Squirts travel a random 70–150px before landing as a deck puddle
+const SQUIRT_MIN_RANGE = 70;
+const SQUIRT_MAX_RANGE = 150;
 
 // Grace constants
 const GRACE_MAX_HP    = 3;
-const PATROL_SPEED    = 55;
-const CHASE_SPEED     = 85;
+const PATROL_SPEED    = 70;
+const CHASE_SPEED     = 115;
+const CHASE_SPEED_WATER = CHASE_SPEED * 0.5; // Grace wades slower through the pool
 const CHASE_RANGE     = 140;
 const STUN_DURATION   = 1200; // ms
 const FART_HIT_RANGE  = 80;   // px shockwave radius
@@ -53,11 +66,14 @@ const LEO_SPEED       = 170;
 const NOODLE_SPEED    = 90;
 const SQUIRT_SPEED    = 160;
 
-// Damage amounts
-const POOL_DRAIN      = 1;    // per frame while in pool (~60 per second)
-const NOODLE_DAMAGE   = 10;
-const SQUIRT_DAMAGE   = 8;
-const CONTACT_DAMAGE  = 15;
+// Damage amounts — all multiples of 20 so each hit = exactly 1 heart (5 hearts total)
+const NOODLE_DAMAGE   = 20;   // 1 heart
+const SQUIRT_DAMAGE   = 20;   // 1 heart
+const PUDDLE_DAMAGE   = 20;   // 1 heart
+const CONTACT_DAMAGE  = 40;   // 2 hearts — very dangerous, avoid Grace touching Leo
+
+const POOL_STUN_MS    = 1500; // ms Leo is stunned after falling in the pool
+const POOL_PUSH_DIST  = 40;   // px pushed away from pool edge on entry
 
 const CONTACT_COOLDOWN = 1500; // ms
 
@@ -84,6 +100,7 @@ export default class GraceBossScene extends Phaser.Scene {
   }
 
   _createImpl() {
+    AudioManager.playMusic(this, MUSIC_BOSS);
     // Reuse systems from registry (set up by NeighborhoodScene)
     this._resources = this.game.registry.get('resources');
     this._party     = this.game.registry.get('party');
@@ -96,7 +113,14 @@ export default class GraceBossScene extends Phaser.Scene {
       this._abilities = new AbilitySystem(this.game, this._party);
     }
 
+    // Boss fights always start at full energy (5 hearts)
+    this._resources.applyChanges({ energy: 100 - this._resources.energy });
+
+    // Hide the neighborhood HUD — boss scene draws its own hearts
+    this.scene.sleep(SCENE_HUD);
+
     this._abilities.register('lightning_fart', (scene, player) => {
+      AudioManager.playFart(scene);
       const ring = scene.add.circle(player.x, player.y, 6, 0xf5e642, 0.9);
       scene.tweens.add({ targets: ring, radius: FART_HIT_RANGE, alpha: 0, duration: 400,
         onComplete: () => ring.destroy() });
@@ -108,7 +132,7 @@ export default class GraceBossScene extends Phaser.Scene {
     this._graceY       = 60;
     this._graceVx      = PATROL_SPEED;
     this._lastContact  = 0;
-    this._lastPoolDrain = 0;
+    this._leoStunned   = false;
     this._fartReady    = true;
     this._fartCooldownMs = 4000;
     this._projectiles  = [];
@@ -117,6 +141,21 @@ export default class GraceBossScene extends Phaser.Scene {
 
     this._leoX = ARENA_W / 2;
     this._leoY = ARENA_H - 50;
+
+    // ── Jump state ────────────────────────────────────────────────────────────
+    this._isJumping      = false;
+    this._jumpElapsed    = 0;
+    this._jumpDuration   = 420;   // ms
+    this._jumpOffsetY    = 0;     // visual lift (negative = up)
+    this._jumpCooldownEnd = 0;
+    this._deckHitCooldown = 0;
+    this._puddles         = [];
+
+    // Lawn chairs — solid, cannot be jumped over (upper-left corner)
+    this._chairs = [
+      { x:  81, y: 66, w: 46, h: 26 },
+      { x: 120, y: 63, w: 40, h: 24 },
+    ];
 
     this._buildArena();
     this._buildGrace();
@@ -130,44 +169,28 @@ export default class GraceBossScene extends Phaser.Scene {
   // ─── Arena ──────────────────────────────────────────────────────────────────
 
   _buildArena() {
-    // Concrete deck
-    this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x888899);
-
-    // Deck tiles (checkerboard pattern)
-    const TILE = 32;
-    for (let r = 0; r < ARENA_H; r += TILE) {
-      for (let c = 0; c < ARENA_W; c += TILE) {
-        if (((r / TILE) + (c / TILE)) % 2 === 0) {
-          this.add.rectangle(c + TILE / 2, r + TILE / 2, TILE, TILE, 0x9999aa, 0.3);
-        }
-      }
+    // Background image — replaces all primitive deck/pool/noodle visuals
+    if (this.textures.exists('bg-grace')) {
+      this.add.image(0, 0, 'bg-grace').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(0);
+    } else {
+      // Fallback if image didn't load
+      this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x888899);
+      this.add.rectangle(POOL_X, POOL_Y, POOL_W + 10, POOL_H + 10, 0xaaaacc);
+      this.add.rectangle(POOL_X, POOL_Y, POOL_W, POOL_H, 0x1a6eb4);
     }
-
-    // Pool hazard — inset with lighter rim
-    this.add.rectangle(POOL_X, POOL_Y, POOL_W + 10, POOL_H + 10, 0xaaaacc); // rim
-    this._pool = this.add.rectangle(POOL_X, POOL_Y, POOL_W, POOL_H, 0x1a6eb4);
-    // Pool shimmer lines
-    for (let i = 0; i < 4; i++) {
-      this.add.rectangle(POOL_X - POOL_W / 2 + 20 + i * 50, POOL_Y, 30, 3, 0x4db8f0, 0.4);
-    }
-    txt(this, POOL_X - 20, POOL_Y - 6, 'POOL', { fontSize: '8px', color: '#7cc8f0' }).setOrigin(0.5).setDepth(2);
-
-    // Arena bounds enforced via Phaser.Math.Clamp in _updateLeo — no physics walls needed
-
-    // Decorative pool noodles lying around
-    const noodleColors = [0xff6060, 0x60ff60, 0x6060ff, 0xffff44];
-    [[80, 40], [380, 50], [60, 200], [410, 190]].forEach(([nx, ny], i) => {
-      this.add.rectangle(nx, ny, 50, 8, noodleColors[i % noodleColors.length])
-        .setAngle(Phaser.Math.Between(-30, 30));
-    });
+    // Pool collision zone is purely logical — POOL_X/Y/W/H constants drive push-out and drain
   }
 
   // ─── Grace visual ───────────────────────────────────────────────────────────
 
   _buildGrace() {
-    this._graceBody   = this.add.rectangle(this._graceX, this._graceY, T * 2.5, T * 3, 0xff6eb4).setDepth(5);
-    this._graceNoodle = this.add.rectangle(this._graceX + 20, this._graceY, T * 3, T * 0.5, 0xff8c00).setDepth(5);
-    this._graceGun    = this.add.rectangle(this._graceX - 16, this._graceY + 4, T * 1.5, T * 0.4, 0x88aaff).setDepth(5);
+    if (this.textures.exists('sprite-grace-char')) {
+      this._graceBody = this.add.image(this._graceX, this._graceY, 'sprite-grace-char')
+        .setDisplaySize(40, 60).setDepth(5);
+    } else {
+      this._graceBody = this.add.rectangle(this._graceX, this._graceY, T * 2.5, T * 3, 0xff6eb4).setDepth(5);
+    }
+
 
     this._graceHpBg   = this.add.rectangle(ARENA_W / 2, 16, 160, 8, 0x440000).setScrollFactor(0).setDepth(20);
     this._graceHpFill = this.add.rectangle(ARENA_W / 2 - 78, 16, 156, 6, 0xff2222)
@@ -183,6 +206,8 @@ export default class GraceBossScene extends Phaser.Scene {
   // ─── Leo visual ─────────────────────────────────────────────────────────────
 
   _buildLeo() {
+    this._leoShadow = this.add.ellipse(this._leoX, this._leoY + 10, 22, 7, 0x000000, 0.28).setDepth(4);
+
     if (this.textures.exists(SPRITE_LEO)) {
       registerCharacterAnims(this.anims, SPRITE_LEO);
       this._leoSprite = this.add.sprite(this._leoX, this._leoY, SPRITE_LEO, 'down-0')
@@ -198,31 +223,78 @@ export default class GraceBossScene extends Phaser.Scene {
   }
 
   _moveLeoVisual(vx, vy) {
+    const visualY = this._leoY + this._jumpOffsetY;
+    this._leoShadow.setPosition(this._leoX, this._leoY + 10); // shadow always at ground
+
     if (this._leoSprite) {
-      this._leoSprite.setPosition(this._leoX, this._leoY);
+      this._leoSprite.setPosition(this._leoX, visualY);
       if (Math.abs(vx) >= Math.abs(vy)) { if (vx > 0) this._leoFacing = 'right'; else if (vx < 0) this._leoFacing = 'left'; }
       else                              { if (vy > 0) this._leoFacing = 'down';  else if (vy < 0) this._leoFacing = 'up'; }
       const moving  = vx !== 0 || vy !== 0;
       const animKey = moving ? `${SPRITE_LEO}-walk-${this._leoFacing}` : `${SPRITE_LEO}-idle-${this._leoFacing}`;
       if (this._leoSprite.anims?.currentAnim?.key !== animKey) this._leoSprite.play(animKey);
     } else {
-      this._leoBody.setPosition(this._leoX, this._leoY);
-      this._leoDot.setPosition(this._leoX, this._leoY - 12);
+      this._leoBody.setPosition(this._leoX, visualY);
+      this._leoDot.setPosition(this._leoX, visualY - 12);
     }
   }
 
   // ─── HUD overlay ────────────────────────────────────────────────────────────
 
   _buildHud() {
-    txt(this, 8, 8, 'F: FART', { fontSize: '8px', color: '#f5e642' })
-      .setScrollFactor(0).setDepth(20);
+    txt(this, 8,  8, 'F: FART',     { fontSize: '8px', color: '#f5e642' }).setScrollFactor(0).setDepth(20);
+    txt(this, 8, 18, 'SPACE: JUMP', { fontSize: '8px', color: '#88eeff' }).setScrollFactor(0).setDepth(20);
+    txt(this, 8, 28, 'WASD: MOVE',  { fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setDepth(20);
 
-    txt(this, 8, 20, 'WASD: MOVE', { fontSize: '8px', color: '#aaaaaa' })
-      .setScrollFactor(0).setDepth(20);
-
-    // "Don't fall in the pool!" hint
     txt(this, ARENA_W / 2, ARENA_H - 10, 'AVOID THE POOL!', { fontSize: '8px', color: '#ff4444' })
       .setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+    // Hearts — 5 hearts × 20 energy each
+    txt(this, ARENA_W - 6, 5, 'LEO', { fontSize: '8px', color: '#cccccc' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(20);
+    this._heartGfx = [];
+    for (let i = 0; i < 5; i++) {
+      const g = this.add.graphics().setScrollFactor(0).setDepth(20);
+      this._heartGfx.push(g);
+    }
+    this._updateHearts(); // draw initial full hearts
+  }
+
+  // 7×6 pixel-art heart at 3px scale. state: 'full' | 'half' | 'empty'
+  _drawHeart(gfx, x, y, state) {
+    const S = 3;
+    const rows = [
+      [0,1,1,0,1,1,0],
+      [1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,0],
+      [0,0,1,1,1,0,0],
+      [0,0,0,1,0,0,0],
+    ];
+    gfx.clear();
+    // Dark background pass
+    gfx.fillStyle(0x330011, 1);
+    rows.forEach((row, py) =>
+      row.forEach((on, px) => { if (on) gfx.fillRect(x + px * S, y + py * S, S, S); })
+    );
+    if (state === 'empty') return;
+    // Bright fill pass (full = all columns, half = left 4 columns only)
+    const maxCol = state === 'full' ? 7 : 4;
+    gfx.fillStyle(0xff1155, 1);
+    rows.forEach((row, py) =>
+      row.forEach((on, px) => { if (on && px < maxCol) gfx.fillRect(x + px * S, y + py * S, S, S); })
+    );
+  }
+
+  _updateHearts() {
+    const e   = Math.max(0, this._resources.energy);
+    const full = Math.floor(e / 20);
+    const half = (e % 20) >= 10;
+    this._heartGfx.forEach((g, i) => {
+      const x = ARENA_W - 120 + i * 23;
+      const state = i < full ? 'full' : (i === full && half ? 'half' : 'empty');
+      this._drawHeart(g, x, 14, state);
+    });
   }
 
   // ─── Input ──────────────────────────────────────────────────────────────────
@@ -238,7 +310,8 @@ export default class GraceBossScene extends Phaser.Scene {
       leftAlt:  Phaser.Input.Keyboard.KeyCodes.LEFT,
       rightAlt: Phaser.Input.Keyboard.KeyCodes.RIGHT,
     });
-    this._fartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    this._fartKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    this._spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
   }
 
   // ─── Attack timers ──────────────────────────────────────────────────────────
@@ -292,10 +365,12 @@ export default class GraceBossScene extends Phaser.Scene {
     this._updateGrace();
     this._updateProjectiles();
     this._checkPoolHazard();
+    this._checkChairCollision();
+    this._checkPuddles();
   }
 
   _updateLeo() {
-    if (this._inputLocked) return;
+    if (this._inputLocked || this._leoStunned) return;
 
     let vx = 0, vy = 0;
     if (this._keys.left.isDown  || this._keys.leftAlt.isDown)  vx = -LEO_SPEED;
@@ -307,14 +382,29 @@ export default class GraceBossScene extends Phaser.Scene {
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
     const dt = 1 / 60;
-    this._leoX = Phaser.Math.Clamp(this._leoX + vx * dt, 16, ARENA_W - 16);
-    this._leoY = Phaser.Math.Clamp(this._leoY + vy * dt, 16, ARENA_H - 16);
+    this._leoX = Phaser.Math.Clamp(this._leoX + vx * dt, DECK_LEFT, DECK_RIGHT);
+    this._leoY = Phaser.Math.Clamp(this._leoY + vy * dt, DECK_TOP,  DECK_BOTTOM);
 
     this._moveLeoVisual(vx, vy);
+
+    // Jump
+    const now = Date.now();
+    if (Phaser.Input.Keyboard.JustDown(this._spaceKey) && !this._isJumping && now >= this._jumpCooldownEnd) {
+      this._isJumping    = true;
+      this._jumpElapsed  = 0;
+      this._jumpCooldownEnd = now + 700;
+    }
+    if (this._isJumping) {
+      this._jumpElapsed += this.game.loop.delta;
+      const t = Math.min(this._jumpElapsed / this._jumpDuration, 1);
+      this._jumpOffsetY = -Math.round(15 * 4 * t * (1 - t)); // parabola, negative = up
+      if (t >= 1) { this._isJumping = false; this._jumpOffsetY = 0; }
+    }
 
     // Fart attack — local cooldown so it always works in the boss scene
     if (Phaser.Input.Keyboard.JustDown(this._fartKey) && this._fartReady) {
       this._fartReady = false;
+      AudioManager.playFart(this);
       // Visual ring
       const ring = this.add.circle(this._leoX, this._leoY, 6, 0xf5e642, 0.9).setDepth(8);
       this.tweens.add({
@@ -338,10 +428,11 @@ export default class GraceBossScene extends Phaser.Scene {
   }
 
   _hitGrace() {
+    AudioManager.playSfx(this, 'sfx-girly-grace', { volume: 0.9 });
     this._graceHp--;
     this._graceState = 'STUNNED';
-    this._graceBody.setFillStyle(0xffffff);
-    this.time.delayedCall(150, () => this._graceBody.setFillStyle(0xff6eb4));
+    this._graceBody.setTint(0xffffff);
+    this.time.delayedCall(150, () => this._graceBody.clearTint());
     this.time.delayedCall(STUN_DURATION, () => {
       if (this._graceState !== 'DEFEATED') {
         if (this._graceHp <= 0) {
@@ -387,11 +478,11 @@ export default class GraceBossScene extends Phaser.Scene {
     } else if (this._graceState === 'CHASE') {
       if (dist > 4) {
         const nx = dx / dist, ny = dy / dist;
-        this._graceX += nx * CHASE_SPEED * (1 / 60);
-        this._graceY += ny * CHASE_SPEED * (1 / 60);
+        // Grace wades through the pool — half speed in water, full speed on deck
+        const spd = this._graceInPool() ? CHASE_SPEED_WATER : CHASE_SPEED;
+        this._graceX += nx * spd * (1 / 60);
+        this._graceY += ny * spd * (1 / 60);
       }
-      // Keep Grace out of the pool (she navigates around it)
-      this._keepGraceOutOfPool();
       if (dist > CHASE_RANGE * 1.5) this._graceState = 'PATROL';
 
       // Contact damage
@@ -411,23 +502,14 @@ export default class GraceBossScene extends Phaser.Scene {
     this._syncGraceVisuals();
   }
 
-  _keepGraceOutOfPool() {
+  _graceInPool() {
     const hw = POOL_W / 2, hh = POOL_H / 2;
-    const px1 = POOL_X - hw, px2 = POOL_X + hw;
-    const py1 = POOL_Y - hh, py2 = POOL_Y + hh;
-    if (this._graceX > px1 && this._graceX < px2 &&
-        this._graceY > py1 && this._graceY < py2) {
-      // Push Grace away from pool center
-      const pushX = this._graceX < POOL_X ? px1 - 5 : px2 + 5;
-      this._graceX = pushX;
-    }
+    return this._graceX > POOL_X - hw && this._graceX < POOL_X + hw &&
+           this._graceY > POOL_Y - hh && this._graceY < POOL_Y + hh;
   }
 
   _syncGraceVisuals() {
     this._graceBody.setPosition(this._graceX, this._graceY);
-    const offX = this._graceVx >= 0 ? 20 : -20;
-    this._graceNoodle.setPosition(this._graceX + offX, this._graceY);
-    this._graceGun.setPosition(this._graceX - offX * 0.6, this._graceY + 4);
     this._alertLabel.setPosition(this._graceX, this._graceY - 30);
   }
 
@@ -447,11 +529,15 @@ export default class GraceBossScene extends Phaser.Scene {
     if (dist < 8) return;
     const nx = dx / dist, ny = dy / dist;
 
-    const noodle = this.add.rectangle(this._graceX, this._graceY, 28, 6, 0xff8c00).setDepth(4);
+    const noodle = this.textures.exists('sprite-pool-noodle')
+      ? this.add.image(this._graceX, this._graceY, 'sprite-pool-noodle').setDisplaySize(56, 20).setDepth(4)
+      : this.add.rectangle(this._graceX, this._graceY, 48, 12, 0x44cc44).setDepth(4);
     noodle.angle = Math.atan2(ny, nx) * (180 / Math.PI);
     this._projectiles.push({
       obj: noodle, vx: nx * NOODLE_SPEED, vy: ny * NOODLE_SPEED,
       damage: NOODLE_DAMAGE, type: 'noodle',
+      wavePhase: 0, waveAmp: 22, waveFreq: 2.8,
+      perpVx: -ny, perpVy: nx,  // unit vector perpendicular to flight direction
     });
   }
 
@@ -464,9 +550,11 @@ export default class GraceBossScene extends Phaser.Scene {
     const nx = dx / dist, ny = dy / dist;
 
     const drop = this.add.circle(this._graceX, this._graceY, 4, 0x4db8f0).setDepth(4);
+    const range = SQUIRT_MIN_RANGE + Math.random() * (SQUIRT_MAX_RANGE - SQUIRT_MIN_RANGE);
     this._projectiles.push({
       obj: drop, vx: nx * SQUIRT_SPEED, vy: ny * SQUIRT_SPEED,
       damage: SQUIRT_DAMAGE, type: 'squirt',
+      startX: this._graceX, startY: this._graceY, maxRange: range,
     });
   }
 
@@ -476,6 +564,28 @@ export default class GraceBossScene extends Phaser.Scene {
       const p = this._projectiles[i];
       p.obj.x += p.vx * dt;
       p.obj.y += p.vy * dt;
+
+      if (p.type === 'noodle') {
+        // Tumble spin
+        p.obj.angle += 220 * dt;
+        // Sinusoidal wobble perpendicular to flight path
+        const prevOffset = Math.sin(p.wavePhase) * p.waveAmp;
+        p.wavePhase += dt * p.waveFreq * Math.PI * 2;
+        const deltaOffset = Math.sin(p.wavePhase) * p.waveAmp - prevOffset;
+        p.obj.x += deltaOffset * p.perpVx;
+        p.obj.y += deltaOffset * p.perpVy;
+      }
+
+      // Squirt: check max range — land as puddle if it hits the deck before reaching Leo
+      if (p.type === 'squirt' && p.maxRange !== undefined) {
+        const dx2 = p.obj.x - p.startX, dy2 = p.obj.y - p.startY;
+        if (dx2 * dx2 + dy2 * dy2 >= p.maxRange * p.maxRange) {
+          if (this._isOnDeck(p.obj.x, p.obj.y)) this._createPuddle(p.obj.x, p.obj.y);
+          p.obj.destroy();
+          this._projectiles.splice(i, 1);
+          continue;
+        }
+      }
 
       // Out of bounds
       if (p.obj.x < 0 || p.obj.x > ARENA_W || p.obj.y < 0 || p.obj.y > ARENA_H) {
@@ -498,22 +608,53 @@ export default class GraceBossScene extends Phaser.Scene {
   // ─── Pool hazard ────────────────────────────────────────────────────────────
 
   _checkPoolHazard() {
+    if (this._leoStunned) return;
     const hw = POOL_W / 2, hh = POOL_H / 2;
     if (
       this._leoX > POOL_X - hw + 8 && this._leoX < POOL_X + hw - 8 &&
       this._leoY > POOL_Y - hh + 8 && this._leoY < POOL_Y + hh - 8
     ) {
-      // Drain energy every 500ms while in pool
-      const now = Date.now();
-      if (now - this._lastPoolDrain > 500) {
-        this._lastPoolDrain = now;
-        this._resources.applyChanges({ energy: -15 });
-        this.cameras.main.flash(120, 0, 100, 220);
-        if (this._resources.isExhausted()) { this._gameOver(); return; }
+      const splashX = this._leoX, splashY = this._leoY;
+
+      // Push Leo out to nearest pool edge + extra distance
+      const dLeft  = this._leoX - (POOL_X - hw);
+      const dRight = (POOL_X + hw) - this._leoX;
+      const dTop   = this._leoY - (POOL_Y - hh);
+      const dBot   = (POOL_Y + hh) - this._leoY;
+      const minD   = Math.min(dLeft, dRight, dTop, dBot);
+      if      (minD === dLeft)  this._leoX = POOL_X - hw - POOL_PUSH_DIST;
+      else if (minD === dRight) this._leoX = POOL_X + hw + POOL_PUSH_DIST;
+      else if (minD === dTop)   this._leoY = POOL_Y - hh - POOL_PUSH_DIST;
+      else                      this._leoY = POOL_Y + hh + POOL_PUSH_DIST;
+      this._leoX = Phaser.Math.Clamp(this._leoX, DECK_LEFT, DECK_RIGHT);
+      this._leoY = Phaser.Math.Clamp(this._leoY, DECK_TOP,  DECK_BOTTOM);
+
+      // Stun
+      this._leoStunned = true;
+      this.time.delayedCall(POOL_STUN_MS, () => { this._leoStunned = false; });
+
+      // Splash SFX
+      AudioManager.playSfx(this, 'sfx-splash', { volume: 0.9 });
+
+      // Water ripple at entry point
+      const ripple = this.add.circle(splashX, splashY, 6, 0x4db8f0, 0.85).setDepth(6);
+      this.tweens.add({ targets: ripple, scaleX: 7, scaleY: 7, alpha: 0, duration: 650,
+        onComplete: () => ripple.destroy() });
+
+      // Blue camera flash
+      this.cameras.main.flash(300, 0, 120, 255);
+
+      // Floating "SPLASH!" text
+      const t = txt(this, splashX, splashY - 12, 'SPLASH!', { fontSize: '8px', color: '#88ddff' })
+        .setOrigin(0.5).setDepth(10);
+      this.tweens.add({ targets: t, y: t.y - 20, alpha: 0, duration: 900, onComplete: () => t.destroy() });
+
+      // Leo blinks while stunned
+      const leoVisual = this._leoSprite ?? this._leoBody;
+      if (leoVisual) {
+        this.tweens.add({ targets: leoVisual, alpha: 0.25, duration: 180, yoyo: true, repeat: 4,
+          onComplete: () => leoVisual.setAlpha(1) });
       }
-      // Push Leo toward nearest edge
-      const pushX = this._leoX < POOL_X ? -(POOL_W / 2 + 12) : (POOL_W / 2 + 12);
-      this._leoX = POOL_X + pushX;
     }
   }
 
@@ -521,6 +662,7 @@ export default class GraceBossScene extends Phaser.Scene {
 
   _damagePlayer(amount, source) {
     this._resources.applyChanges({ energy: -amount });
+    this._updateHearts();
     const color = source === 'squirt' ? [0, 100, 255] : [255, 50, 50];
     this.cameras.main.flash(180, color[0], color[1], color[2]);
 
@@ -536,9 +678,12 @@ export default class GraceBossScene extends Phaser.Scene {
 
     if (!this._gauntlet) {
       this.cameras.main.fade(600, 0, 0, 0, false, (cam, progress) => {
-        if (progress === 1) this.scene.start(SCENE_NEIGHBORHOOD, {
-          bossLost: 'grace', bossScene: SCENE_GRACE_BOSS, spawnCol: 122, spawnRow: 65,
-        });
+        if (progress === 1) {
+          this.scene.wake(SCENE_HUD);
+          this.scene.start(SCENE_NEIGHBORHOOD, {
+            bossLost: 'grace', bossScene: SCENE_GRACE_BOSS, spawnCol: 122, spawnRow: 65,
+          });
+        }
       });
       return;
     }
@@ -594,6 +739,63 @@ export default class GraceBossScene extends Phaser.Scene {
     noBg.once('pointerdown', () => { cleanup(); onDone(); });
   }
 
+  // ─── Deck obstacle collision ────────────────────────────────────────────────
+
+  // Puddles left by water gun shots — jump over or take splash damage
+  _checkPuddles() {
+    if (this._isJumping) return;
+    const now = Date.now();
+    if (now - this._deckHitCooldown < 1200) return;
+    for (const p of this._puddles) {
+      if (!p.obj.active) continue;
+      if (Math.abs(this._leoX - p.obj.x) < 14 && Math.abs(this._leoY - p.obj.y) < 10) {
+        this._deckHitCooldown = now;
+        this._damagePlayer(PUDDLE_DAMAGE, 'squirt');
+        return;
+      }
+    }
+  }
+
+  _createPuddle(x, y) {
+    const duration = Phaser.Math.Between(10000, 15000);
+    const puddle = this.add.ellipse(x, y, 22, 11, 0x4db8f0, 0.7).setDepth(3);
+    this._puddles.push({ obj: puddle });
+
+    // Fade out and evaporate
+    this.time.delayedCall(duration - 1500, () => {
+      if (puddle.active) {
+        this.tweens.add({ targets: puddle, alpha: 0, duration: 1500,
+          onComplete: () => { puddle.destroy(); this._puddles = this._puddles.filter(p => p.obj !== puddle); }
+        });
+      }
+    });
+  }
+
+  _isOnDeck(x, y) {
+    if (x < DECK_LEFT || x > DECK_RIGHT || y < DECK_TOP || y > DECK_BOTTOM) return false;
+    const hw = POOL_W / 2, hh = POOL_H / 2;
+    return !(x > POOL_X - hw && x < POOL_X + hw && y > POOL_Y - hh && y < POOL_Y + hh);
+  }
+
+  // Lawn chairs: solid blockers — push Leo out, no damage
+  _checkChairCollision() {
+    for (const c of this._chairs) {
+      const hw = c.w / 2 + 8, hh = c.h / 2 + 8;
+      if (this._leoX > c.x - hw && this._leoX < c.x + hw &&
+          this._leoY > c.y - hh && this._leoY < c.y + hh) {
+        const overlapL = this._leoX - (c.x - hw);
+        const overlapR = (c.x + hw) - this._leoX;
+        const overlapT = this._leoY - (c.y - hh);
+        const overlapB = (c.y + hh) - this._leoY;
+        const min = Math.min(overlapL, overlapR, overlapT, overlapB);
+        if      (min === overlapL) this._leoX = c.x - hw;
+        else if (min === overlapR) this._leoX = c.x + hw;
+        else if (min === overlapT) this._leoY = c.y - hh;
+        else                       this._leoY = c.y + hh;
+      }
+    }
+  }
+
   // ─── Grace defeat ───────────────────────────────────────────────────────────
 
   _defeatGrace() {
@@ -601,21 +803,21 @@ export default class GraceBossScene extends Phaser.Scene {
     this._noodleTimer?.remove();
     this._squirtTimer?.remove();
 
-    // Clear remaining projectiles
+    // Clear remaining projectiles and puddles
     this._projectiles.forEach(p => p.obj.destroy());
     this._projectiles = [];
+    this._puddles.forEach(p => p.obj?.destroy());
+    this._puddles = [];
 
     // Victory flash
     this.cameras.main.flash(300, 255, 255, 100);
 
     // Spin out Grace
     this.tweens.add({
-      targets: [this._graceBody, this._graceNoodle, this._graceGun],
+      targets: [this._graceBody],
       alpha: 0, angle: 360, duration: 700,
       onComplete: () => {
         this._graceBody.destroy();
-        this._graceNoodle.destroy();
-        this._graceGun.destroy();
         this._graceHpBg.destroy();
         this._graceHpFill.destroy();
 
@@ -630,7 +832,10 @@ export default class GraceBossScene extends Phaser.Scene {
             });
           } else {
             this.cameras.main.fade(500, 0, 0, 0);
-            this.time.delayedCall(520, () => this.scene.start(SCENE_NEIGHBORHOOD, { graceDefeated: true, spawnCol: 122, spawnRow: 65 }));
+            this.time.delayedCall(520, () => {
+              this.scene.wake(SCENE_HUD);
+              this.scene.start(SCENE_NEIGHBORHOOD, { graceDefeated: true, spawnCol: 122, spawnRow: 65 });
+            });
           }
         });
       },

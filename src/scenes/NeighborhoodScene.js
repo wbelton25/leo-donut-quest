@@ -2,8 +2,9 @@ import {
   SCENE_NEIGHBORHOOD, SCENE_TITLE, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL, SCENE_BOSS_GAUNTLET,
   SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_DONUT_SHOP,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
-  PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN,
+  PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 import Player from '../entities/Player.js';
 import Follower, { PositionBuffer } from '../entities/Follower.js';
 import DeerObstacle     from '../entities/DeerObstacle.js';
@@ -81,6 +82,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   _createImpl() {
+    AudioManager.playMusic(this, MUSIC_NEIGHBORHOOD);
     const worldW = MAP_COLS * T;
     const worldH = MAP_ROWS * T;
 
@@ -122,9 +124,17 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.game.registry.set('abilities', this._abilities);
 
     this._abilities.register('lightning_fart', (scene, player) => {
+      AudioManager.playFart(scene);
       const ring = scene.add.circle(player.x, player.y, 6, 0xf5e642, 0.9);
       scene.tweens.add({ targets: ring, radius: 48, alpha: 0, duration: 400,
         onComplete: () => ring.destroy() });
+      // Knock down any deer within fart radius
+      const FART_RADIUS = 80;
+      (scene._obstacles ?? []).forEach(o => {
+        if (typeof o.knockdown !== 'function') return;
+        const dx = o._x - player.x, dy = o._y - player.y;
+        if (dx * dx + dy * dy <= FART_RADIUS * FART_RADIUS) o.knockdown();
+      });
     });
 
     // ── Ground ────────────────────────────────────────────────────────────────
@@ -145,46 +155,127 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._addWall(0, 0, 1, MAP_ROWS, false);
     this._addWall(MAP_COLS - 1, 0, 1, MAP_ROWS, false);
 
-    // ── Roads (visual only — collision is handled by off-road walls above) ────
-    // Edge strips (road-edge-h / road-edge-v) are 20px RGBA strips placed
-    // straddling each road boundary: transparent on the grass side, opaque road
-    // texture on the road side, with a noise-driven organic profile in between.
-    // They sit at depth 2, above both the grass (depth 0) and road (depth 1).
-    const EDGE = 20;  // matches EDGE_SIZE in generate-world-textures.js
+    // ── Roads — tile-set bitmask approach ────────────────────────────────────
+    // 1. Build a Set of every (col,row) occupied by a road rectangle.
+    // 2. Fill each road rect with plain asphalt texture.
+    // 3. Scan the tile set: for every tile whose neighbour is NOT road, that
+    //    side is a grass-facing edge → draw a sandy edge strip there.
+    //    Where two roads connect, both tiles are in the set so no strip is
+    //    placed — roads join cleanly with no unwanted sandy border.
+    // 4. Group consecutive exposed-edge tiles into spans so we draw one
+    //    tileSprite per run instead of one per tile.
+
+    const roadSet = new Set();
+    ROADS.forEach(([c, r, w, h]) => {
+      for (let row = r; row < r + h; row++)
+        for (let col = c; col < c + w; col++)
+          roadSet.add(`${col},${row}`);
+    });
+    const isRoad = (col, row) => roadSet.has(`${col},${row}`);
+
+    // Asphalt fill
     ROADS.forEach(([c, r, w, h, label]) => {
-      const px = c * T + (w * T) / 2;
-      const py = r * T + (h * T) / 2;
-      const pw = w * T, ph = h * T;
-      const isHoriz = w >= h;
+      this._ts(c * T + (w * T) / 2, r * T + (h * T) / 2, w * T, h * T, 'tex-road', 1);
+      if (label) txt(this, c * T + 2, r * T + 2, label, { fontSize: '8px', color: '#888899' }).setDepth(3);
+    });
 
-      // Road surface (depth 1)
-      this._ts(px, py, pw, ph, 'tex-road', 1);
+    // Collect exposed edge tiles into per-row / per-col lists
+    const topEdges = new Map(), botEdges = new Map();
+    const lefEdges = new Map(), rigEdges = new Map();
+    roadSet.forEach(key => {
+      const [col, row] = key.split(',').map(Number);
+      if (!isRoad(col, row - 1)) { (topEdges.get(row) ?? topEdges.set(row, []).get(row)).push(col); }
+      if (!isRoad(col, row + 1)) { (botEdges.get(row) ?? botEdges.set(row, []).get(row)).push(col); }
+      if (!isRoad(col - 1, row)) { (lefEdges.get(col) ?? lefEdges.set(col, []).get(col)).push(row); }
+      if (!isRoad(col + 1, row)) { (rigEdges.get(col) ?? rigEdges.set(col, []).get(col)).push(row); }
+    });
 
-      // Organic edge strips (depth 2) — straddle each road boundary
-      if (isHoriz) {
-        // Top edge: grass side (transparent) at top, road texture at bottom
-        const et = this.add.tileSprite(px, r * T, pw, EDGE, 'tex-road-edge-h').setDepth(2);
-        et.setTilePosition(c * T % 128, 0);
-        // Bottom edge: same strip flipped — now transparent at bottom
-        const eb = this.add.tileSprite(px, (r + h) * T, pw, EDGE, 'tex-road-edge-h').setDepth(2).setFlipY(true);
-        eb.setTilePosition(c * T % 128, 0);
-      } else {
-        // Left edge: grass side (transparent) at left, road at right
-        const el = this.add.tileSprite(c * T, py, EDGE, ph, 'tex-road-edge-v').setDepth(2);
-        el.setTilePosition(0, r * T % 128);
-        // Right edge: flipped — transparent at right
-        const er = this.add.tileSprite((c + w) * T, py, EDGE, ph, 'tex-road-edge-v').setDepth(2).setFlipX(true);
-        er.setTilePosition(0, r * T % 128);
+    // Group a sorted integer array into consecutive runs [[start,end], ...]
+    const getRuns = arr => {
+      const s = [...arr].sort((a, b) => a - b);
+      const runs = [];
+      let lo = s[0], hi = s[0];
+      for (let i = 1; i < s.length; i++) {
+        if (s[i] === hi + 1) hi = s[i];
+        else { runs.push([lo, hi]); lo = s[i]; hi = s[i]; }
       }
+      runs.push([lo, hi]);
+      return runs;
+    };
 
-      // Centre line only on Tega Cay Drive (the main through-road)
-      if (label === 'Tega Cay Drive') {
-        this.add.rectangle(px, py, pw, 1, 0xffff88, 0.25).setDepth(1);
+    // Road-to-grass edge gradient — uses pre-generated 16×16 PNG textures (power-of-2,
+    // no WebGL seam artifacts). Run scripts/generate-road-edges.js to (re)generate them.
+    const EDGE = 16;
+
+    // Top edges — strip above road; tex-road-edge-h has transparent top, opaque bottom
+    topEdges.forEach((cols, row) => getRuns(cols).forEach(([sc, ec]) => {
+      const rw = (ec - sc + 1) * T;
+      this.add.tileSprite(sc * T + rw / 2, row * T - EDGE / 2, rw, EDGE, 'tex-road-edge-h').setDepth(2);
+    }));
+
+    // Bottom edges — flip Y so opaque side faces the road (upward)
+    botEdges.forEach((cols, row) => getRuns(cols).forEach(([sc, ec]) => {
+      const rw = (ec - sc + 1) * T;
+      this.add.tileSprite(sc * T + rw / 2, (row + 1) * T + EDGE / 2, rw, EDGE, 'tex-road-edge-h').setDepth(2).setFlipY(true);
+    }));
+
+    // Left edges — tex-road-edge-v has transparent left, opaque right (toward road)
+    lefEdges.forEach((rows, col) => getRuns(rows).forEach(([sr, er]) => {
+      const rh = (er - sr + 1) * T;
+      this.add.tileSprite(col * T - EDGE / 2, sr * T + rh / 2, EDGE, rh, 'tex-road-edge-v').setDepth(2);
+    }));
+
+    // Right edges — flip X so opaque side faces the road (leftward)
+    rigEdges.forEach((rows, col) => getRuns(rows).forEach(([sr, er]) => {
+      const rh = (er - sr + 1) * T;
+      this.add.tileSprite((col + 1) * T + EDGE / 2, sr * T + rh / 2, EDGE, rh, 'tex-road-edge-v').setDepth(2).setFlipX(true);
+    }));
+
+    // Corner arcs — solid filled quarter-circle sectors matching road color.
+    // Center is inset INTO the road so the arc overlaps the road surface and
+    // the curved boundary falls in the grass — creating a visually rounded corner.
+    const INSET = 4;  // px into road per axis
+    const R = INSET + 1; // radius clips 1px into grass
+    const gCorner = this.add.graphics().setDepth(1);
+    gCorner.fillStyle(0x343434, 1.0);
+    roadSet.forEach(key => {
+      const [col, row] = key.split(',').map(Number);
+      const nOpen = !isRoad(col, row - 1), sOpen = !isRoad(col, row + 1);
+      const wOpen = !isRoad(col - 1, row), eOpen = !isRoad(col + 1, row);
+      if (nOpen && wOpen) {
+        const cx = col * T + INSET, cy = row * T + INSET;
+        gCorner.beginPath();
+        gCorner.moveTo(cx, cy);
+        gCorner.arc(cx, cy, R, Math.PI, Math.PI * 1.5, false);
+        gCorner.closePath();
+        gCorner.fillPath();
       }
-      if (label) {
-        txt(this, c * T + 2, r * T + 2, label, { fontSize: '8px', color: '#888899' }).setDepth(3);
+      if (nOpen && eOpen) {
+        const cx = (col + 1) * T - INSET, cy = row * T + INSET;
+        gCorner.beginPath();
+        gCorner.moveTo(cx, cy);
+        gCorner.arc(cx, cy, R, Math.PI * 1.5, Math.PI * 2, false);
+        gCorner.closePath();
+        gCorner.fillPath();
+      }
+      if (sOpen && wOpen) {
+        const cx = col * T + INSET, cy = (row + 1) * T - INSET;
+        gCorner.beginPath();
+        gCorner.moveTo(cx, cy);
+        gCorner.arc(cx, cy, R, Math.PI * 0.5, Math.PI, false);
+        gCorner.closePath();
+        gCorner.fillPath();
+      }
+      if (sOpen && eOpen) {
+        const cx = (col + 1) * T - INSET, cy = (row + 1) * T - INSET;
+        gCorner.beginPath();
+        gCorner.moveTo(cx, cy);
+        gCorner.arc(cx, cy, R, 0, Math.PI * 0.5, false);
+        gCorner.closePath();
+        gCorner.fillPath();
       }
     });
+
 
     // ── Runde Park ────────────────────────────────────────────────────────────
     const parkPx = PARK_C * T + (PARK_W * T) / 2;
@@ -213,19 +304,21 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, GC_C * T + 8, 4, 'TEGA CAY\nGOLF CLUB', { fontSize: '8px', color: '#88ff88' });
 
     // ── Houses ────────────────────────────────────────────────────────────────
+    const useHouseSprite = this.textures.exists('sprite-house');
     HOUSE_GROUPS.forEach(({ col, row, n, stepCol, stepRow }) => {
       for (let i = 0; i < n; i++) {
         const hc = col + i * stepCol;
         const hr = row + i * stepRow;
-        const hx = hc * T + 2 * T;         // centre x of 4-tile-wide house
-        // Roof — top row
-        this._ts(hx, hr * T + T / 2,  4 * T, T,     TILE.ROOF);
-        // Wall — bottom two rows
-        this._ts(hx, hr * T + 2 * T,  4 * T, 2 * T, TILE.WALL);
-        // Window — left side of wall
-        this._ts(hc * T + T,       hr * T + 1.5 * T, T, T, TILE.WINDOW);
-        // Door — right-centre of bottom wall row
-        this._ts(hc * T + 2.5 * T, hr * T + 2.5 * T, T, T, TILE.DOOR);
+        const hx = hc * T + 2 * T;
+        if (useHouseSprite) {
+          this.add.image(hx, hr * T + T * 1.5, 'sprite-house')
+            .setDisplaySize(T * 4, T * 3).setDepth(4);
+        } else {
+          this._ts(hx, hr * T + T / 2,  4 * T, T,     TILE.ROOF);
+          this._ts(hx, hr * T + 2 * T,  4 * T, 2 * T, TILE.WALL);
+          this._ts(hc * T + T,       hr * T + 1.5 * T, T, T, TILE.WINDOW);
+          this._ts(hc * T + 2.5 * T, hr * T + 2.5 * T, T, T, TILE.DOOR);
+        }
       }
     });
     txt(this, 126 * T, 75 * T, "WARREN'S",  { fontSize: '8px', color: '#ff8888' });
@@ -259,11 +352,16 @@ export default class NeighborhoodScene extends Phaser.Scene {
     });
 
     // ── Trees ─────────────────────────────────────────────────────────────────
+    const useTreeSprite = this.textures.exists('sprite-tree');
     this._generateTrees().forEach(([tc, tr]) => {
       const tx = tc * T + T / 2, ty = tr * T + T / 2;
-      this._ts(tx, ty, T, T, TILE.TRUNK);       // trunk (behind canopy)
-      this._ts(tx, ty, T, T, TILE.TREE_DK);     // dark outer canopy
-      this._ts(tx, ty, T, T, TILE.TREE_LT);     // light inner highlight
+      if (useTreeSprite) {
+        this.add.image(tx, ty, 'sprite-tree').setDisplaySize(T * 3, T * 3).setDepth(5);
+      } else {
+        this._ts(tx, ty, T, T, TILE.TRUNK);
+        this._ts(tx, ty, T, T, TILE.TREE_DK);
+        this._ts(tx, ty, T, T, TILE.TREE_LT);
+      }
     });
 
     // ── Boat docks — on left lake shore ───────────────────────────────────────
@@ -413,7 +511,8 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._posBuffer.record();
     this._followers.forEach(f => f.update());
 
-    const fartJustDown = Phaser.Input.Keyboard.JustDown(this._fartKey);
+    const fartJustDown = Phaser.Input.Keyboard.JustDown(this._fartKey) ||
+                         this._player.fartJustPressed;
     if (fartJustDown) {
       this._abilities.execute('lightning_fart', this, this._player);
     }

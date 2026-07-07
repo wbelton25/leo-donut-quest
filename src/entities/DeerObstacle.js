@@ -1,17 +1,21 @@
 import { TILE_SIZE } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 
-// DeerObstacle: a deer that wanders back and forth along a road segment.
-// Uses sprite-deer atlas when loaded; falls back to multi-part primitives.
+// DeerObstacle: wanders in 2D within a patrol rectangle, pausing unpredictably.
+// Primary axis (E-W or N-S) comes from Tiled object bounds; perpendicular gets
+// DRIFT_RANGE px of wandering on each side.
 //
 // Constructor (pixel coords):
 //   scene, x, y      — center spawn position in pixels
-//   minBound, maxBound — patrol range in pixels on the patrol axis
-//   isHorizontal     — true = patrol X axis (E-W), false = patrol Y axis (N-S)
+//   minBound, maxBound — patrol range in pixels on the primary axis
+//   isHorizontal     — true = primary axis is X, false = Y
 //   onHitPlayer(damage) — callback when player is hit
 //   speed            — optional override (default 40 px/s)
 
 const DEFAULT_SPEED = 40;
 const HIT_COOLDOWN  = 2000;
+const DRIFT_RANGE   = TILE_SIZE * 2; // px of perpendicular wandering each side
+const ARRIVE_DIST   = 6;             // px — close enough to count as arrived
 const T = TILE_SIZE;
 const SPRITE_KEY = 'sprite-deer';
 
@@ -22,21 +26,28 @@ export default class DeerObstacle {
     this._isH         = isHorizontal;
     this._lastHit     = 0;
     this._speed       = speed ?? DEFAULT_SPEED;
-    this._x = x;
-    this._y = y;
-    this._lastDir = null;
+    this._x = x; this._y = y;
+    this._vx = 0; this._vy = 0;
+    this._targetX = x; this._targetY = y;
+    this._lastDir = 'down';
+    this._bolting = false;
+    this._knockedDown = false;
+    this._stateTimer = null;
 
+    // 2D patrol area
     if (this._isH) {
-      this._minX = minBound; this._maxX = maxBound;
-      this._minY = this._maxY = y;
+      this._minX = minBound;        this._maxX = maxBound;
+      this._minY = y - DRIFT_RANGE; this._maxY = y + DRIFT_RANGE;
     } else {
-      this._minY = minBound; this._maxY = maxBound;
-      this._minX = this._maxX = x;
+      this._minY = minBound;        this._maxY = maxBound;
+      this._minX = x - DRIFT_RANGE; this._maxX = x + DRIFT_RANGE;
     }
 
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    this._vx = this._isH ? this._speed * dir : 0;
-    this._vy = this._isH ? 0 : this._speed * dir;
+    // Per-deer randomised timing — each deer has its own rhythm
+    this._moveMin  = Phaser.Math.Between(800,  2500);
+    this._moveMax  = Phaser.Math.Between(2500, 5500);
+    this._standMin = Phaser.Math.Between(1000, 3000);
+    this._standMax = Phaser.Math.Between(3500, 7000);
 
     const hasSprite = scene.textures.exists(SPRITE_KEY);
     if (hasSprite) {
@@ -49,12 +60,9 @@ export default class DeerObstacle {
       this._parts  = this._buildParts(scene, x, y);
     }
 
-    scene.time.addEvent({
-      delay: Phaser.Math.Between(3000, 7000),
-      loop: true,
-      callback: this._graze,
-      callbackScope: this,
-    });
+    // Stagger so nearby deer don't move in sync
+    const initialWait = Phaser.Math.Between(200, this._standMax);
+    this._stateTimer = scene.time.delayedCall(initialWait, this._beginMove, [], this);
   }
 
   _buildParts(scene, x, y) {
@@ -71,8 +79,10 @@ export default class DeerObstacle {
   }
 
   _getDir() {
-    if (this._isH) return this._vx >= 0 ? 'right' : 'left';
-    return this._vy >= 0 ? 'down' : 'up';
+    const ax = Math.abs(this._vx), ay = Math.abs(this._vy);
+    if (ax === 0 && ay === 0) return this._lastDir;
+    return ax >= ay ? (this._vx >= 0 ? 'right' : 'left')
+                    : (this._vy >= 0 ? 'down'  : 'up');
   }
 
   _updateFrame() {
@@ -112,22 +122,46 @@ export default class DeerObstacle {
     }
   }
 
-  update(player) {
-    const dt = 1 / 60;
-    this._x += this._vx * dt;
-    this._y += this._vy * dt;
+  _beginMove() {
+    if (this._bolting) return;
+    // Pick a random destination anywhere in the 2D patrol area
+    const tx = Phaser.Math.Between(this._minX, this._maxX);
+    const ty = Phaser.Math.Between(this._minY, this._maxY);
+    const dx = tx - this._x, dy = ty - this._y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < ARRIVE_DIST) { this._beginStand(); return; }
+    this._targetX = tx; this._targetY = ty;
+    this._vx = (dx / dist) * this._speed;
+    this._vy = (dy / dist) * this._speed;
+    const moveDur = Phaser.Math.Between(this._moveMin, this._moveMax);
+    this._stateTimer = this._scene.time.delayedCall(moveDur, this._beginStand, [], this);
+  }
 
-    if (this._isH) {
-      if (this._x <= this._minX || this._x >= this._maxX) {
-        this._vx *= -1;
-        this._x = Phaser.Math.Clamp(this._x, this._minX, this._maxX);
-      }
-    } else {
-      if (this._y <= this._minY || this._y >= this._maxY) {
-        this._vy *= -1;
-        this._y = Phaser.Math.Clamp(this._y, this._minY, this._maxY);
+  _beginStand() {
+    if (this._bolting) return;
+    this._vx = 0; this._vy = 0;
+    const standDur = Phaser.Math.Between(this._standMin, this._standMax);
+    this._stateTimer = this._scene.time.delayedCall(standDur, this._beginMove, [], this);
+  }
+
+  update(player) {
+    if (this._knockedDown) return;
+    const dt = 1 / 60;
+
+    // Arrive at target early if close enough
+    if (!this._bolting && (this._vx !== 0 || this._vy !== 0)) {
+      const dx = this._targetX - this._x, dy = this._targetY - this._y;
+      if (Math.abs(dx) < ARRIVE_DIST && Math.abs(dy) < ARRIVE_DIST) {
+        if (this._stateTimer) { this._stateTimer.remove(false); this._stateTimer = null; }
+        this._beginStand();
+        return;
       }
     }
+
+    this._x += this._vx * dt;
+    this._y += this._vy * dt;
+    this._x = Phaser.Math.Clamp(this._x, this._minX, this._maxX);
+    this._y = Phaser.Math.Clamp(this._y, this._minY, this._maxY);
 
     if (this._sprite) this._updateFrame();
     else              this._updateParts();
@@ -139,29 +173,78 @@ export default class DeerObstacle {
       if (now - this._lastHit > HIT_COOLDOWN) {
         this._lastHit = now;
         this._onHitPlayer(10);
-        if (this._isH) {
-          this._vx = (player.x < this._x ? 1 : -1) * this._speed * 2.5;
-          this._scene.time.delayedCall(800, () => {
-            this._vx = this._speed * (this._vx > 0 ? 1 : -1);
-          });
-        } else {
-          this._vy = (player.y < this._y ? 1 : -1) * this._speed * 2.5;
-          this._scene.time.delayedCall(800, () => {
-            this._vy = this._speed * (this._vy > 0 ? 1 : -1);
-          });
-        }
+        AudioManager.playDeerGrunt(this._scene);
+        this._bolting = true;
+        if (this._stateTimer) { this._stateTimer.remove(false); this._stateTimer = null; }
+        // Bolt directly away from player in 2D
+        const bx = this._x - player.x, by = this._y - player.y;
+        const bd = Math.sqrt(bx * bx + by * by) || 1;
+        this._vx = (bx / bd) * this._speed * 2.5;
+        this._vy = (by / bd) * this._speed * 2.5;
+        this._scene.time.delayedCall(1200, () => {
+          this._bolting = false;
+          this._beginStand();
+        });
       }
     }
   }
 
-  _graze() {
-    this._vx = 0;
-    this._vy = 0;
-    this._scene.time.delayedCall(Phaser.Math.Between(800, 2000), () => {
-      const d = Math.random() < 0.5 ? 1 : -1;
-      if (this._isH) this._vx = this._speed * d;
-      else           this._vy = this._speed * d;
-    });
+  knockdown() {
+    if (this._knockedDown || this._bolting) return;
+    this._knockedDown = true;
+    AudioManager.playDeerGrunt(this._scene);
+
+    // Stop current movement
+    this._vx = 0; this._vy = 0;
+    if (this._stateTimer) { this._stateTimer.remove(false); this._stateTimer = null; }
+
+    if (this._sprite) {
+      // Tween to 90° (fall over sideways)
+      this._scene.tweens.add({
+        targets: this._sprite,
+        angle: 90,
+        duration: 200,
+        ease: 'Power2',
+        onComplete: () => {
+          this._scene.time.delayedCall(1800, () => {
+            if (!this._sprite) return; // destroyed during delay
+            this._scene.tweens.add({
+              targets: this._sprite,
+              angle: 0,
+              duration: 300,
+              ease: 'Back.Out',
+              onComplete: () => {
+                this._knockedDown = false;
+                this._beginStand();
+              }
+            });
+          });
+        }
+      });
+    } else {
+      // Parts fallback: squash body flat and fade legs to simulate collapse
+      const p = this._parts;
+      this._scene.tweens.add({
+        targets: [p.body, p.head, p.snout, p.earL, p.earR, p.tail, ...p.legs],
+        scaleY: 0.25,
+        duration: 180,
+        ease: 'Power2',
+        onComplete: () => {
+          this._scene.time.delayedCall(1800, () => {
+            this._scene.tweens.add({
+              targets: [p.body, p.head, p.snout, p.earL, p.earR, p.tail, ...p.legs],
+              scaleY: 1,
+              duration: 250,
+              ease: 'Back.Out',
+              onComplete: () => {
+                this._knockedDown = false;
+                this._beginStand();
+              }
+            });
+          });
+        }
+      });
+    }
   }
 
   setDepth(d) {
@@ -176,6 +259,7 @@ export default class DeerObstacle {
   }
 
   destroy() {
+    if (this._stateTimer) this._stateTimer.remove(false);
     if (this._sprite) { this._sprite.destroy(); return; }
     const p = this._parts;
     p.body.destroy(); p.head.destroy(); p.snout.destroy();

@@ -1,4 +1,5 @@
-import { TILE_SIZE } from '../constants.js';
+import { TILE_SIZE, SFX_GOLF_CART_HIT } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 
 // GolfCartObstacle: a golf cart with a visible driver.
 // Uses sprite-golf-cart atlas when loaded; falls back to primitives.
@@ -159,6 +160,8 @@ export default class GolfCartObstacle {
       if (now - this._lastHit > HIT_COOLDOWN) {
         this._lastHit = now;
         this._onHitPlayer(this._damage);
+        if (this._scene.cache.audio.exists(SFX_GOLF_CART_HIT))
+          AudioManager.playSfx(this._scene, SFX_GOLF_CART_HIT, { volume: 0.8 });
       }
     }
   }

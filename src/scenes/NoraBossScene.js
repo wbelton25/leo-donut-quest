@@ -1,7 +1,8 @@
 import {
   SCENE_NORA_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
-  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt,
+  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -35,11 +36,11 @@ const T = TILE_SIZE;
 const ARENA_W = BASE_WIDTH;
 const ARENA_H = BASE_HEIGHT;
 
-// Pool geometry (bottom center)
-const POOL_X = ARENA_W / 2;
-const POOL_Y = ARENA_H - 55;
-const POOL_W = 160;
-const POOL_H = 40;
+// Pool geometry — round hot-tub in bottom-right of nora_boss_level.png
+const POOL_X = 415;
+const POOL_Y = 228;
+const POOL_W = 90;
+const POOL_H = 78;
 
 // Bar counter (top strip)
 const BAR_Y      = 38;
@@ -97,6 +98,7 @@ export default class NoraBossScene extends Phaser.Scene {
   }
 
   _createImpl() {
+    AudioManager.playMusic(this, MUSIC_BOSS);
     this._resources = this.game.registry.get('resources');
     this._party     = this.game.registry.get('party');
     this._abilities = this.game.registry.get('abilities');
@@ -108,6 +110,7 @@ export default class NoraBossScene extends Phaser.Scene {
     }
 
     this._abilities.register('lightning_fart', (scene, player) => {
+      AudioManager.playFart(scene);
       const ring = scene.add.circle(player.x, player.y, 6, 0xf5e642, 0.9);
       scene.tweens.add({ targets: ring, radius: FART_HIT_RANGE, alpha: 0, duration: 400,
         onComplete: () => ring.destroy() });
@@ -142,61 +145,16 @@ export default class NoraBossScene extends Phaser.Scene {
   // ─── Arena ────────────────────────────────────────────────────────────────
 
   _buildArena() {
-    // Grass yard
-    this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a7a2a);
-
-    // Patio stones around bar area
-    this.add.rectangle(ARENA_W / 2, BAR_Y + BAR_H / 2 + 20, ARENA_W, 24, 0x888877, 0.5);
-
-    // Pool
-    this.add.rectangle(POOL_X, POOL_Y, POOL_W + 10, POOL_H + 10, 0xaaaacc); // rim
-    this._pool = this.add.rectangle(POOL_X, POOL_Y, POOL_W, POOL_H, 0x1a6eb4).setDepth(1);
-    for (let i = 0; i < 3; i++) {
-      this.add.rectangle(POOL_X - 55 + i * 55, POOL_Y, 35, 3, 0x4db8f0, 0.4).setDepth(2);
+    // Background image — replaces all primitive visuals
+    if (this.textures.exists('bg-nora')) {
+      this.add.image(0, 0, 'bg-nora').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(0);
+    } else {
+      // Fallback
+      this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a7a2a);
+      this.add.rectangle(ARENA_W / 2, BAR_Y, ARENA_W, BAR_H, BAR_COLOR);
     }
-    txt(this, POOL_X, POOL_Y - 6, 'POOL', { fontSize: '8px', color: '#7cc8f0' })
-      .setOrigin(0.5).setDepth(2);
-
-    // Pool floaties
-    this.add.circle(POOL_X - 40, POOL_Y + 5, 10, 0xff6666, 0.8).setDepth(2);
-    this.add.circle(POOL_X + 40, POOL_Y - 5, 8,  0xffff44, 0.8).setDepth(2);
-
-    // Bar counter (full width, top)
-    this.add.rectangle(ARENA_W / 2, BAR_Y, ARENA_W, BAR_H, BAR_COLOR);
-    this.add.rectangle(ARENA_W / 2, BAR_Y - BAR_H / 2 + 3, ARENA_W, 6, BAR_TOP); // counter top
-
-    // Lazy Lizard sign
-    txt(this, ARENA_W / 2, BAR_Y - BAR_H / 2 - 14, '🦎 THE LAZY LIZARD 🦎', {
-      fontSize: '8px', color: '#ffdd44',
-      stroke: '#332200', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(5);
-
-    // Cabinets (3 hiding spots)
-    CABINETS.forEach((cab, i) => {
-      const c = this.add.rectangle(cab.x, cab.y, 52, BAR_H - 4, 0x5a3a10).setDepth(3);
-      this.add.rectangle(cab.x, cab.y, 50, BAR_H - 6, 0x7a5a20).setDepth(4);
-      // Cabinet handle
-      this.add.rectangle(cab.x + 10, cab.y, 3, 8, 0xddaa44).setDepth(5);
-      this.add.rectangle(cab.x - 10, cab.y, 3, 8, 0xddaa44).setDepth(5);
-    });
-
-    // Bar stools
-    [80, 170, 240, 310, 400].forEach(sx => {
-      this.add.rectangle(sx, BAR_Y + BAR_H / 2 + 14, 14, 6, 0x6b3a10);
-      this.add.rectangle(sx, BAR_Y + BAR_H / 2 + 22, 4, 16, 0x5a3010);
-    });
-
-    // Bottles on bar
-    [130, 200, 280, 350].forEach(bx => {
-      this.add.rectangle(bx, BAR_Y - 4, 5, 14, 0x44aa44, 0.9).setDepth(5);
-      this.add.rectangle(bx, BAR_Y - 12, 3, 6, 0x88dd88, 0.7).setDepth(5);
-    });
-
-    // Deck chairs near pool
-    [[POOL_X - 100, POOL_Y - 30], [POOL_X + 90, POOL_Y - 30]].forEach(([cx, cy]) => {
-      this.add.rectangle(cx, cy, 30, 10, 0xddaa66).setDepth(1);
-      this.add.rectangle(cx - 18, cy, 6, 14, 0xaa8844).setDepth(1);
-    });
+    // Pool collision zone is invisible — POOL_X/Y/W/H drive the hazard logic
+    // Bar collision zone — Leo cannot cross into the bar area (clamped in _updateLeo)
   }
 
   // ─── Nora visual ──────────────────────────────────────────────────────────
@@ -393,6 +351,7 @@ export default class NoraBossScene extends Phaser.Scene {
     // Fart
     if (Phaser.Input.Keyboard.JustDown(this._fartKey) && this._fartReady) {
       this._fartReady = false;
+      AudioManager.playFart(this);
       const ring = this.add.circle(this._leoX, this._leoY, 6, 0xf5e642, 0.9).setDepth(9);
       this.tweens.add({
         targets: ring, displayWidth: FART_HIT_RANGE * 2, displayHeight: FART_HIT_RANGE * 2,
@@ -445,12 +404,12 @@ export default class NoraBossScene extends Phaser.Scene {
     this._noraBallDot.setPosition(this._noraX + 16, this._noraY + 6);
     this._alertLabel.setPosition(this._noraX, this._noraY - 28);
 
-    // Hide Nora's body behind cabinet when in hiding states
+    // Hide Nora fully behind the bar when in hiding states
     const hiding = (this._noraState === 'SHOOT' || this._noraState === 'MOVING_TO_CABINET');
-    this._noraBody.setAlpha(hiding ? 0.25 : 1);
-    this._noraShirt.setAlpha(hiding ? 0.25 : 1);
-    this._noraBall.setAlpha(hiding ? 0.5 : 1);
-    this._noraBallDot.setAlpha(hiding ? 0.5 : 1);
+    this._noraBody.setAlpha(hiding ? 0 : 1);
+    this._noraShirt.setAlpha(hiding ? 0 : 1);
+    this._noraBall.setAlpha(hiding ? 0 : 1);
+    this._noraBallDot.setAlpha(hiding ? 0 : 1);
   }
 
   _updateBalls() {
@@ -539,6 +498,7 @@ export default class NoraBossScene extends Phaser.Scene {
     const dx = this._noraX - this._leoX, dy = this._noraY - this._leoY;
     if (Math.sqrt(dx * dx + dy * dy) > FART_HIT_RANGE) return;
 
+    AudioManager.playSfx(this, 'sfx-girly-nora', { volume: 0.9 });
     this._noraHp--;
     this._noraHpFill.scaleX = Math.max(0, this._noraHp / NORA_MAX_HP);
 

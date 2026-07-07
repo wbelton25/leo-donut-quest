@@ -27,6 +27,14 @@ export default class PreloadScene extends Phaser.Scene {
       this.load.atlas(`sprite-${id}`, `assets/sprites/${id}.png`, `assets/sprites/${id}.json`);
     });
 
+    // World sprites — tree and house (extracted from tileset reference)
+    this.load.image('sprite-tree',  'assets/sprites/tree.png');
+    this.load.image('sprite-house', 'assets/sprites/house.png');
+
+    // Boss character + weapon sprites (AI-generated, replaced from rectangles)
+    this.load.image('sprite-grace-char',  'assets/sprites/grace.png');
+    this.load.image('sprite-pool-noodle', 'assets/sprites/pool_noodle.png');
+
     // Obstacle sprites (48×48, 12 frames: 4 dirs × 3)
     this.load.atlas('sprite-deer',      'assets/sprites/deer.png',      'assets/sprites/deer.json');
     this.load.atlas('sprite-car-red',   'assets/sprites/car-red.png',   'assets/sprites/car-red.json');
@@ -47,15 +55,42 @@ export default class PreloadScene extends Phaser.Scene {
       { frameWidth: 16, frameHeight: 16 }
     );
 
+    // Boss arena backgrounds
+    this.load.image('bg-grace', 'assets/backgrounds/grace_pool.png');
+    this.load.image('bg-nora',  'assets/backgrounds/nora_boss_level.png');
+
     // Seamless 128×128 surface textures — used for large tileSprite fills
     ['grass', 'park', 'golf', 'road', 'sidewalk', 'water', 'water-lt', 'shore']
       .forEach(id => this.load.image(`tex-${id}`, `assets/textures/${id}.png`));
 
-    // RGBA road edge strips — transparent on grass side, opaque road on other side.
-    // Placed straddling each road boundary to replace the hard rectangular edge
-    // with an organic noise-driven profile.
-    this.load.image('tex-road-edge-h', 'assets/textures/road-edge-h.png');
-    this.load.image('tex-road-edge-v', 'assets/textures/road-edge-v.png');
+    // Road edge strips — sandy curb, transparent on grass side, only at grass boundaries.
+    this.load.image('tex-road-edge-h',  'assets/textures/road-edge-h.png');
+    this.load.image('tex-road-edge-v',  'assets/textures/road-edge-v.png');
+    this.load.image('tex-road-corner',  'assets/textures/road-corner.png');
+
+    // ── Music ────────────────────────────────────────────────────────────────────
+    this.load.audio('music-title',              'assets/audio/music/music_intro.wav');
+    this.load.audio('music-neighborhood-intro', 'assets/audio/music/music_level_intro.wav');
+    this.load.audio('music-neighborhood-loop',  'assets/audio/music/music_level_loop.wav');
+    this.load.audio('music-boss',               'assets/audio/music/music_boss.wav');
+    this.load.audio('music-credits',            'assets/audio/music/music_credits.wav');
+
+    // ── SFX ──────────────────────────────────────────────────────────────────────
+    [1, 2, 3, 4].forEach(n =>
+      this.load.audio(`sfx-deer-grunt-${n}`, `assets/audio/sfx/sfx_deer_grunt_${n}.wav`)
+    );
+    this.load.audio('sfx-coyote-max-baseball', 'assets/audio/sfx/sfx_coyote_max_baseball.mp3');
+    this.load.audio('sfx-coyote-max-mj',       'assets/audio/sfx/sfx_coyote_max_mj.mp3');
+    this.load.audio('sfx-girly-grace', 'assets/audio/sfx/sfx_girly_grace.mp3');
+    this.load.audio('sfx-girly-nora',  'assets/audio/sfx/sfx_girly_nora.mp3');
+    this.load.audio('sfx-girly-edie',  'assets/audio/sfx/sfx_girly_edie.mp3');
+    this.load.audio('sfx-splash',          'assets/audio/sfx/sfx_splash.wav');
+    this.load.audio('sfx-car-hit',        'assets/audio/sfx/sfx_car_hit.mp3');
+    this.load.audio('sfx-golf-cart-hit',  'assets/audio/sfx/sfx_golf_cart_hit.mp3');
+    this.load.audio('sfx-bike-hit',       'assets/audio/sfx/sfx_bike_hit.mp3');
+    [1, 2, 3, 4].forEach(n =>
+      this.load.audio(`sfx-fart-${n}`, `assets/audio/sfx/sfx_fart_${n}.wav`)
+    );
   }
 
   create() {

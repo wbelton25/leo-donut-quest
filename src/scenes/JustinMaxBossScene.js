@@ -1,7 +1,8 @@
 import {
   SCENE_JUSTIN_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
-  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt,
+  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -82,6 +83,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
   }
 
   _createImpl() {
+    AudioManager.playMusic(this, MUSIC_BOSS);
     this._resources = this.game.registry.get('resources');
     this._party     = this.game.registry.get('party');
     this._abilities = this.game.registry.get('abilities');
@@ -93,6 +95,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     }
 
     this._abilities.register('lightning_fart', (scene, player) => {
+      AudioManager.playFart(scene);
       const ring = scene.add.circle(player.x, player.y, 6, 0xf5e642, 0.9);
       scene.tweens.add({ targets: ring, radius: FART_HIT_RANGE, alpha: 0, duration: 400,
         onComplete: () => ring.destroy() });
@@ -304,6 +307,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     // Fart
     if (Phaser.Input.Keyboard.JustDown(this._fartKey) && this._fartReady) {
       this._fartReady = false;
+      AudioManager.playFart(this);
       const ring = this.add.circle(this._leoX, this._leoY, 6, 0xf5e642, 0.9).setDepth(8);
       this.tweens.add({
         targets: ring, displayWidth: FART_HIT_RANGE * 2, displayHeight: FART_HIT_RANGE * 2,
@@ -519,6 +523,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     const dx = this._maxX - this._leoX, dy = this._maxY - this._leoY;
     if (Math.sqrt(dx * dx + dy * dy) > FART_HIT_RANGE) return;
 
+    AudioManager.playSfx(this, 'sfx-coyote-max-baseball', { volume: 0.9 });
     this._maxHp--;
     this._maxHpFill.scaleX = Math.max(0, this._maxHp / MAX_HP);
 

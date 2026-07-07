@@ -23,13 +23,15 @@ const FRAME_SIZE = 48;
 
 // [frameName, sourceRow, sourceCol, options?]
 // Left frames are horizontal mirrors of right frames (identical pose quality)
+// The source cells (row 0) show the deer facing LEFT — mirror them for right,
+// use them as-is for left.
 const FRAMES = [
-  ['right-0', 0, 0],
-  ['right-1', 0, 1],
-  ['right-2', 0, 0],
-  ['left-0',  0, 0, { flop: true }],
-  ['left-1',  0, 1, { flop: true }],
-  ['left-2',  0, 0, { flop: true }],
+  ['right-0', 0, 0, { flop: true }],
+  ['right-1', 0, 1, { flop: true }],
+  ['right-2', 0, 0, { flop: true }],
+  ['left-0',  0, 0],
+  ['left-1',  0, 1],
+  ['left-2',  0, 0],
   ['down-0',  1, 1],            // front / facing camera
   ['down-1',  1, 1],
   ['down-2',  1, 1],

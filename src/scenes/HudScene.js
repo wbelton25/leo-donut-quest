@@ -3,6 +3,7 @@ import {
   EVT_RESOURCE_UPDATE, EVT_PARTY_UPDATE, EVT_ABILITY_USED,
   BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 
 // HudScene: persistent parallel scene, always on top.
 // All text is 8px minimum — Press Start 2P is an 8px-grid font, smaller sizes blur.
@@ -47,6 +48,22 @@ export default class HudScene extends Phaser.Scene {
 
     // ── Money counter ─────────────────────────────────────────────────────────
     this._moneyText = txt(this, 308, y, '$50', { fontSize: '8px', color: '#f5a623' });
+
+    // ── Settings button ───────────────────────────────────────────────────────
+    this._settingsBtn = txt(this, 362, y, 'OPT', { fontSize: '8px', color: '#778899' })
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this._openSettings())
+      .on('pointerover', () => this._settingsBtn.setColor('#aabbcc'))
+      .on('pointerout',  () => this._settingsBtn.setColor('#778899'));
+
+    this._settingsOpen = false;
+    this._settingsObjs = [];
+
+    // Initialise registry defaults on first create.
+    if (this.game.registry.get('audio-music') == null)
+      this.game.registry.set('audio-music', true);
+    if (this.game.registry.get('audio-sfx') == null)
+      this.game.registry.set('audio-sfx', true);
 
     // ── Party member dots ─────────────────────────────────────────────────────
     // Four circles near the right edge — light up when that member joins
@@ -116,6 +133,87 @@ export default class HudScene extends Phaser.Scene {
         this._fartFill.setFillStyle(0xa09020);
       }
     }
+  }
+
+  // ── Settings overlay ──────────────────────────────────────────────────────
+
+  _openSettings() {
+    if (this._settingsOpen) return;
+    this._settingsOpen = true;
+    this._settingsObjs = [];
+
+    const cx = BASE_WIDTH / 2;
+    const cy = BASE_HEIGHT - 54; // anchor panel near bottom
+    const D  = 105; // panel depth base
+
+    const push = (obj) => { this._settingsObjs.push(obj); return obj; };
+
+    // Dim backdrop — absorbs clicks so they don't reach the game
+    push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.78)
+      .setDepth(D).setInteractive());
+
+    // Panel
+    push(this.add.rectangle(cx, cy, 176, 96, 0x0d1a26)
+      .setDepth(D + 1).setStrokeStyle(1, 0x4fc3f7));
+
+    // Title
+    push(txt(this, cx, cy - 36, 'SETTINGS', { fontSize: '8px', color: '#4fc3f7' })
+      .setOrigin(0.5).setDepth(D + 2));
+
+    // ── Music row ──
+    push(txt(this, cx - 56, cy - 12, 'MUSIC', { fontSize: '8px', color: '#cccccc' })
+      .setOrigin(0, 0.5).setDepth(D + 2));
+
+    const musicOn = !!this.game.registry.get('audio-music');
+    this._settMusicBtn = push(
+      txt(this, cx + 56, cy - 12, musicOn ? 'ON' : 'OFF',
+        { fontSize: '8px', color: musicOn ? '#4fc3f7' : '#445566' })
+        .setOrigin(1, 0.5).setDepth(D + 2)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this._settToggleMusic())
+    );
+
+    // ── SFX row ──
+    push(txt(this, cx - 56, cy + 6, 'SFX', { fontSize: '8px', color: '#cccccc' })
+      .setOrigin(0, 0.5).setDepth(D + 2));
+
+    const sfxOn = !!this.game.registry.get('audio-sfx');
+    this._settSfxBtn = push(
+      txt(this, cx + 56, cy + 6, sfxOn ? 'ON' : 'OFF',
+        { fontSize: '8px', color: sfxOn ? '#4fc3f7' : '#445566' })
+        .setOrigin(1, 0.5).setDepth(D + 2)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this._settToggleSfx())
+    );
+
+    // ── Close button ──
+    const closeBg = push(this.add.rectangle(cx, cy + 30, 72, 16, 0x1a2e40)
+      .setDepth(D + 2).setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this._closeSettings())
+      .on('pointerover', function() { this.setFillStyle(0x2a4e60); })
+      .on('pointerout',  function() { this.setFillStyle(0x1a2e40); }));
+
+    push(txt(this, cx, cy + 30, 'CLOSE', { fontSize: '8px', color: '#aaaaaa' })
+      .setOrigin(0.5).setDepth(D + 3));
+  }
+
+  _closeSettings() {
+    this._settingsObjs.forEach(o => o.destroy());
+    this._settingsObjs = [];
+    this._settingsOpen = false;
+  }
+
+  _settToggleMusic() {
+    const on = !this.game.registry.get('audio-music');
+    this.game.registry.set('audio-music', on);
+    AudioManager.setMusicEnabled(this, on);
+    this._settMusicBtn.setText(on ? 'ON' : 'OFF').setColor(on ? '#4fc3f7' : '#445566');
+  }
+
+  _settToggleSfx() {
+    const on = !this.game.registry.get('audio-sfx');
+    this.game.registry.set('audio-sfx', on);
+    this._settSfxBtn.setText(on ? 'ON' : 'OFF').setColor(on ? '#4fc3f7' : '#445566');
   }
 
   shutdown() {

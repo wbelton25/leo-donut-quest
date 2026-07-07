@@ -1,6 +1,7 @@
-import { SCENE_CREDITS, SCENE_TITLE, BASE_WIDTH, BASE_HEIGHT, txt } from '../constants.js';
+import { SCENE_CREDITS, SCENE_TITLE, BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_CREDITS } from '../constants.js';
 import SaveSystem from '../systems/SaveSystem.js';
 import ScoreSystem from '../systems/ScoreSystem.js';
+import AudioManager from '../systems/AudioManager.js';
 
 export default class CreditsScene extends Phaser.Scene {
   constructor() {
@@ -14,6 +15,7 @@ export default class CreditsScene extends Phaser.Scene {
   }
 
   create() {
+    AudioManager.playMusic(this, MUSIC_CREDITS);
     const cx = BASE_WIDTH / 2;
     this.add.rectangle(cx, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x0a0a1a);
 

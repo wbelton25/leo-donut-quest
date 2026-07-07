@@ -1,7 +1,8 @@
 import {
   SCENE_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
-  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt,
+  BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -66,6 +67,7 @@ export default class MaxBossScene extends Phaser.Scene {
   }
 
   _createImpl() {
+    AudioManager.playMusic(this, MUSIC_BOSS);
     this._resources = this.game.registry.get('resources');
     this._party     = this.game.registry.get('party');
     this._abilities = this.game.registry.get('abilities');
@@ -283,6 +285,7 @@ export default class MaxBossScene extends Phaser.Scene {
     // Fart attack
     if (Phaser.Input.Keyboard.JustDown(this._fartKey) && this._fartReady) {
       this._fartReady = false;
+      AudioManager.playFart(this);
       const ring = this.add.circle(this._leoX, this._leoY, 6, 0xf5e642, 0.9).setDepth(8);
       this.tweens.add({
         targets: ring, displayWidth: FART_HIT_RANGE * 2, displayHeight: FART_HIT_RANGE * 2,
@@ -311,6 +314,7 @@ export default class MaxBossScene extends Phaser.Scene {
   }
 
   _hitMax() {
+    AudioManager.playSfx(this, 'sfx-coyote-max-mj', { volume: 0.9 });
     this._maxHp--;
     this._maxState = 'STUNNED';
     this._maxBody.setFillStyle(0xffffff);

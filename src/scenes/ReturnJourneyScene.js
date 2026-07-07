@@ -1,7 +1,8 @@
 import {
   SCENE_RETURN_JOURNEY, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE,
-  BASE_WIDTH, BASE_HEIGHT, txt,
+  BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 
 // ReturnJourneyScene: sunset cutscene — the crew rides home with donuts.
 // No events, no input. Pure visual with auto-transition after RIDE_DURATION ms.
@@ -23,6 +24,7 @@ export default class ReturnJourneyScene extends Phaser.Scene {
   }
 
   create() {
+    AudioManager.playMusic(this, MUSIC_NEIGHBORHOOD);
     const party   = this._initData.party   ?? [];
     const donuts  = this._initData.donuts  ?? 0;
     const elapsed = { ms: 0 };

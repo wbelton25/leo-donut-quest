@@ -5,7 +5,31 @@
       "Bash(npm run *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(node scripts/generate-world-textures.js)"
+      "Bash(node scripts/generate-world-textures.js)",
+      "Bash(node scripts/generate-obstacle-sprites.js)",
+      "Bash(node scripts/process-deer.js \"/c/Users/wbelt/Downloads/gemini-2.5-flash-image_deer.jpg\")",
+      "Bash(node scripts/process-bike.js \"/c/Users/wbelt/Downloads/_2fc82a3d-b2e2-4707-8c1b-66227ca8a8e3.jpg\")",
+      "Bash(node scripts/process-bike.js /c/Users/wbelt/Downloads/biker_right.png /c/Users/wbelt/Downloads/biker_down.png /c/Users/wbelt/Downloads/biker_up.png /c/Users/wbelt/Downloads/biker_left.png)",
+      "Bash(node --input-type=module)",
+      "Bash(node scripts/process-tileset.js \"C:/Users/wbelt/Downloads/game_components.jpg\")",
+      "Bash(node scripts/generate-road-edges.js)",
+      "Read(//c/Users/wbelt/**)",
+      "Bash(node scripts/process-tileset.js /c/Users/wbelt/Downloads/game_components.jpg)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\wbelt\\\\Downloads\" | Where-Object { $_.Extension -match '\\\\.\\(mp3|ogg|wav|m4a|aac|flac\\)' } | Select-Object Name, Length | Format-Table -AutoSize)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\wbelt\\\\leo_quest\\\\public\\\\assets\\\\audio\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(curl -s http://localhost:5173/leo-donut-quest/)",
+      "Bash(ffmpeg -version)",
+      "PowerShell(ffmpeg -version 2>&1)",
+      "Bash(winget install *)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); ffmpeg -i public/assets/audio/music/music_level.wav -af \"silencedetect=noise=-50dB:duration=0.3\" -f null - 2>&1 | Select-String \"silence\")",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); ffmpeg -i public/assets/audio/music/music_level.wav -af \"silencedetect=noise=-35dB:duration=0.05\" -f null - 2>&1 | Select-String \"silence\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\wbelt\\\\Downloads\" -Recurse | Where-Object { $_.Name -match \"^short.8\" } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\wbelt\\\\Downloads\" | Where-Object { $_.Name -match \"short\" } | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\wbelt\\\\Downloads\" | Select-Object Name | Where-Object { $_.Name -match \"8\" } | Select-Object -First 20)",
+      "Read(//mnt/c/Users/wbelt/**)",
+      "PowerShell($files = Get-ChildItem \"C:\\\\Users\\\\wbelt\\\\Downloads\" | Sort-Object LastWriteTime -Descending; foreach \\($f in $files[0..14]\\) { \"$\\($f.LastWriteTime\\) $\\($f.Name\\)\" })",
+      "Bash(npx vite *)"
     ]
   }
 }

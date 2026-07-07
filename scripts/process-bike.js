@@ -1,22 +1,10 @@
 // scripts/process-bike.js
-// Slices the AI-generated 3×2 kid-on-bike reference image into a Phaser atlas.
+// Builds a Phaser atlas from 4 individual biker direction images.
 //
 // Usage:
-//   node scripts/process-bike.js <path-to-source-image.png|.jpg>
+//   node scripts/process-bike.js <right.png> <down.png> <up.png> [left.png]
 //
-// Source image layout (3 cols × 3 rows, labelled in image):
-//   (row 0, col 0) — UP   front  (facing camera  → game DOWN direction)
-//   (row 0, col 1) — UP   back   (facing away     → game UP direction)
-//   (row 0, col 2) — Right side profile
-//   (row 1, col 0) — Left side profile
-//   (row 1, col 1) — Left back variant
-//   (row 1, col 2) — Right side variant
-//   (row 2, col 0) — Down / angled
-//   (row 2, col 1) — 3D variant
-//   (row 2, col 2) — Right side variant 2
-//
-// Source has a CHECKERBOARD (transparent) background — light flood-fill removal.
-//
+// If left.png is omitted, the right image is mirrored for left frames.
 // Output → public/assets/sprites/bike.png + bike.json
 
 import sharp from 'sharp';
@@ -28,22 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'public', 'assets', 'sprites');
 const FRAME_SIZE = 48;
 
-const FRAMES = [
-  ['right-0', 0, 2],           // right side
-  ['right-1', 1, 2],           // right side variant
-  ['right-2', 2, 2],           // right side variant 2
-  ['left-0',  1, 0],           // left side
-  ['left-1',  1, 0],
-  ['left-2',  1, 0],
-  ['down-0',  0, 0],           // UP front = facing camera = game DOWN
-  ['down-1',  0, 0],
-  ['down-2',  0, 0],
-  ['up-0',    0, 1],           // UP back = facing away = game UP
-  ['up-1',    0, 1],
-  ['up-2',    0, 1],
-];
-
-// ── Background removal — checkerboard / light neutral background ──────────
+// ── Background removal — light / checkerboard bg ──────────────────────────
 async function removeBackground(imageBuffer) {
   const { data, info } = await sharp(imageBuffer)
     .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -89,48 +62,60 @@ async function removeBackground(imageBuffer) {
   return sharp(result, { raw: { width, height, channels: ch } }).png().toBuffer();
 }
 
+async function prepareFrame(srcPath, flop = false) {
+  let pipe = sharp(srcPath);
+  if (flop) pipe = pipe.flop();
+  const buf   = await pipe.toBuffer();
+  const noBg  = await removeBackground(buf);
+  return sharp(noBg)
+    .resize(FRAME_SIZE, FRAME_SIZE, {
+      kernel: sharp.kernel.nearest,
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    }).png().toBuffer();
+}
+
 async function run() {
-  const srcPath = process.argv[2];
-  if (!srcPath) {
-    console.error('Usage: node scripts/process-bike.js <source-image.png>');
+  const [rightSrc, downSrc, upSrc, leftSrc] = process.argv.slice(2);
+  if (!rightSrc || !downSrc || !upSrc) {
+    console.error('Usage: node scripts/process-bike.js <right.png> <down.png> <up.png> [left.png]');
     process.exit(1);
   }
 
-  const meta  = await sharp(srcPath).metadata();
-  const cellW = Math.floor(meta.width  / 3);
-  const cellH = Math.floor(meta.height / 3);
-  console.log(`Source: ${meta.width}×${meta.height}  cells: ${cellW}×${cellH}  output: ${FRAME_SIZE}×${FRAME_SIZE}`);
+  console.log(`right: ${rightSrc}`);
+  console.log(`down:  ${downSrc}`);
+  console.log(`up:    ${upSrc}`);
+  console.log(`left:  ${leftSrc ?? '(mirror of right)'}`);
 
-  const cache = {};
-  const getCell = async (row, col, opts = {}) => {
-    const key = `${row},${col},${opts.flop ? 'f' : ''}`;
-    if (cache[key]) return cache[key];
+  const rightBuf = await prepareFrame(rightSrc);
+  const downBuf  = await prepareFrame(downSrc);
+  const upBuf    = await prepareFrame(upSrc);
+  const leftBuf  = leftSrc
+    ? await prepareFrame(leftSrc)
+    : await prepareFrame(rightSrc, true);
 
-    let pipe = sharp(srcPath)
-      .extract({ left: col * cellW, top: row * cellH, width: cellW, height: cellH });
-    if (opts.flop) pipe = pipe.flop();
-
-    const extracted = await pipe.toBuffer();
-    const noBg      = await removeBackground(extracted);
-    const scaled    = await sharp(noBg)
-      .resize(FRAME_SIZE, FRAME_SIZE, {
-        kernel: sharp.kernel.nearest,
-        fit: 'contain',
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
-      }).png().toBuffer();
-
-    cache[key] = scaled;
-    return scaled;
-  };
-
-  const frameBuffers = await Promise.all(FRAMES.map(([, row, col, opts]) => getCell(row, col, opts)));
+  // Build 12-frame atlas: right×3, left×3, down×3, up×3
+  const FRAMES = [
+    ['right-0', rightBuf],
+    ['right-1', rightBuf],
+    ['right-2', rightBuf],
+    ['left-0',  leftBuf],
+    ['left-1',  leftBuf],
+    ['left-2',  leftBuf],
+    ['down-0',  downBuf],
+    ['down-1',  downBuf],
+    ['down-2',  downBuf],
+    ['up-0',    upBuf],
+    ['up-1',    upBuf],
+    ['up-2',    upBuf],
+  ];
 
   mkdirSync(OUT_DIR, { recursive: true });
 
   const totalW = FRAME_SIZE * FRAMES.length;
   const sheet  = await sharp({
     create: { width: totalW, height: FRAME_SIZE, channels: 4, background: { r:0,g:0,b:0,alpha:0 } },
-  }).composite(frameBuffers.map((buf, i) => ({ input: buf, left: i * FRAME_SIZE, top: 0 })))
+  }).composite(FRAMES.map(([, buf], i) => ({ input: buf, left: i * FRAME_SIZE, top: 0 })))
     .png().toBuffer();
 
   writeFileSync(join(OUT_DIR, 'bike.png'), sheet);

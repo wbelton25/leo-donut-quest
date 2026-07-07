@@ -1,7 +1,8 @@
 import {
   SCENE_OREGON_TRAIL, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_DONUT_SHOP,
-  BASE_WIDTH, BASE_HEIGHT, txt,
+  BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
+import AudioManager from '../systems/AudioManager.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
 import EventSystem from '../systems/EventSystem.js';
@@ -157,6 +158,7 @@ export default class OregonTrailScene extends Phaser.Scene {
   }
 
   create() {
+    AudioManager.playMusic(this, MUSIC_NEIGHBORHOOD);
     // ── Systems ───────────────────────────────────────────────────────────────
     this._resources = new ResourceSystem(this.game);
     this._party     = new PartySystem(this.game);

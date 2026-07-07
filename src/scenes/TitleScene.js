@@ -1,9 +1,10 @@
 import {
   SCENE_TITLE, SCENE_NEIGHBORHOOD, SCENE_HUD, SCENE_DIALOGUE,
-  BASE_WIDTH, BASE_HEIGHT, txt,
+  BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_TITLE,
 } from '../constants.js';
 import SaveSystem from '../systems/SaveSystem.js';
 import ScoreSystem from '../systems/ScoreSystem.js';
+import AudioManager from '../systems/AudioManager.js';
 
 export default class TitleScene extends Phaser.Scene {
   constructor() {
@@ -11,6 +12,7 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    AudioManager.playMusic(this, MUSIC_TITLE);
     const cx = BASE_WIDTH / 2;
     const cy = BASE_HEIGHT / 2;
 

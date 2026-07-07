@@ -44,6 +44,11 @@ const config = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
 
+  // Gamepad API — enables Phaser's gamepad plugin for controller support
+  input: {
+    gamepad: true,
+  },
+
   // Arcade physics: simple AABB + circle collision, runs at 60fps easily
   physics: {
     default: 'arcade',
