@@ -133,7 +133,7 @@ async function buildVariant(name, opts, scale = 1) {
 async function run() {
   // Justin: keep blue bike, yellow shirt, black hair
   await buildVariant('justin', { bikeHue: null, shirt: { h: 50, s: 0.85 }, blackHair: true });
-  // Carson: red bike, green shirt, brown hair, slightly smaller
-  await buildVariant('carson', { bikeHue: 2, shirt: { h: 132, s: 0.6 }, blackHair: false }, 0.85);
+  // Carson: red bike, green shirt, brown hair, only a touch smaller than Leo
+  await buildVariant('carson', { bikeHue: 2, shirt: { h: 132, s: 0.6 }, blackHair: false }, 0.94);
 }
 run().catch(e => { console.error(e); process.exit(1); });
