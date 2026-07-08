@@ -5,6 +5,7 @@ import {
   PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
+import FX from '../systems/FX.js';
 import Player from '../entities/Player.js';
 import Follower, { PositionBuffer } from '../entities/Follower.js';
 import DeerObstacle     from '../entities/DeerObstacle.js';
@@ -12,6 +13,7 @@ import CarObstacle      from '../entities/CarObstacle.js';
 import GolfCartObstacle from '../entities/GolfCartObstacle.js';
 import BikeObstacle     from '../entities/BikeObstacle.js';
 import GolfBallSpawner  from '../entities/GolfBallSpawner.js';
+import BeanPickup       from '../entities/BeanPickup.js';
 // GraceBoss is now handled in GraceBossScene; import removed
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
@@ -125,16 +127,78 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     this._abilities.register('lightning_fart', (scene, player) => {
       AudioManager.playFart(scene);
-      const ring = scene.add.circle(player.x, player.y, 6, 0xf5e642, 0.9);
-      scene.tweens.add({ targets: ring, radius: 48, alpha: 0, duration: 400,
+
+      // Power-fart buff (from eating beans) → bigger cloud, wider knockdown radius
+      const boosted = scene._powerFartUntil && Date.now() < scene._powerFartUntil;
+      const FART_RADIUS = boosted ? 130 : 80;
+      const ringMax     = boosted ? 96  : 48;
+      const ring2Max    = boosted ? 130 : 72;
+
+      // Expanding shockwave ring
+      const ring = scene.add.circle(player.x, player.y, 6, 0xf5e642, 0.9).setDepth(6);
+      scene.tweens.add({ targets: ring, radius: ringMax, alpha: 0, duration: 400,
         onComplete: () => ring.destroy() });
-      // Knock down any deer within fart radius
-      const FART_RADIUS = 80;
+
+      // Second, fainter ring for a layered blast look
+      const ring2 = scene.add.circle(player.x, player.y, 4, 0xbfa640, 0.6).setDepth(6);
+      scene.tweens.add({ targets: ring2, radius: ring2Max, alpha: 0, duration: 520,
+        onComplete: () => ring2.destroy() });
+
+      // Green/yellow gas cloud puffing out behind Leo (denser when boosted)
+      FX.burst(scene, player.x, player.y, {
+        count: boosted ? 24 : 14,
+        colors: [0xd4e157, 0xaed581, 0x9ccc65, 0xe6ee9c],
+        minSpeed: 30, maxSpeed: boosted ? 130 : 95,
+        minSize: 2, maxSize: boosted ? 7 : 5,
+        duration: 520, depth: 6,
+      });
+
+      // Punchy comic-book callout + a little kick to the camera
+      FX.popText(scene, player.x, player.y - 20, boosted ? 'BRAAAP!' : 'PBBBT!', {
+        color: '#c6e37b', fontSize: boosted ? '12px' : '10px', rise: 18,
+      });
+      FX.shake(scene, boosted ? 220 : 160, boosted ? 0.009 : 0.006);
+
+      // ── Rocket fart: shove Leo forward (bigger shove when boosted) ──────────────
+      player.boostForward(
+        PLAYER_SPEED * (boosted ? 3.6 : 2.2),
+        boosted ? 340 : 260,
+      );
+
+      // Knock down deer within radius. Each FRESH topple claws back clock time —
+      // deer flip from a hazard-to-avoid into a time resource worth hunting.
+      const TIME_PER_DEER = 2;
+      let knocked = 0;
       (scene._obstacles ?? []).forEach(o => {
         if (typeof o.knockdown !== 'function') return;
         const dx = o._x - player.x, dy = o._y - player.y;
-        if (dx * dx + dy * dy <= FART_RADIUS * FART_RADIUS) o.knockdown();
+        if (dx * dx + dy * dy > FART_RADIUS * FART_RADIUS) return;
+
+        const alreadyDown = o._knockedDown || o._bolting;
+        o.knockdown();
+        if (alreadyDown || !o._knockedDown) return; // only reward a fresh knockdown
+
+        knocked++;
+        scene._resources.applyChanges({ time: TIME_PER_DEER });
+
+        // Dust puff + "time gained" popup where the deer topples
+        FX.burst(scene, o._x, o._y + 8, {
+          count: 6, colors: [0xcdb891, 0xbfa77e, 0xe0d3b8],
+          minSpeed: 20, maxSpeed: 55, minSize: 1, maxSize: 3,
+          duration: 420, depth: 5, gravity: 6,
+        });
+        FX.popText(scene, o._x, o._y - 12, `+${TIME_PER_DEER}s`, {
+          color: '#7fe07f', fontSize: '8px', rise: 18, duration: 700,
+        });
       });
+
+      // Combo callout shows the total time banked
+      if (knocked >= 2) {
+        FX.popText(scene, player.x, player.y - 40, `${knocked}x COMBO!  +${knocked * TIME_PER_DEER}s`, {
+          color: '#ffd54f', fontSize: '12px', rise: 30, duration: 900,
+        });
+        FX.shake(scene, 240, 0.011);
+      }
     });
 
     // ── Ground ────────────────────────────────────────────────────────────────
@@ -440,6 +504,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // Until Tiled integration is active, DEFAULT_OBSTACLES below defines the spawn set.
     this._spawnObstaclesFromMap();
 
+    // ── Bean power-ups (temporary "power fart" buff) ─────────────────────────────
+    this._spawnBeans();
+
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
       fontSize: '8px', color: '#f5e642',
@@ -519,6 +586,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     // Update obstacles
     this._obstacles.forEach(o => o.update(this._player));
+
+    // ── Bean pickups + power-fart buff ───────────────────────────────────────────
+    this._checkBeanPickups();
+    this._updatePowerFart();
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
@@ -633,6 +704,96 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _onObstacleHit(damage = 10) {
     this._resources.applyChanges({ bikeCondition: -damage });
     this.cameras.main.flash(200, 255, Math.min(damage * 5, 255), 0);
+  }
+
+  // ── Bean power-ups ───────────────────────────────────────────────────────────
+  // Beans sit on out-of-the-way road tiles. Grabbing one grants a temporary
+  // "power fart" buff: bigger cloud + wider knockdown radius + 3× faster recharge.
+  // Collected beans persist for the session (registry) so they don't respawn after
+  // a boss fight sends Leo back to the neighborhood.
+
+  _spawnBeans() {
+    // Tile (col,row) spots — each verified to sit on a road, off the main artery.
+    const SPOTS = [
+      [58, 65],   // Tara Tea Dr, west end
+      [82, 85],   // Mariana Ln, east end
+      [64, 117],  // Marquesas Ave
+      [30, 148],  // Leo's house loop (SW)
+      [110, 76],  // Suwarrow Ct cul-de-sac
+      [300, 154], // south road near Justin's
+      [240, 120], // long central N-S spur
+    ];
+
+    this._powerFartUntil = 0;
+    this._powerFartDuration = 15000;
+
+    const collected = this.game.registry.get('beansCollected') ?? new Set();
+    this.game.registry.set('beansCollected', collected);
+
+    this._beans = [];
+    SPOTS.forEach(([c, r], i) => {
+      if (collected.has(i)) return;
+      const bean = new BeanPickup(this, c * T + 8, r * T + 8);
+      bean._spotIndex = i;
+      this._beans.push(bean);
+    });
+
+    // Green aura that pulses around Leo while the buff is active
+    this._fartAura = this.add.ellipse(0, 0, 44, 44, 0x9ccc65, 0).setDepth(2);
+
+    // Small buff timer HUD (bottom-left, pinned to camera)
+    this._beanHud = this.add.container(24, BASE_HEIGHT - 26)
+      .setScrollFactor(0).setDepth(41).setVisible(false);
+    const hudCan = this.add.rectangle(0, 0, 9, 12, 0xc0392b).setStrokeStyle(1, 0x7b241c);
+    const hudLbl = this.add.rectangle(0, 1, 9, 4, 0xf5e6c0);
+    const barBg  = this.add.rectangle(9, 0, 46, 6, 0x222222).setOrigin(0, 0.5);
+    this._beanBar = this.add.rectangle(9, 0, 46, 6, 0x9ccc65).setOrigin(0, 0.5);
+    const hudTxt = txt(this, 9, -11, 'POWER FART', { fontSize: '8px', color: '#c6e37b' }).setOrigin(0, 0.5);
+    this._beanHud.add([hudCan, hudLbl, barBg, this._beanBar, hudTxt]);
+  }
+
+  _checkBeanPickups() {
+    if (!this._beans || this._beans.length === 0) return;
+    const px = this._player.x, py = this._player.y;
+    for (const bean of this._beans) {
+      if (bean.collected) continue;
+      const dx = bean.x - px, dy = bean.y - py;
+      if (dx * dx + dy * dy < 18 * 18) {
+        bean.collect();
+        this.game.registry.get('beansCollected').add(bean._spotIndex);
+        this._activatePowerFart();
+      }
+    }
+  }
+
+  _activatePowerFart() {
+    this._powerFartUntil = Date.now() + this._powerFartDuration;
+    this._abilities.setCooldownScale('lightning_fart', 0.3);
+    AudioManager.playFart(this);
+    FX.popText(this, this._player.x, this._player.y - 26, 'POWER FART!', {
+      color: '#c6e37b', fontSize: '12px', rise: 28, duration: 900,
+    });
+  }
+
+  _updatePowerFart() {
+    const active = this._powerFartUntil && Date.now() < this._powerFartUntil;
+
+    if (!active) {
+      if (this._powerFartUntil) {
+        this._powerFartUntil = 0;
+        this._abilities.setCooldownScale('lightning_fart', 1);
+      }
+      this._beanHud.setVisible(false);
+      this._fartAura.setVisible(false);
+      return;
+    }
+
+    const remain = (this._powerFartUntil - Date.now()) / this._powerFartDuration;
+    this._beanHud.setVisible(true);
+    this._beanBar.width = 46 * Phaser.Math.Clamp(remain, 0, 1);
+
+    this._fartAura.setVisible(true).setPosition(this._player.x, this._player.y);
+    this._fartAura.setAlpha(0.22 + 0.14 * Math.sin(Date.now() / 110));
   }
 
   // ── Obstacle factory ───────────────────────────────────────────────────────────

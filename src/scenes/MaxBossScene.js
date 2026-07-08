@@ -3,6 +3,7 @@ import {
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
+import FX from '../systems/FX.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -252,6 +253,7 @@ export default class MaxBossScene extends Phaser.Scene {
 
   update() {
     if (this._defeated) return;
+    if (this._fxFrozen) return; // hit-stop
     this._updateLeo();
     this._updateMax();
     this._updateProjectiles();
@@ -327,11 +329,19 @@ export default class MaxBossScene extends Phaser.Scene {
     });
     this._updateMaxHpBar();
 
-    const hitNum = txt(this, this._maxX, this._maxY - 20, '!', {
-      fontSize: '8px', color: '#ffffff',
-    }).setOrigin(0.5).setDepth(30);
-    this.tweens.add({ targets: hitNum, y: hitNum.y - 24, alpha: 0, duration: 600,
-      onComplete: () => hitNum.destroy() });
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.freeze(this, 60);
+    FX.shake(this, 220, 0.012);
+    FX.pop(this, this._maxBody, 0.4);
+    FX.burst(this, this._maxX, this._maxY, {
+      count: 12, colors: [0xd4e157, 0x9ccc65, 0xffffff],
+      minSpeed: 40, maxSpeed: 130, minSize: 1, maxSize: 4, duration: 460, depth: 30,
+    });
+    const lastHit = this._maxHp <= 0;
+    FX.popText(this, this._maxX, this._maxY - 22, lastHit ? 'K.O.!' : 'POW!', {
+      color: lastHit ? '#ff5252' : '#ffee58',
+      fontSize: lastHit ? '14px' : '12px', rise: 30, duration: 750,
+    });
   }
 
   _updateMax() {
@@ -500,6 +510,21 @@ export default class MaxBossScene extends Phaser.Scene {
     this._resources.applyChanges({ energy: -amount });
     const color = source === 'electric' ? [255, 255, 0] : [255, 60, 60];
     this.cameras.main.flash(200, color[0], color[1], color[2]);
+
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.shake(this, 200, 0.01);
+    const burstColor = source === 'electric'
+      ? [0xffff00, 0xfff59d, 0xffffff]
+      : [0xff5252, 0xff8a80, 0xffffff];
+    FX.burst(this, this._leoX, this._leoY, {
+      count: 9, colors: burstColor,
+      minSpeed: 35, maxSpeed: 100, minSize: 1, maxSize: 3, duration: 420, depth: 30,
+    });
+    FX.popText(this, this._leoX, this._leoY - 18, `-${amount}`, {
+      color: source === 'electric' ? '#ffee58' : '#ff5252',
+      fontSize: '9px', rise: 22, duration: 600,
+    });
+
     if (this._resources.isExhausted()) this._gameOver();
   }
 

@@ -13,8 +13,18 @@ export default class AbilitySystem {
     // Cooldown state: maps abilityId → timestamp when it's next available (ms)
     this._cooldowns = {};
 
+    // Temporary cooldown multipliers: maps abilityId → scale (e.g. 0.3 = recharge
+    // 3× faster). Set by power-ups like beans; 1 (or absent) means normal.
+    this._cooldownScale = {};
+
     // Registered ability handlers: maps abilityId → function(scene, player)
     this._handlers = {};
+  }
+
+  // Temporarily speed up (or slow down) an ability's cooldown. scale of 1 clears it.
+  setCooldownScale(abilityId, scale) {
+    if (scale === 1) delete this._cooldownScale[abilityId];
+    else this._cooldownScale[abilityId] = scale;
   }
 
   // ── Registration ──────────────────────────────────────────────────────────────
@@ -47,12 +57,13 @@ export default class AbilitySystem {
     const handler = this._handlers[abilityId];
     if (handler) handler(scene, player);
 
-    // Set cooldown
-    this._cooldowns[abilityId] = Date.now() + ability.cooldown;
+    // Set cooldown (scaled by any active power-up multiplier)
+    const scale = this._cooldownScale[abilityId] ?? 1;
+    this._cooldowns[abilityId] = Date.now() + ability.cooldown * scale;
 
     this._game.events.emit(EVT_ABILITY_USED, {
       abilityId,
-      cooldown: ability.cooldown,
+      cooldown: ability.cooldown * scale,
     });
 
     return true;
@@ -82,7 +93,8 @@ export default class AbilitySystem {
     const now = Date.now();
     if (now >= nextAvailable) return 1;
     const remaining = nextAvailable - now;
-    return 1 - remaining / ability.cooldown;
+    const scale = this._cooldownScale[abilityId] ?? 1;
+    return 1 - remaining / (ability.cooldown * scale);
   }
 
   // Returns all ability IDs that are currently available to the player

@@ -3,6 +3,7 @@ import {
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
+import FX from '../systems/FX.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -325,6 +326,7 @@ export default class NoraBossScene extends Phaser.Scene {
 
   update() {
     if (this._defeated) return;
+    if (this._fxFrozen) return; // hit-stop
     this._updateLeo();
     this._updateNora();
     this._updateBalls();
@@ -391,6 +393,7 @@ export default class NoraBossScene extends Phaser.Scene {
         this._lastContact = Date.now();
         this._resources.applyChanges({ energy: -CONTACT_DAMAGE });
         this.cameras.main.shake(150, 0.008);
+        this._leoHurtFx(CONTACT_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();
       }
     }
@@ -432,6 +435,7 @@ export default class NoraBossScene extends Phaser.Scene {
       if (Math.sqrt(dx * dx + dy * dy) < 18) {
         this._resources.applyChanges({ energy: -BALL_DAMAGE });
         this.cameras.main.shake(120, 0.006);
+        this._leoHurtFx(BALL_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();
         b.sprite.destroy(); b.dot.destroy();
         this._balls.splice(i, 1);
@@ -482,6 +486,17 @@ export default class NoraBossScene extends Phaser.Scene {
     });
   }
 
+  // Shared "Leo got hurt" juice: red burst + floating damage number.
+  _leoHurtFx(amount) {
+    FX.burst(this, this._leoX, this._leoY, {
+      count: 9, colors: [0xff5252, 0xff8a80, 0xffffff],
+      minSpeed: 35, maxSpeed: 100, minSize: 1, maxSize: 3, duration: 420, depth: 30,
+    });
+    FX.popText(this, this._leoX, this._leoY - 18, `-${amount}`, {
+      color: '#ff5252', fontSize: '9px', rise: 22, duration: 600,
+    });
+  }
+
   // ─── Fart hit ─────────────────────────────────────────────────────────────
 
   _checkFartHit() {
@@ -505,6 +520,20 @@ export default class NoraBossScene extends Phaser.Scene {
     this._noraBody.setFillStyle(0xffffff);
     this.time.delayedCall(120, () => {
       if (!this._defeated) this._noraBody.setFillStyle(0xff8c00);
+    });
+
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.freeze(this, 60);
+    FX.shake(this, 220, 0.012);
+    FX.pop(this, this._noraBody, 0.4);
+    FX.burst(this, this._noraX, this._noraY, {
+      count: 12, colors: [0xd4e157, 0x9ccc65, 0xffffff],
+      minSpeed: 40, maxSpeed: 130, minSize: 1, maxSize: 4, duration: 460, depth: 30,
+    });
+    const lastHit = this._noraHp <= 0;
+    FX.popText(this, this._noraX, this._noraY - 22, lastHit ? 'K.O.!' : 'POW!', {
+      color: lastHit ? '#ff5252' : '#ffee58',
+      fontSize: lastHit ? '14px' : '12px', rise: 30, duration: 750,
     });
 
     if (this._noraHp <= 0) {

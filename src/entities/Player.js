@@ -62,6 +62,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     this._padFartJustPressed = false;
 
+    // ── Rocket-fart boost state ─────────────────────────────────────────────────
+    this._boosting     = false;
+    this._boostVx      = 0;
+    this._boostVy      = 0;
+    this._boostElapsed = 0;
+    this._boostDuration = 0;
+
     // Store base body offsets so we can restore them when grounded
     this._baseOffsetX = this.body.offset.x;
     this._baseOffsetY = this.body.offset.y;
@@ -130,6 +137,20 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     // Normalize diagonal so Leo doesn't go faster at 45°
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
+    // ── Rocket-fart boost ───────────────────────────────────────────────────────
+    // A short decaying impulse added on top of input velocity (Leo can still steer).
+    if (this._boosting) {
+      this._boostElapsed += this.scene.game.loop.delta;
+      const t = this._boostElapsed / this._boostDuration;
+      if (t >= 1) {
+        this._boosting = false;
+      } else {
+        const decay = 1 - t; // linear fall-off
+        vx += this._boostVx * decay;
+        vy += this._boostVy * decay;
+      }
+    }
+
     this.setVelocity(vx, vy);
 
     // ── Jump ──────────────────────────────────────────────────────────────────
@@ -171,6 +192,23 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
   get isJumping() { return this._isJumping; }
   get fartJustPressed() { return this._padFartJustPressed; }
+
+  // Shove Leo forward — direction from current movement, or facing if standing still.
+  // Used by the fart: every toot rockets Leo along (beans make it a bigger shove).
+  boostForward(speed, durationMs) {
+    let dx = this.body.velocity.x;
+    let dy = this.body.velocity.y;
+    if (dx === 0 && dy === 0) {
+      const map = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+      [dx, dy] = map[this._facing] ?? [0, 1];
+    }
+    const len = Math.hypot(dx, dy) || 1;
+    this._boostVx = (dx / len) * speed;
+    this._boostVy = (dy / len) * speed;
+    this._boostElapsed  = 0;
+    this._boostDuration = durationMs;
+    this._boosting = true;
+  }
 
   _updateDirectionIndicator() {
     const offsets = { up: { x: 0, y: -10 }, down: { x: 0, y: 10 }, left: { x: -10, y: 0 }, right: { x: 10, y: 0 } };

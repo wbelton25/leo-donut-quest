@@ -3,6 +3,7 @@ import {
   BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
+import FX from '../systems/FX.js';
 
 // EdieBossScene: Leo's sister Edie — the final boss of the gauntlet.
 // She throws household items (books, shoes) and charges at Leo.
@@ -100,6 +101,7 @@ export default class EdieBossScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this._defeated || this._gameover) return;
+    if (this._fxFrozen) return; // hit-stop
     const dt = delta / 1000;
 
     this._moveLeo(dt);
@@ -230,8 +232,19 @@ export default class EdieBossScene extends Phaser.Scene {
     this._hitFlashTimer = 500;
     this._hpFill.setSize(Math.max(0, (116 / EDIE_HP) * this._edieHP), 6);
 
-    const floatTxt = txt(this, this._edieX, this._edieY - 14, '-1', { fontSize: '8px', color: '#ffff44' }).setDepth(10);
-    this.tweens.add({ targets: floatTxt, y: this._edieY - 40, alpha: 0, duration: 800, onComplete: () => floatTxt.destroy() });
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.freeze(this, 60);
+    FX.shake(this, 220, 0.012);
+    FX.pop(this, this._edieSprite, 0.4);
+    FX.burst(this, this._edieX, this._edieY, {
+      count: 12, colors: [0xd4e157, 0x9ccc65, 0xffffff],
+      minSpeed: 40, maxSpeed: 130, minSize: 1, maxSize: 4, duration: 460, depth: 30,
+    });
+    const lastHit = this._edieHP <= 0;
+    FX.popText(this, this._edieX, this._edieY - 18, lastHit ? 'K.O.!' : 'POW!', {
+      color: lastHit ? '#ff5252' : '#ffee58',
+      fontSize: lastHit ? '14px' : '12px', rise: 30, duration: 750,
+    });
 
     if (this._edieHP <= 0) this._defeatEdie();
   }
@@ -298,6 +311,16 @@ export default class EdieBossScene extends Phaser.Scene {
     this.time.delayedCall(200, () => this._leoSprite.setFillStyle(0x3b82f6));
     this.cameras.main.flash(180, 255, 50, 50);
     this._updateLeoHp();
+
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.shake(this, 200, 0.01);
+    FX.burst(this, this._leoX, this._leoY, {
+      count: 9, colors: [0xff5252, 0xff8a80, 0xffffff],
+      minSpeed: 35, maxSpeed: 100, minSize: 1, maxSize: 3, duration: 420, depth: 30,
+    });
+    FX.popText(this, this._leoX, this._leoY - 18, `-${amount}`, {
+      color: '#ff5252', fontSize: '9px', rise: 22, duration: 600,
+    });
 
     if (this._leoHP <= 0) {
       this._gameover = true;

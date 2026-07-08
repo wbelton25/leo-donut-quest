@@ -3,6 +3,7 @@ import {
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
+import FX from '../systems/FX.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -282,6 +283,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
   update() {
     if (this._defeated) return;
+    if (this._fxFrozen) return; // hit-stop
     this._updateLeo();
     this._updateMax();
     this._updatePitches();
@@ -349,6 +351,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
         this._lastContact = Date.now();
         this._resources.applyChanges({ energy: -CONTACT_DAMAGE });
         this.cameras.main.shake(150, 0.008);
+        this._leoHurtFx(CONTACT_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();
       }
 
@@ -387,6 +390,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       if (Math.sqrt(dx * dx + dy * dy) < 18) {
         this._resources.applyChanges({ energy: -PITCH_DAMAGE });
         this.cameras.main.shake(150, 0.007);
+        this._leoHurtFx(PITCH_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();
         b.sprite.destroy();
         this._pitches.splice(i, 1);
@@ -437,6 +441,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       if (Math.sqrt(dx * dx + dy * dy) < SWING_RANGE + 10) {
         this._resources.applyChanges({ energy: -SWING_DAMAGE });
         this.cameras.main.shake(200, 0.012);
+        this._leoHurtFx(SWING_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();
       }
     });
@@ -503,6 +508,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
             this._resources.applyChanges({ energy: -ELECTRIC_DAMAGE });
             this.cameras.main.flash(200, 255, 255, 0);
             this.cameras.main.shake(200, 0.014);
+            this._leoHurtFx(ELECTRIC_DAMAGE, true);
             if (!this._defeated && this._resources.isExhausted()) this._gameOver();
           }
         }
@@ -514,6 +520,18 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this.time.delayedCall(ELECTRIC_EXPAND + 100, () => {
       ring.destroy();
       this._electricActive = false;
+    });
+  }
+
+  // Shared "Leo got hurt" juice: colored burst + floating damage number.
+  _leoHurtFx(amount, isElectric = false) {
+    FX.burst(this, this._leoX, this._leoY, {
+      count: 9,
+      colors: isElectric ? [0xffff00, 0xfff59d, 0xffffff] : [0xff5252, 0xff8a80, 0xffffff],
+      minSpeed: 35, maxSpeed: 100, minSize: 1, maxSize: 3, duration: 420, depth: 30,
+    });
+    FX.popText(this, this._leoX, this._leoY - 18, `-${amount}`, {
+      color: isElectric ? '#ffee58' : '#ff5252', fontSize: '9px', rise: 22, duration: 600,
     });
   }
 
@@ -529,6 +547,20 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
     this._maxBody.setFillStyle(0xffffff);
     this.time.delayedCall(120, () => this._maxBody.setFillStyle(0xcc4400));
+
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.freeze(this, 60);
+    FX.shake(this, 220, 0.012);
+    FX.pop(this, this._maxBody, 0.4);
+    FX.burst(this, this._maxX, this._maxY, {
+      count: 12, colors: [0xd4e157, 0x9ccc65, 0xffffff],
+      minSpeed: 40, maxSpeed: 130, minSize: 1, maxSize: 4, duration: 460, depth: 30,
+    });
+    const lastHit = this._maxHp <= 0;
+    FX.popText(this, this._maxX, this._maxY - 22, lastHit ? 'K.O.!' : 'POW!', {
+      color: lastHit ? '#ff5252' : '#ffee58',
+      fontSize: lastHit ? '14px' : '12px', rise: 30, duration: 750,
+    });
 
     if (this._maxHp <= 0) {
       this._defeatMax();

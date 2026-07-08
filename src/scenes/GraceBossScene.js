@@ -3,6 +3,7 @@ import {
   SCENE_HUD, BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
+import FX from '../systems/FX.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -360,6 +361,7 @@ export default class GraceBossScene extends Phaser.Scene {
 
   update() {
     if (this._defeated) return;
+    if (this._fxFrozen) return; // hit-stop: freeze the sim for a few frames on impact
 
     this._updateLeo();
     this._updateGrace();
@@ -445,12 +447,27 @@ export default class GraceBossScene extends Phaser.Scene {
     });
     this._updateGraceHpBar();
 
-    // Floating hit number
-    const hitNum = txt(this, this._graceX, this._graceY - 20, '!' , {
-      fontSize: '8px', color: '#ffffff',
-    }).setOrigin(0.5).setDepth(30);
-    this.tweens.add({ targets: hitNum, y: hitNum.y - 24, alpha: 0, duration: 600,
-      onComplete: () => hitNum.destroy() });
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.freeze(this, 60);                   // hit-stop: sim pauses, impact lands
+    FX.shake(this, 220, 0.012);            // punchy camera kick
+    FX.pop(this, this._graceBody, 0.4);    // Grace squashes on impact
+
+    // Stinky green impact burst around Grace
+    FX.burst(this, this._graceX, this._graceY, {
+      count: 12,
+      colors: [0xd4e157, 0x9ccc65, 0xffffff],
+      minSpeed: 40, maxSpeed: 130,
+      minSize: 1, maxSize: 4,
+      duration: 460, depth: 30,
+    });
+
+    // Punchy "POW!" callout + remaining-HP feedback
+    const lastHit = this._graceHp <= 0;
+    FX.popText(this, this._graceX, this._graceY - 22, lastHit ? 'K.O.!' : 'POW!', {
+      color: lastHit ? '#ff5252' : '#ffee58',
+      fontSize: lastHit ? '14px' : '12px',
+      rise: 30, duration: 750,
+    });
   }
 
   _updateGrace() {
@@ -665,6 +682,21 @@ export default class GraceBossScene extends Phaser.Scene {
     this._updateHearts();
     const color = source === 'squirt' ? [0, 100, 255] : [255, 50, 50];
     this.cameras.main.flash(180, color[0], color[1], color[2]);
+
+    // ── Juice ──────────────────────────────────────────────────────────────
+    FX.shake(this, 200, 0.01);
+    const burstColor = source === 'squirt'
+      ? [0x4fc3f7, 0x81d4fa, 0xffffff]   // water droplets
+      : [0xff5252, 0xff8a80, 0xffffff];  // ow-red
+    FX.burst(this, this._leoX, this._leoY, {
+      count: 9, colors: burstColor,
+      minSpeed: 35, maxSpeed: 100, minSize: 1, maxSize: 3,
+      duration: 420, depth: 30,
+    });
+    FX.popText(this, this._leoX, this._leoY - 18, `-${amount}`, {
+      color: source === 'squirt' ? '#4fc3f7' : '#ff5252',
+      fontSize: '9px', rise: 22, duration: 600,
+    });
 
     if (this._resources.isExhausted()) {
       this._gameOver();
