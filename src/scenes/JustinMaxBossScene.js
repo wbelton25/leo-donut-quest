@@ -114,6 +114,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
     this._maxHp          = MAX_HP;
     this._maxState       = 'PATROL';
+    this._maxUnleashed   = false; // becomes true on Leo's first fart
     this._maxX           = 130;
     this._maxY           = 155;
     this._maxVx          = PATROL_SPEED;
@@ -328,6 +329,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     // Fart
     if (Phaser.Input.Keyboard.JustDown(this._fartKey) && this._fartReady) {
       this._fartReady = false;
+      this._maxUnleashed = true; // first fart lets Max chase across the whole yard
       AudioManager.playFart(this);
       const ring = this.add.circle(this._leoX, this._leoY, 6, 0xf5e642, 0.9).setDepth(8);
       this.tweens.add({
@@ -388,9 +390,10 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       // Handled by timer
     }
 
-    // Keep Max in the upper yard — never crowd Leo out of the lower dodge lane
+    // Max holds to the upper yard until Leo's first fart, then chases the whole yard
+    const maxYBottom = this._maxUnleashed ? YARD_BOTTOM : MAX_Y_BOTTOM;
     this._maxX = Phaser.Math.Clamp(this._maxX, YARD_LEFT, YARD_RIGHT);
-    this._maxY = Phaser.Math.Clamp(this._maxY, YARD_TOP, MAX_Y_BOTTOM);
+    this._maxY = Phaser.Math.Clamp(this._maxY, YARD_TOP, maxYBottom);
 
     // Sync visuals
     this._maxBody.setPosition(this._maxX, this._maxY);
