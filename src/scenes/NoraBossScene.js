@@ -116,6 +116,9 @@ export default class NoraBossScene extends Phaser.Scene {
       this._abilities = new AbilitySystem(this.game, this._party);
     }
 
+    // Boss fights always start at full energy (5 hearts)
+    this._resources.applyChanges({ energy: 100 - this._resources.energy });
+
     this._abilities.register('lightning_fart', (scene, player) => {
       AudioManager.playFart(scene);
       const ring = scene.add.circle(player.x, player.y, 6, 0xf5e642, 0.9);

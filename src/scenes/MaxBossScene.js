@@ -83,6 +83,9 @@ export default class MaxBossScene extends Phaser.Scene {
       this._abilities = new AbilitySystem(this.game, this._party);
     }
 
+    // Boss fights always start at full energy (5 hearts)
+    this._resources.applyChanges({ energy: 100 - this._resources.energy });
+
     this._maxHp         = MAX_HP;
     this._maxState      = 'PATROL';
     this._maxX          = ARENA_W / 2;
