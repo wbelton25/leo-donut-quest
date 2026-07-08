@@ -40,11 +40,16 @@ const FENCE_THICK = 10;
 const YARD_LEFT = 12, YARD_RIGHT = 468, YARD_TOP = 135, YARD_BOTTOM = 252;
 // Max stays in the UPPER yard so Leo always keeps a dodge lane below him.
 const MAX_Y_BOTTOM = YARD_TOP + 46; // 181
+// Yard trees — oval trunk obstacles Leo rides around (matched to the art).
+const TREES = [
+  { x: 79,  y: 188, rx: 13, ry: 30 },
+  { x: 406, y: 198, rx: 12, ry: 26 },
+];
 
 // Max constants
 const MAX_HP            = 4;
 const PATROL_SPEED      = 55;
-const CHASE_SPEED       = 68;
+const CHASE_SPEED       = 84;
 const CHASE_RANGE       = 150;
 const PITCH_INTERVAL    = 3000;
 const SWING_RANGE       = 55;
@@ -312,8 +317,11 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
     const dt = 1 / 60;
-    this._leoX = Phaser.Math.Clamp(this._leoX + vx * dt, YARD_LEFT, YARD_RIGHT);
-    this._leoY = Phaser.Math.Clamp(this._leoY + vy * dt, YARD_TOP, YARD_BOTTOM);
+    const nx = Phaser.Math.Clamp(this._leoX + vx * dt, YARD_LEFT, YARD_RIGHT);
+    const ny = Phaser.Math.Clamp(this._leoY + vy * dt, YARD_TOP, YARD_BOTTOM);
+    if (!this._blockedByTree(nx, ny))              { this._leoX = nx; this._leoY = ny; }
+    else if (!this._blockedByTree(nx, this._leoY)) { this._leoX = nx; }
+    else if (!this._blockedByTree(this._leoX, ny)) { this._leoY = ny; }
 
     this._moveLeoVisual(vx, vy);
 
@@ -330,6 +338,16 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       this.game.events.emit('ability-used', { abilityId: 'lightning_fart', cooldown: this._fartCooldownMs });
       this.time.delayedCall(this._fartCooldownMs, () => { this._fartReady = true; });
     }
+  }
+
+  _blockedByTree(x, y) {
+    const pad = 7;
+    for (const t of TREES) {
+      const dx = (x - t.x) / (t.rx + pad);
+      const dy = (y - t.y) / (t.ry + pad);
+      if (dx * dx + dy * dy < 1) return true;
+    }
+    return false;
   }
 
   _updateMax() {
@@ -421,8 +439,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       const spread = i === 0 ? 0 : (Math.random() - 0.5) * 0.4;
       const a = angleToLeo + spread;
       const sprite = this.add.circle(this._maxX, this._maxY, 7, 0xffeedd).setDepth(6);
-      // Stitching detail
-      this.add.rectangle(this._maxX, this._maxY, 3, 7, 0xff4444, 0.6).setDepth(7);
       this._pitches.push({ x: this._maxX, y: this._maxY,
         vx: Math.cos(a) * BALL_SPEED, vy: Math.sin(a) * BALL_SPEED, sprite });
     }

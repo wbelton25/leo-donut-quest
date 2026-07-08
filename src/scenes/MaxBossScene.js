@@ -26,10 +26,12 @@ const ARENA_H = BASE_HEIGHT;
 
 // Playable yard — inside the left/bottom fences and below the house strip.
 const YARD_LEFT = 44, YARD_RIGHT = 466, YARD_TOP = 52, YARD_BOTTOM = 238;
-// Tree trunks — circular obstacles Leo can't ride through (matched to the art).
+// Tree trunks — oval obstacles (narrow x, tall y) matched to the art so Leo
+// rides around each trunk instead of through it.
 const TREES = [
-  { x: 180, y: 216, r: 17 },
-  { x: 455, y: 222, r: 17 },
+  { x: 143, y: 208, rx: 15, ry: 24 },
+  { x: 369, y: 218, rx: 15, ry: 24 },
+  { x: 460, y: 224, rx: 14, ry: 22 },
 ];
 
 const MAX_HP           = 3;
@@ -298,10 +300,11 @@ export default class MaxBossScene extends Phaser.Scene {
 
 
   _blockedByTree(x, y) {
+    const pad = 7; // Leo's rough radius
     for (const t of TREES) {
-      const dx = x - t.x, dy = y - t.y;
-      const rr = t.r + 8; // + Leo's rough radius
-      if (dx * dx + dy * dy < rr * rr) return true;
+      const dx = (x - t.x) / (t.rx + pad);
+      const dy = (y - t.y) / (t.ry + pad);
+      if (dx * dx + dy * dy < 1) return true;
     }
     return false;
   }
@@ -420,7 +423,6 @@ export default class MaxBossScene extends Phaser.Scene {
     const angle = baseAngle + angleOffset;
 
     const fb = this.add.ellipse(this._maxX, this._maxY, 14, 10, 0x8b4513).setDepth(4);
-    this.add.rectangle(fb.x, fb.y, 8, 2, 0xffffff).setDepth(4); // laces (static — simplification)
     this._projectiles.push({
       obj: fb, vx: Math.cos(angle) * FOOTBALL_SPEED, vy: Math.sin(angle) * FOOTBALL_SPEED,
       damage: FOOTBALL_DAMAGE, type: 'football',
