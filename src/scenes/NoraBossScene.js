@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
 import FX from '../systems/FX.js';
+import { createHearts } from '../ui/BossHud.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -226,6 +227,9 @@ export default class NoraBossScene extends Phaser.Scene {
     txt(this, 8, 20, 'WASD: MOVE',{ fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setDepth(20);
     txt(this, ARENA_W / 2, ARENA_H - 10, 'FART NORA WHEN SHE EMERGES!',
       { fontSize: '8px', color: '#ffaa44' }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+    // Leo hearts — matches Grace's fight
+    this._heartsUpdate = createHearts(this, ARENA_W);
   }
 
   // ─── Input ────────────────────────────────────────────────────────────────
@@ -400,6 +404,7 @@ export default class NoraBossScene extends Phaser.Scene {
       if (dist < 22 && Date.now() - this._lastContact > CONTACT_COOLDOWN) {
         this._lastContact = Date.now();
         this._resources.applyChanges({ energy: -CONTACT_DAMAGE });
+        this._heartsUpdate(this._resources.energy / 100);
         this.cameras.main.shake(150, 0.008);
         this._leoHurtFx(CONTACT_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();
@@ -442,6 +447,7 @@ export default class NoraBossScene extends Phaser.Scene {
       const dx = b.x - this._leoX, dy = b.y - this._leoY;
       if (Math.sqrt(dx * dx + dy * dy) < 18) {
         this._resources.applyChanges({ energy: -BALL_DAMAGE });
+        this._heartsUpdate(this._resources.energy / 100);
         this.cameras.main.shake(120, 0.006);
         this._leoHurtFx(BALL_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();

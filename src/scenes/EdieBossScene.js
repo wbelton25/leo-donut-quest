@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
 import FX from '../systems/FX.js';
+import { createHearts, createBossBar } from '../ui/BossHud.js';
 
 // EdieBossScene: Leo's sister Edie — the final boss of the gauntlet.
 // She throws household items (books, shoes) and charges at Leo.
@@ -66,10 +67,8 @@ export default class EdieBossScene extends Phaser.Scene {
     this._edieY      = 80;
     this._edieSprite = this.add.rectangle(this._edieX, this._edieY, 14, 18, EDIE_COLOR).setDepth(5);
 
-    // ── HP bar ────────────────────────────────────────────────────────────────
-    this.add.rectangle(ARENA_W / 2, ARENA_H - 18, 120, 8, 0x1a1a1a);
-    this._hpFill = this.add.rectangle(ARENA_W / 2 - 58, ARENA_H - 18, 116, 6, 0xff69b4).setOrigin(0, 0.5);
-    txt(this, ARENA_W / 2, ARENA_H - 30, 'EDIE', { fontSize: '8px', color: '#ff69b4' }).setOrigin(0.5);
+    // ── Edie HP header (top-centre) — matches Grace's fight ─────────────────────
+    this._edieBarUpdate = createBossBar(this, ARENA_W, 0xff69b4);
 
     // ── Leo ───────────────────────────────────────────────────────────────────
     this._leoX    = ARENA_W / 2;
@@ -100,7 +99,7 @@ export default class EdieBossScene extends Phaser.Scene {
     this._gameover       = false;
 
     this._leoHP  = 5;
-    this._leoHpBar = this._buildLeoHpBar();
+    this._heartsUpdate = createHearts(this, ARENA_W);
 
     txt(this, ARENA_W / 2, ARENA_H / 2 - 8,
       'F: FART   WASD/ARROWS: MOVE', { fontSize: '8px', color: '#778899' })
@@ -238,7 +237,7 @@ export default class EdieBossScene extends Phaser.Scene {
     AudioManager.playSfx(this, 'sfx-girly-edie', { volume: 0.9 });
     this._edieHP--;
     this._hitFlashTimer = 500;
-    this._hpFill.setSize(Math.max(0, (116 / EDIE_HP) * this._edieHP), 6);
+    this._edieBarUpdate(this._edieHP / EDIE_HP);
 
     // ── Juice ──────────────────────────────────────────────────────────────
     FX.freeze(this, 60);
@@ -318,7 +317,7 @@ export default class EdieBossScene extends Phaser.Scene {
     this._leoSprite.setFillStyle(0xff0000);
     this.time.delayedCall(200, () => this._leoSprite.setFillStyle(0x3b82f6));
     this.cameras.main.flash(180, 255, 50, 50);
-    this._updateLeoHp();
+    this._heartsUpdate(this._leoHP / 5);
 
     // ── Juice ──────────────────────────────────────────────────────────────
     FX.shake(this, 200, 0.01);
@@ -358,14 +357,4 @@ export default class EdieBossScene extends Phaser.Scene {
     }
   }
 
-  _buildLeoHpBar() {
-    txt(this, 8, 8, 'LEO', { fontSize: '8px', color: '#3b82f6' });
-    this.add.rectangle(50 + (this._leoHP * 8), 14, this._leoHP * 16, 6, 0x1a1a1a).setOrigin(1, 0.5);
-    const fill = this.add.rectangle(10, 14, this._leoHP * 16, 4, 0x3b82f6).setOrigin(0, 0.5);
-    return fill;
-  }
-
-  _updateLeoHp() {
-    this._leoHpBar.setSize(Math.max(0, this._leoHP * 16), 4);
-  }
 }

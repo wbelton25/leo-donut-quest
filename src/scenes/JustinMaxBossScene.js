@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
 import FX from '../systems/FX.js';
+import { createHearts } from '../ui/BossHud.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -247,6 +248,9 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     txt(this, 8, 20, 'WASD: MOVE',{ fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setDepth(20);
     txt(this, ARENA_W / 2, ARENA_H - 10, 'DODGE THE ELECTRIC SHOCK!',
       { fontSize: '8px', color: '#ffff44' }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+    // Leo hearts — matches Grace's fight
+    this._heartsUpdate = createHearts(this, ARENA_W);
   }
 
   // ─── Input ────────────────────────────────────────────────────────────────
@@ -555,6 +559,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
   // Shared "Leo got hurt" juice: colored burst + floating damage number.
   _leoHurtFx(amount, isElectric = false) {
+    this._heartsUpdate(this._resources.energy / 100);
     FX.burst(this, this._leoX, this._leoY, {
       count: 9,
       colors: isElectric ? [0xffff00, 0xfff59d, 0xffffff] : [0xff5252, 0xff8a80, 0xffffff],

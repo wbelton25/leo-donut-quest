@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
 import FX from '../systems/FX.js';
+import { createHearts } from '../ui/BossHud.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
@@ -201,6 +202,9 @@ export default class MaxBossScene extends Phaser.Scene {
     txt(this, ARENA_W / 2, ARENA_H - 10, 'DODGE THE TACKLE!', {
       fontSize: '8px', color: '#ff8844',
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+    // Leo hearts — matches Grace's fight
+    this._heartsUpdate = createHearts(this, ARENA_W);
   }
 
   // ─── Input ──────────────────────────────────────────────────────────────────
@@ -510,6 +514,7 @@ export default class MaxBossScene extends Phaser.Scene {
 
   _damagePlayer(amount, source) {
     this._resources.applyChanges({ energy: -amount });
+    this._heartsUpdate(this._resources.energy / 100);
     const color = source === 'electric' ? [255, 255, 0] : [255, 60, 60];
     this.cameras.main.flash(200, color[0], color[1], color[2]);
 
