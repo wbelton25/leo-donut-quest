@@ -39,13 +39,12 @@ const ARENA_W = BASE_WIDTH;
 const ARENA_H = BASE_HEIGHT;
 
 // Pool geometry — round hot-tub in bottom-right of nora_boss_level.png
-const POOL_X = 415;
-const POOL_Y = 228;
-const POOL_W = 90;
-const POOL_H = 78;
+// Pool — an ellipse matched to the water in the art (mostly off-screen SE).
+// Leo triggers the splash the moment his centre crosses the water's edge.
+const POOL = { x: 425, y: 228, rx: 123, ry: 51 };
 
 // Stone firepit — solid obstacle Leo rides around (oval, matched to the art)
-const FIREPIT = { x: 144, y: 206, rx: 33, ry: 22 };
+const FIREPIT = { x: 132, y: 171, rx: 38, ry: 22 };
 
 // Bar counter (top strip)
 const BAR_Y      = 38;
@@ -166,7 +165,7 @@ export default class NoraBossScene extends Phaser.Scene {
       this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a7a2a);
       this.add.rectangle(ARENA_W / 2, BAR_Y, ARENA_W, BAR_H, BAR_COLOR);
     }
-    // Pool collision zone is invisible — POOL_X/Y/W/H drive the hazard logic
+    // Pool collision zone is invisible — the POOL ellipse drives the hazard logic
     // Bar collision zone — Leo cannot cross into the bar area (clamped in _updateLeo)
   }
 
@@ -418,7 +417,7 @@ export default class NoraBossScene extends Phaser.Scene {
     }
 
     // Keep Nora off-screen-bottom (no going behind pool)
-    this._noraY = Phaser.Math.Clamp(this._noraY, BAR_Y - 8, POOL_Y - POOL_H / 2 - 20);
+    this._noraY = Phaser.Math.Clamp(this._noraY, BAR_Y - 8, POOL.y - POOL.ry - 20);
 
     this._noraBody.setPosition(this._noraX, this._noraY);
     this._noraShirt.setPosition(this._noraX, this._noraY - 3);
@@ -471,22 +470,19 @@ export default class NoraBossScene extends Phaser.Scene {
 
   _checkPoolHazard() {
     if (this._leoStunned) return;
-    const hw = POOL_W / 2, hh = POOL_H / 2;
-    if (!(this._leoX > POOL_X - hw + 8 && this._leoX < POOL_X + hw - 8 &&
-          this._leoY > POOL_Y - hh + 8 && this._leoY < POOL_Y + hh - 8)) return;
+    // Ellipse containment: e < 1 means Leo's centre is over the water
+    const vx = this._leoX - POOL.x, vy = this._leoY - POOL.y;
+    const e = (vx / POOL.rx) ** 2 + (vy / POOL.ry) ** 2;
+    if (e >= 1) return;
 
     const splashX = this._leoX, splashY = this._leoY;
 
-    // Push Leo out to the nearest pool edge + extra distance
-    const dLeft  = this._leoX - (POOL_X - hw);
-    const dRight = (POOL_X + hw) - this._leoX;
-    const dTop   = this._leoY - (POOL_Y - hh);
-    const dBot   = (POOL_Y + hh) - this._leoY;
-    const minD   = Math.min(dLeft, dRight, dTop, dBot);
-    if      (minD === dLeft)  this._leoX = POOL_X - hw - POOL_PUSH_DIST;
-    else if (minD === dRight) this._leoX = POOL_X + hw + POOL_PUSH_DIST;
-    else if (minD === dTop)   this._leoY = POOL_Y - hh - POOL_PUSH_DIST;
-    else                      this._leoY = POOL_Y + hh + POOL_PUSH_DIST;
+    // Push Leo radially out to the water's edge + extra distance
+    const s = 1 / Math.sqrt(Math.max(e, 0.0001));       // scale to the ellipse edge
+    const edgeX = POOL.x + vx * s, edgeY = POOL.y + vy * s;
+    const len = Math.hypot(vx, vy) || 1;
+    this._leoX = edgeX + (vx / len) * POOL_PUSH_DIST;
+    this._leoY = edgeY + (vy / len) * POOL_PUSH_DIST;
     this._leoX = Phaser.Math.Clamp(this._leoX, 12, ARENA_W - 12);
     this._leoY = Phaser.Math.Clamp(this._leoY, BAR_Y + BAR_H / 2 + 8, ARENA_H - 12);
 
