@@ -43,6 +43,9 @@ const POOL_Y = 228;
 const POOL_W = 90;
 const POOL_H = 78;
 
+// Stone firepit — solid obstacle Leo rides around (oval, matched to the art)
+const FIREPIT = { x: 144, y: 206, rx: 33, ry: 22 };
+
 // Bar counter (top strip)
 const BAR_Y      = 38;
 const BAR_H      = 28;
@@ -69,9 +72,11 @@ const FART_HIT_RANGE  = 80;
 
 // Damage
 const BALL_DAMAGE      = 12;
-const POOL_DRAIN_RATE  = 15; // energy per second in pool
 const CONTACT_DAMAGE   = 15;
 const CONTACT_COOLDOWN = 1400;
+// Pool: same stun+push penalty as Grace's fight (no energy drain)
+const POOL_STUN_MS     = 1500; // ms Leo is stunned after falling in the pool
+const POOL_PUSH_DIST   = 40;   // px pushed away from pool edge on entry
 
 const BALL_SPEED = 200;
 const LEO_SPEED  = 170;
@@ -124,7 +129,7 @@ export default class NoraBossScene extends Phaser.Scene {
     this._targetCabinet  = 1;
     this._vulnerable     = false;
     this._lastContact    = 0;
-    this._lastPoolDrain  = 0;
+    this._leoStunned     = false;
     this._fartReady      = true;
     this._fartCooldownMs = 4000;
     this._balls          = [];
@@ -334,7 +339,7 @@ export default class NoraBossScene extends Phaser.Scene {
   }
 
   _updateLeo() {
-    if (this._inputLocked) return;
+    if (this._inputLocked || this._leoStunned) return;
 
     let vx = 0, vy = 0;
     if (this._keys.left.isDown  || this._keys.leftAlt.isDown)  vx = -LEO_SPEED;
@@ -345,8 +350,11 @@ export default class NoraBossScene extends Phaser.Scene {
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
     const dt = 1 / 60;
-    this._leoX = Phaser.Math.Clamp(this._leoX + vx * dt, 12, ARENA_W - 12);
-    this._leoY = Phaser.Math.Clamp(this._leoY + vy * dt, BAR_Y + BAR_H / 2 + 8, ARENA_H - 12);
+    const nx = Phaser.Math.Clamp(this._leoX + vx * dt, 12, ARENA_W - 12);
+    const ny = Phaser.Math.Clamp(this._leoY + vy * dt, BAR_Y + BAR_H / 2 + 8, ARENA_H - 12);
+    if (!this._inFirepit(nx, ny))              { this._leoX = nx; this._leoY = ny; }
+    else if (!this._inFirepit(nx, this._leoY)) { this._leoX = nx; }
+    else if (!this._inFirepit(this._leoX, ny)) { this._leoY = ny; }
 
     this._moveLeoVisual(vx, vy);
 
@@ -443,20 +451,50 @@ export default class NoraBossScene extends Phaser.Scene {
     }
   }
 
-  _checkPoolHazard() {
-    const inPool = Math.abs(this._leoX - POOL_X) < POOL_W / 2 &&
-                   Math.abs(this._leoY - POOL_Y) < POOL_H / 2;
-    if (!inPool) return;
+  _inFirepit(x, y) {
+    const dx = (x - FIREPIT.x) / (FIREPIT.rx + 7);
+    const dy = (y - FIREPIT.y) / (FIREPIT.ry + 7);
+    return dx * dx + dy * dy < 1;
+  }
 
-    const now = Date.now();
-    if (now - this._lastPoolDrain > 500) {
-      this._lastPoolDrain = now;
-      this._resources.applyChanges({ energy: -POOL_DRAIN_RATE });
-      this.cameras.main.shake(80, 0.004);
-      if (!this._defeated && this._resources.isExhausted()) this._gameOver();
-      // Push Leo toward nearest pool edge
-      const edgeDx = this._leoX < POOL_X ? -(POOL_W / 2 + 10) : (POOL_W / 2 + 10);
-      this._leoX = POOL_X + edgeDx;
+  _checkPoolHazard() {
+    if (this._leoStunned) return;
+    const hw = POOL_W / 2, hh = POOL_H / 2;
+    if (!(this._leoX > POOL_X - hw + 8 && this._leoX < POOL_X + hw - 8 &&
+          this._leoY > POOL_Y - hh + 8 && this._leoY < POOL_Y + hh - 8)) return;
+
+    const splashX = this._leoX, splashY = this._leoY;
+
+    // Push Leo out to the nearest pool edge + extra distance
+    const dLeft  = this._leoX - (POOL_X - hw);
+    const dRight = (POOL_X + hw) - this._leoX;
+    const dTop   = this._leoY - (POOL_Y - hh);
+    const dBot   = (POOL_Y + hh) - this._leoY;
+    const minD   = Math.min(dLeft, dRight, dTop, dBot);
+    if      (minD === dLeft)  this._leoX = POOL_X - hw - POOL_PUSH_DIST;
+    else if (minD === dRight) this._leoX = POOL_X + hw + POOL_PUSH_DIST;
+    else if (minD === dTop)   this._leoY = POOL_Y - hh - POOL_PUSH_DIST;
+    else                      this._leoY = POOL_Y + hh + POOL_PUSH_DIST;
+    this._leoX = Phaser.Math.Clamp(this._leoX, 12, ARENA_W - 12);
+    this._leoY = Phaser.Math.Clamp(this._leoY, BAR_Y + BAR_H / 2 + 8, ARENA_H - 12);
+
+    // Stun
+    this._leoStunned = true;
+    this.time.delayedCall(POOL_STUN_MS, () => { this._leoStunned = false; });
+
+    // Splash SFX + ripple + blue flash + "SPLASH!" + Leo blink
+    AudioManager.playSfx(this, 'sfx-splash', { volume: 0.9 });
+    const ripple = this.add.circle(splashX, splashY, 6, 0x4db8f0, 0.85).setDepth(9);
+    this.tweens.add({ targets: ripple, scaleX: 7, scaleY: 7, alpha: 0, duration: 650,
+      onComplete: () => ripple.destroy() });
+    this.cameras.main.flash(300, 0, 120, 255);
+    const t = txt(this, splashX, splashY - 12, 'SPLASH!', { fontSize: '8px', color: '#88ddff' })
+      .setOrigin(0.5).setDepth(10);
+    this.tweens.add({ targets: t, y: t.y - 20, alpha: 0, duration: 900, onComplete: () => t.destroy() });
+    const leoVisual = this._leoSprite ?? this._leoBody;
+    if (leoVisual) {
+      this.tweens.add({ targets: leoVisual, alpha: 0.25, duration: 180, yoyo: true, repeat: 4,
+        onComplete: () => leoVisual.setAlpha(1) });
     }
   }
 
