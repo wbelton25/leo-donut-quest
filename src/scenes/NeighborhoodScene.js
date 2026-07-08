@@ -1,6 +1,6 @@
 import {
   SCENE_NEIGHBORHOOD, SCENE_TITLE, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL, SCENE_BOSS_GAUNTLET,
-  SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_DONUT_SHOP,
+  SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_EDIE_BOSS, SCENE_DONUT_SHOP,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
   PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
@@ -560,12 +560,35 @@ export default class NeighborhoodScene extends Phaser.Scene {
         });
       });
 
+    // ── DEV CHEAT: jump straight to any boss fight (keys 5-9) for testing ────────
+    const BOSS_KEYS = {
+      FIVE:  { scene: SCENE_GRACE_BOSS,      name: 'GRACE' },
+      SIX:   { scene: SCENE_MAX_BOSS,        name: 'MAX (MJ)' },
+      SEVEN: { scene: SCENE_NORA_BOSS,       name: 'NORA' },
+      EIGHT: { scene: SCENE_JUSTIN_MAX_BOSS, name: "MAX (JUSTIN'S)" },
+      NINE:  { scene: SCENE_EDIE_BOSS,       name: 'EDIE' },
+    };
+    Object.entries(BOSS_KEYS).forEach(([code, { scene }]) => {
+      this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes[code]).on('down', () => {
+        // Refill Leo so every test starts fresh
+        this._resources.applyChanges({
+          energy:        100 - this._resources.energy,
+          bikeCondition: 100 - this._resources.bikeCondition,
+        });
+        this.cameras.main.fade(300, 0, 0, 0);
+        this.time.delayedCall(320, () => this.scene.start(scene, {}));
+      });
+    });
+
     // ── Camera ────────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, 0, worldW, worldH);
     this.cameras.main.startFollow(this._player, true, 0.08, 0.08);
     this.cameras.main.setDeadzone(80, 60);
 
     // ── Controls hint ─────────────────────────────────────────────────────────
+    txt(this, 6, BASE_HEIGHT - 18, 'BOSS TEST  5:GRACE  6:MAX  7:NORA  8:JUSTIN-MAX  9:EDIE', {
+      fontSize: '8px', color: '#997788',
+    }).setScrollFactor(0).setDepth(10);
     txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   D: TALK   2: ACT 2   3: GAUNTLET', {
       fontSize: '8px', color: '#778899',
     }).setScrollFactor(0).setDepth(10);
