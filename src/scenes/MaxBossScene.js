@@ -26,10 +26,10 @@ const ARENA_H = BASE_HEIGHT;
 
 // Playable yard — inside the left/bottom fences and below the house strip.
 const YARD_LEFT = 44, YARD_RIGHT = 466, YARD_TOP = 52, YARD_BOTTOM = 238;
-// Tree trunks — circular obstacles Leo can't ride through.
+// Tree trunks — circular obstacles Leo can't ride through (matched to the art).
 const TREES = [
-  { x: 175, y: 214, r: 15 },
-  { x: 430, y: 226, r: 15 },
+  { x: 180, y: 216, r: 17 },
+  { x: 455, y: 222, r: 17 },
 ];
 
 const MAX_HP           = 3;

@@ -37,12 +37,14 @@ const ARENA_H = BASE_HEIGHT;
 const FENCE_THICK = 10;
 // Playable yard — the house fills the top of the background, so play is confined
 // below it (down to the front walkway).
-const YARD_LEFT = 12, YARD_RIGHT = 468, YARD_TOP = 135, YARD_BOTTOM = 246;
+const YARD_LEFT = 12, YARD_RIGHT = 468, YARD_TOP = 135, YARD_BOTTOM = 252;
+// Max stays in the UPPER yard so Leo always keeps a dodge lane below him.
+const MAX_Y_BOTTOM = YARD_TOP + 46; // 181
 
 // Max constants
 const MAX_HP            = 4;
 const PATROL_SPEED      = 55;
-const CHASE_SPEED       = 90;
+const CHASE_SPEED       = 68;
 const CHASE_RANGE       = 150;
 const PITCH_INTERVAL    = 3000;
 const SWING_RANGE       = 55;
@@ -107,8 +109,8 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
     this._maxHp          = MAX_HP;
     this._maxState       = 'PATROL';
-    this._maxX           = ARENA_W / 2;
-    this._maxY           = 160;
+    this._maxX           = 130;
+    this._maxY           = 155;
     this._maxVx          = PATROL_SPEED;
     this._lastContact    = 0;
     this._fartReady      = true;
@@ -120,8 +122,8 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._defeated       = false;
     this._inputLocked    = true;
 
-    this._leoX = ARENA_W / 2;
-    this._leoY = ARENA_H - 45;
+    this._leoX = 340;
+    this._leoY = ARENA_H - 30;
 
     this._buildArena();
     this._buildMax();
@@ -368,9 +370,9 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       // Handled by timer
     }
 
-    // Keep Max within the yard (below the house)
+    // Keep Max in the upper yard — never crowd Leo out of the lower dodge lane
     this._maxX = Phaser.Math.Clamp(this._maxX, YARD_LEFT, YARD_RIGHT);
-    this._maxY = Phaser.Math.Clamp(this._maxY, YARD_TOP, YARD_BOTTOM);
+    this._maxY = Phaser.Math.Clamp(this._maxY, YARD_TOP, MAX_Y_BOTTOM);
 
     // Sync visuals
     this._maxBody.setPosition(this._maxX, this._maxY);
