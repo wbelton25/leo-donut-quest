@@ -24,6 +24,14 @@ const T = TILE_SIZE;
 const ARENA_W = BASE_WIDTH;
 const ARENA_H = BASE_HEIGHT;
 
+// Playable yard — inside the left/bottom fences and below the house strip.
+const YARD_LEFT = 44, YARD_RIGHT = 466, YARD_TOP = 52, YARD_BOTTOM = 238;
+// Tree trunks — circular obstacles Leo can't ride through.
+const TREES = [
+  { x: 175, y: 214, r: 15 },
+  { x: 430, y: 226, r: 15 },
+];
+
 const MAX_HP           = 3;
 const PATROL_SPEED     = 60;
 const CHASE_SPEED      = 95;
@@ -264,8 +272,12 @@ export default class MaxBossScene extends Phaser.Scene {
     if (this._keys.down.isDown  || this._keys.downAlt.isDown)  vy =  LEO_SPEED;
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
-    this._leoX = Phaser.Math.Clamp(this._leoX + vx * (1 / 60), 16, ARENA_W - 16);
-    this._leoY = Phaser.Math.Clamp(this._leoY + vy * (1 / 60), 30, ARENA_H - 16);
+    // Clamp to the yard, and slide along tree trunks (axis-separated)
+    const nx = Phaser.Math.Clamp(this._leoX + vx * (1 / 60), YARD_LEFT, YARD_RIGHT);
+    const ny = Phaser.Math.Clamp(this._leoY + vy * (1 / 60), YARD_TOP, YARD_BOTTOM);
+    if (!this._blockedByTree(nx, ny))            { this._leoX = nx; this._leoY = ny; }
+    else if (!this._blockedByTree(nx, this._leoY)) { this._leoX = nx; }
+    else if (!this._blockedByTree(this._leoX, ny)) { this._leoY = ny; }
 
     this._moveLeoVisual(vx, vy);
 
@@ -284,6 +296,15 @@ export default class MaxBossScene extends Phaser.Scene {
     }
   }
 
+
+  _blockedByTree(x, y) {
+    for (const t of TREES) {
+      const dx = x - t.x, dy = y - t.y;
+      const rr = t.r + 8; // + Leo's rough radius
+      if (dx * dx + dy * dy < rr * rr) return true;
+    }
+    return false;
+  }
 
   _checkFartHit() {
     if (this._maxState === 'STUNNED' || this._maxState === 'DEFEATED') return;
@@ -362,8 +383,8 @@ export default class MaxBossScene extends Phaser.Scene {
       }
     }
 
-    this._maxX = Phaser.Math.Clamp(this._maxX, 20, ARENA_W - 20);
-    this._maxY = Phaser.Math.Clamp(this._maxY, 30, ARENA_H - 20);
+    this._maxX = Phaser.Math.Clamp(this._maxX, YARD_LEFT, YARD_RIGHT);
+    this._maxY = Phaser.Math.Clamp(this._maxY, YARD_TOP, YARD_BOTTOM);
     this._syncMaxVisuals();
   }
 

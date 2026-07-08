@@ -35,6 +35,9 @@ const ARENA_H = BASE_HEIGHT;
 
 // Arena geometry
 const FENCE_THICK = 10;
+// Playable yard — the house fills the top of the background, so play is confined
+// below it (down to the front walkway).
+const YARD_LEFT = 12, YARD_RIGHT = 468, YARD_TOP = 135, YARD_BOTTOM = 246;
 
 // Max constants
 const MAX_HP            = 4;
@@ -105,7 +108,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._maxHp          = MAX_HP;
     this._maxState       = 'PATROL';
     this._maxX           = ARENA_W / 2;
-    this._maxY           = 60;
+    this._maxY           = 160;
     this._maxVx          = PATROL_SPEED;
     this._lastContact    = 0;
     this._fartReady      = true;
@@ -160,18 +163,17 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       // Pitcher's mound
       this.add.circle(ARENA_W / 2, ARENA_H / 2, 18).setFillStyle(0x8b7040, 0.6);
       this.add.circle(ARENA_W / 2, ARENA_H / 2, 6).setFillStyle(0x9b8040, 0.8);
-    }
 
-    // Wooden fence (4 sides) — always drawn: it marks the play boundary
-    this.add.rectangle(ARENA_W / 2, FENCE_THICK / 2, ARENA_W, FENCE_THICK, 0x8b5e2a); // top
-    this.add.rectangle(ARENA_W / 2, ARENA_H - FENCE_THICK / 2, ARENA_W, FENCE_THICK, 0x8b5e2a); // bottom
-    this.add.rectangle(FENCE_THICK / 2, ARENA_H / 2, FENCE_THICK, ARENA_H, 0x8b5e2a); // left
-    this.add.rectangle(ARENA_W - FENCE_THICK / 2, ARENA_H / 2, FENCE_THICK, ARENA_H, 0x8b5e2a); // right
-
-    // Fence posts
-    for (let x = 0; x <= ARENA_W; x += 30) {
-      this.add.rectangle(x, FENCE_THICK / 2, 4, FENCE_THICK + 4, 0x5a3a10);
-      this.add.rectangle(x, ARENA_H - FENCE_THICK / 2, 4, FENCE_THICK + 4, 0x5a3a10);
+      // Wooden fence (4 sides) + posts — only for the procedural fallback.
+      // With real background art these would "bleed" a brown frame over the yard.
+      this.add.rectangle(ARENA_W / 2, FENCE_THICK / 2, ARENA_W, FENCE_THICK, 0x8b5e2a);
+      this.add.rectangle(ARENA_W / 2, ARENA_H - FENCE_THICK / 2, ARENA_W, FENCE_THICK, 0x8b5e2a);
+      this.add.rectangle(FENCE_THICK / 2, ARENA_H / 2, FENCE_THICK, ARENA_H, 0x8b5e2a);
+      this.add.rectangle(ARENA_W - FENCE_THICK / 2, ARENA_H / 2, FENCE_THICK, ARENA_H, 0x8b5e2a);
+      for (let x = 0; x <= ARENA_W; x += 30) {
+        this.add.rectangle(x, FENCE_THICK / 2, 4, FENCE_THICK + 4, 0x5a3a10);
+        this.add.rectangle(x, ARENA_H - FENCE_THICK / 2, 4, FENCE_THICK + 4, 0x5a3a10);
+      }
     }
   }
 
@@ -308,8 +310,8 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
     const dt = 1 / 60;
-    this._leoX = Phaser.Math.Clamp(this._leoX + vx * dt, FENCE_THICK + 8, ARENA_W - FENCE_THICK - 8);
-    this._leoY = Phaser.Math.Clamp(this._leoY + vy * dt, FENCE_THICK + 8, ARENA_H - FENCE_THICK - 8);
+    this._leoX = Phaser.Math.Clamp(this._leoX + vx * dt, YARD_LEFT, YARD_RIGHT);
+    this._leoY = Phaser.Math.Clamp(this._leoY + vy * dt, YARD_TOP, YARD_BOTTOM);
 
     this._moveLeoVisual(vx, vy);
 
@@ -333,7 +335,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
     if (this._maxState === 'PATROL') {
       this._maxX += this._maxVx * dt;
-      const left = FENCE_THICK + 30, right = ARENA_W - FENCE_THICK - 30;
+      const left = YARD_LEFT + 20, right = YARD_RIGHT - 20;
       if (this._maxX <= left || this._maxX >= right) {
         this._maxVx *= -1;
         this._maxX = Phaser.Math.Clamp(this._maxX, left, right);
@@ -366,9 +368,9 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       // Handled by timer
     }
 
-    // Keep Max in upper half
-    this._maxX = Phaser.Math.Clamp(this._maxX, FENCE_THICK + 5, ARENA_W - FENCE_THICK - 5);
-    this._maxY = Phaser.Math.Clamp(this._maxY, FENCE_THICK + 5, ARENA_H / 2 + 30);
+    // Keep Max within the yard (below the house)
+    this._maxX = Phaser.Math.Clamp(this._maxX, YARD_LEFT, YARD_RIGHT);
+    this._maxY = Phaser.Math.Clamp(this._maxY, YARD_TOP, YARD_BOTTOM);
 
     // Sync visuals
     this._maxBody.setPosition(this._maxX, this._maxY);
