@@ -12,7 +12,7 @@ import PartySystem from '../systems/PartySystem.js';
 // ─── Max Boss Scene ──────────────────────────────────────────────────────────
 // MJ's brother Max is blocking the driveway.
 //
-// Arena: a suburban driveway — concrete surface, car parked on one side.
+// Arena: MJ's front yard / driveway.
 //
 // Max attacks:
 //   TACKLE     — charges straight at Leo, deals damage on impact
@@ -23,12 +23,6 @@ import PartySystem from '../systems/PartySystem.js';
 const T = TILE_SIZE;
 const ARENA_W = BASE_WIDTH;
 const ARENA_H = BASE_HEIGHT;
-
-// Car obstacle (blocks right half of driveway)
-const CAR_X = ARENA_W - 90;
-const CAR_Y = ARENA_H / 2;
-const CAR_W = 80;
-const CAR_H = 40;
 
 const MAX_HP           = 3;
 const PATROL_SPEED     = 60;
@@ -106,8 +100,7 @@ export default class MaxBossScene extends Phaser.Scene {
 
   _buildArena() {
     // Full-scene background art drops in here; otherwise fall back to the
-    // procedural driveway. Art should depict the driveway + house + lawn; the
-    // parked car (an obstacle) is still drawn on top so it stays gameplay-clear.
+    // procedural driveway + yard.
     if (this.textures.exists('bg-max')) {
       this.add.image(0, 0, 'bg-max').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(-1);
     } else {
@@ -134,12 +127,6 @@ export default class MaxBossScene extends Phaser.Scene {
         this.add.rectangle(fx, fy, 8, 2, 0xffffff);
       });
     }
-
-    // Parked car (obstacle) — always drawn so its collision stays visible
-    this.add.rectangle(CAR_X, CAR_Y, CAR_W, CAR_H, 0x3355aa);         // body
-    this.add.rectangle(CAR_X, CAR_Y - 8, CAR_W - 20, CAR_H / 2, 0x4466bb); // roof
-    this.add.rectangle(CAR_X - 28, CAR_Y + 10, 12, 8, 0x222233);      // wheel L
-    this.add.rectangle(CAR_X + 28, CAR_Y + 10, 12, 8, 0x222233);      // wheel R
   }
 
   // ─── Max visual ─────────────────────────────────────────────────────────────
@@ -277,17 +264,8 @@ export default class MaxBossScene extends Phaser.Scene {
     if (this._keys.down.isDown  || this._keys.downAlt.isDown)  vy =  LEO_SPEED;
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
-    // Block movement through the car
-    const nx = Phaser.Math.Clamp(this._leoX + vx * (1 / 60), 16, ARENA_W - 16);
-    const ny = Phaser.Math.Clamp(this._leoY + vy * (1 / 60), 30, ARENA_H - 16);
-    if (!this._collidesWithCar(nx, ny)) {
-      this._leoX = nx;
-      this._leoY = ny;
-    } else if (!this._collidesWithCar(nx, this._leoY)) {
-      this._leoX = nx;
-    } else if (!this._collidesWithCar(this._leoX, ny)) {
-      this._leoY = ny;
-    }
+    this._leoX = Phaser.Math.Clamp(this._leoX + vx * (1 / 60), 16, ARENA_W - 16);
+    this._leoY = Phaser.Math.Clamp(this._leoY + vy * (1 / 60), 30, ARENA_H - 16);
 
     this._moveLeoVisual(vx, vy);
 
@@ -306,12 +284,6 @@ export default class MaxBossScene extends Phaser.Scene {
     }
   }
 
-  _collidesWithCar(x, y) {
-    return (
-      x > CAR_X - CAR_W / 2 - 8 && x < CAR_X + CAR_W / 2 + 8 &&
-      y > CAR_Y - CAR_H / 2 - 8 && y < CAR_Y + CAR_H / 2 + 8
-    );
-  }
 
   _checkFartHit() {
     if (this._maxState === 'STUNNED' || this._maxState === 'DEFEATED') return;
