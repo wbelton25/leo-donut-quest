@@ -14,6 +14,7 @@ import GolfCartObstacle from '../entities/GolfCartObstacle.js';
 import BikeObstacle     from '../entities/BikeObstacle.js';
 import GolfBallSpawner  from '../entities/GolfBallSpawner.js';
 import BeanPickup       from '../entities/BeanPickup.js';
+import BikeRepairPickup from '../entities/BikeRepairPickup.js';
 // GraceBoss is now handled in GraceBossScene; import removed
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
@@ -507,6 +508,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Bean power-ups (temporary "power fart" buff) ─────────────────────────────
     this._spawnBeans();
 
+    // ── Bike-repair pickups (restore bike condition → speed) ─────────────────────
+    this._spawnBikeRepairs();
+
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
       fontSize: '8px', color: '#f5e642',
@@ -590,6 +594,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Bean pickups + power-fart buff ───────────────────────────────────────────
     this._checkBeanPickups();
     this._updatePowerFart();
+    this._checkBikeRepairs();
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
@@ -706,11 +711,28 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.cameras.main.flash(200, 255, Math.min(damage * 5, 255), 0);
   }
 
+  // Collected-pickup tracking lives on the saved gameState object (same channel
+  // that persists recruited friends), so it survives boss fights AND save/continue.
+  // Returns the Set of collected spot-indices for the given pickup key.
+  _collectedSet(key) {
+    const gs = this.game.registry.get('gameState') ?? {};
+    this.game.registry.set('gameState', gs);
+    return new Set(gs[key] ?? []);
+  }
+
+  _markCollected(key, index) {
+    const gs = this.game.registry.get('gameState') ?? {};
+    const set = new Set(gs[key] ?? []);
+    set.add(index);
+    gs[key] = [...set];
+    this.game.registry.set('gameState', gs);
+    this._autosave(); // persist immediately so a boss entry can't lose it
+  }
+
   // ── Bean power-ups ───────────────────────────────────────────────────────────
   // Beans sit on out-of-the-way road tiles. Grabbing one grants a temporary
   // "power fart" buff: bigger cloud + wider knockdown radius + 3× faster recharge.
-  // Collected beans persist for the session (registry) so they don't respawn after
-  // a boss fight sends Leo back to the neighborhood.
+  // Collected beans persist in gameState so they don't respawn after a boss fight.
 
   _spawnBeans() {
     // Tile (col,row) spots — each verified to sit on a road, off the main artery.
@@ -727,8 +749,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._powerFartUntil = 0;
     this._powerFartDuration = 15000;
 
-    const collected = this.game.registry.get('beansCollected') ?? new Set();
-    this.game.registry.set('beansCollected', collected);
+    const collected = this._collectedSet('collectedBeans');
 
     this._beans = [];
     SPOTS.forEach(([c, r], i) => {
@@ -760,7 +781,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
       const dx = bean.x - px, dy = bean.y - py;
       if (dx * dx + dy * dy < 18 * 18) {
         bean.collect();
-        this.game.registry.get('beansCollected').add(bean._spotIndex);
+        this._markCollected('collectedBeans', bean._spotIndex);
         this._activatePowerFart();
       }
     }
@@ -794,6 +815,58 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     this._fartAura.setVisible(true).setPosition(this._player.x, this._player.y);
     this._fartAura.setAlpha(0.22 + 0.14 * Math.sin(Date.now() / 110));
+  }
+
+  // ── Bike-repair pickups ──────────────────────────────────────────────────────
+  // Toolboxes on out-of-the-way road tiles. Grabbing one fully restores bike
+  // condition (and therefore speed) — a finite lifeline for a battered bike.
+  // Collected ones persist in gameState so they don't respawn after a boss.
+
+  _spawnBikeRepairs() {
+    const SPOTS = [
+      [47, 100],  // Windward Dr, mid — long southbound artery
+      [210, 70],  // east spur off Tega Cay Drive
+      [290, 98],  // far-east loop road
+      [313, 140], // south-east corner
+    ];
+
+    const collected = this._collectedSet('collectedBikeRepairs');
+
+    this._bikeRepairs = [];
+    SPOTS.forEach(([c, r], i) => {
+      if (collected.has(i)) return;
+      const kit = new BikeRepairPickup(this, c * T + 8, r * T + 8);
+      kit._spotIndex = i;
+      this._bikeRepairs.push(kit);
+    });
+  }
+
+  _checkBikeRepairs() {
+    if (!this._bikeRepairs || this._bikeRepairs.length === 0) return;
+    const px = this._player.x, py = this._player.y;
+    for (const kit of this._bikeRepairs) {
+      if (kit.collected) continue;
+      const dx = kit.x - px, dy = kit.y - py;
+      if (dx * dx + dy * dy < 18 * 18) {
+        kit.collect();
+        this._markCollected('collectedBikeRepairs', kit._spotIndex);
+        this._repairBike();
+      }
+    }
+  }
+
+  _repairBike() {
+    const missing = 100 - this._resources.bikeCondition;
+    this._resources.applyChanges({ bikeCondition: missing });
+    AudioManager.playSfx(this, 'sfx-bike-hit', { volume: 0.5 });
+    FX.popText(this, this._player.x, this._player.y - 26, 'BIKE FIXED!', {
+      color: '#8ad4ff', fontSize: '12px', rise: 28, duration: 900,
+    });
+    // Quick sparkle wash over Leo
+    FX.burst(this, this._player.x, this._player.y, {
+      count: 12, colors: [0x8ad4ff, 0xe8eef2, 0xffffff],
+      minSpeed: 30, maxSpeed: 90, minSize: 1, maxSize: 3, duration: 450, depth: 7,
+    });
   }
 
   // ── Obstacle factory ───────────────────────────────────────────────────────────
