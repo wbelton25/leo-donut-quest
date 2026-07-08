@@ -132,18 +132,37 @@ export default class JustinMaxBossScene extends Phaser.Scene {
   // ─── Arena ────────────────────────────────────────────────────────────────
 
   _buildArena() {
-    // Grass yard
-    this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a7a3a);
+    // Full-scene background art drops in here; otherwise fall back to the
+    // procedural ball-field. The wooden fence marks Leo's play boundary, so it's
+    // always drawn on top even when art is present.
+    if (this.textures.exists('bg-justin-max')) {
+      this.add.image(0, 0, 'bg-justin-max').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(-1);
+    } else {
+      // Grass yard
+      this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a7a3a);
 
-    // Grass stripes
-    for (let i = 0; i < 5; i++) {
-      if (i % 2 === 0) {
-        const sw = ARENA_W / 5;
-        this.add.rectangle(sw * i + sw / 2, ARENA_H / 2, sw, ARENA_H, 0x3e8040, 0.35);
+      // Grass stripes
+      for (let i = 0; i < 5; i++) {
+        if (i % 2 === 0) {
+          const sw = ARENA_W / 5;
+          this.add.rectangle(sw * i + sw / 2, ARENA_H / 2, sw, ARENA_H, 0x3e8040, 0.35);
+        }
       }
+
+      // Dugout bench (top-left)
+      this.add.rectangle(50, 28, 60, 8, 0x6b4820);
+      this.add.rectangle(50, 24, 60, 4, 0x9b6830); // bench top
+      txt(this, 20, 18, 'DUGOUT', { fontSize: '8px', color: '#886644' });
+
+      // Home plate
+      this.add.rectangle(ARENA_W / 2, ARENA_H - 30, 14, 10, 0xffffff, 0.8);
+
+      // Pitcher's mound
+      this.add.circle(ARENA_W / 2, ARENA_H / 2, 18).setFillStyle(0x8b7040, 0.6);
+      this.add.circle(ARENA_W / 2, ARENA_H / 2, 6).setFillStyle(0x9b8040, 0.8);
     }
 
-    // Wooden fence (4 sides)
+    // Wooden fence (4 sides) — always drawn: it marks the play boundary
     this.add.rectangle(ARENA_W / 2, FENCE_THICK / 2, ARENA_W, FENCE_THICK, 0x8b5e2a); // top
     this.add.rectangle(ARENA_W / 2, ARENA_H - FENCE_THICK / 2, ARENA_W, FENCE_THICK, 0x8b5e2a); // bottom
     this.add.rectangle(FENCE_THICK / 2, ARENA_H / 2, FENCE_THICK, ARENA_H, 0x8b5e2a); // left
@@ -154,18 +173,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       this.add.rectangle(x, FENCE_THICK / 2, 4, FENCE_THICK + 4, 0x5a3a10);
       this.add.rectangle(x, ARENA_H - FENCE_THICK / 2, 4, FENCE_THICK + 4, 0x5a3a10);
     }
-
-    // Dugout bench (top-left)
-    this.add.rectangle(50, 28, 60, 8, 0x6b4820);
-    this.add.rectangle(50, 24, 60, 4, 0x9b6830); // bench top
-    txt(this, 20, 18, 'DUGOUT', { fontSize: '8px', color: '#886644' });
-
-    // Home plate
-    this.add.rectangle(ARENA_W / 2, ARENA_H - 30, 14, 10, 0xffffff, 0.8);
-
-    // Pitcher's mound
-    this.add.circle(ARENA_W / 2, ARENA_H / 2, 18).setFillStyle(0x8b7040, 0.6);
-    this.add.circle(ARENA_W / 2, ARENA_H / 2, 6).setFillStyle(0x9b8040, 0.8);
   }
 
   // ─── Max visual ───────────────────────────────────────────────────────────

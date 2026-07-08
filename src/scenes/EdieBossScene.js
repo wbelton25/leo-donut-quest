@@ -36,21 +36,29 @@ export default class EdieBossScene extends Phaser.Scene {
   create() {
     AudioManager.playMusic(this, MUSIC_BOSS);
     // ── Arena — Leo's living room ──────────────────────────────────────────────
-    this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a2a1a);
-    // Walls
+    // Full-scene background art drops in here; otherwise fall back to the
+    // procedural room. The wall border marks Leo's play boundary, so it's always
+    // drawn on top even when art is present.
+    if (this.textures.exists('bg-edie')) {
+      this.add.image(0, 0, 'bg-edie').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(-1);
+    } else {
+      this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a2a1a);
+
+      // Furniture (sofas, TV — impassable flavor)
+      this.add.rectangle(ARENA_W / 2, 40, 120, 18, 0x6b4226);  // TV stand
+      this.add.rectangle(80, ARENA_H / 2, 20, 60, 0x5a3a20);   // bookshelf
+      this.add.rectangle(ARENA_W - 80, ARENA_H / 2, 20, 60, 0x5a3a20);
+
+      txt(this, ARENA_W / 2, 16, 'EDIE', { fontSize: '8px', color: '#ff69b4' }).setOrigin(0.5);
+    }
+
+    // Wall border — always drawn: it marks the play boundary
     [
       [0, ARENA_H / 2, 20, ARENA_H],
       [ARENA_W, ARENA_H / 2, 20, ARENA_H],
       [ARENA_W / 2, 0, ARENA_W, 20],
       [ARENA_W / 2, ARENA_H, ARENA_W, 20],
     ].forEach(([x, y, w, h]) => this.add.rectangle(x, y, w, h, 0x5a3a1a));
-
-    // Furniture (sofas, TV — impassable flavor)
-    this.add.rectangle(ARENA_W / 2, 40, 120, 18, 0x6b4226);  // TV stand
-    this.add.rectangle(80, ARENA_H / 2, 20, 60, 0x5a3a20);   // bookshelf
-    this.add.rectangle(ARENA_W - 80, ARENA_H / 2, 20, 60, 0x5a3a20);
-
-    txt(this, ARENA_W / 2, 16, 'EDIE', { fontSize: '8px', color: '#ff69b4' }).setOrigin(0.5);
 
     // ── Edie ──────────────────────────────────────────────────────────────────
     this._edieHP     = EDIE_HP;

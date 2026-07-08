@@ -1098,9 +1098,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _isRoadChunk(c, r, step) {
     // Left water strip (col 0-9)
     if (c + step <= 10) return false;
-    // South water (rows 151+)
-    if (r >= 151) return false;
-    // South water left portion (col 0-110, rows 151+)
+    // South water is ONLY the left portion (cols 0-110, rows 151+). The right
+    // side of the bottom band is dry land carrying the southern roads (37/38/39/40),
+    // so we must NOT blanket-wall all of rows 151+ — that made those roads
+    // un-rideable even though they render as asphalt.
     if (c + step <= 110 && r + step > 151) return false;
 
     for (const [rc, rr, rw, rh] of ROADS) {

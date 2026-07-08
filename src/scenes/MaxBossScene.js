@@ -105,34 +105,41 @@ export default class MaxBossScene extends Phaser.Scene {
   // ─── Arena ──────────────────────────────────────────────────────────────────
 
   _buildArena() {
-    // Concrete driveway
-    this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x999aaa);
+    // Full-scene background art drops in here; otherwise fall back to the
+    // procedural driveway. Art should depict the driveway + house + lawn; the
+    // parked car (an obstacle) is still drawn on top so it stays gameplay-clear.
+    if (this.textures.exists('bg-max')) {
+      this.add.image(0, 0, 'bg-max').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(-1);
+    } else {
+      // Concrete driveway
+      this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x999aaa);
 
-    // Driveway seams
-    for (let i = 1; i < 4; i++) {
-      this.add.rectangle(ARENA_W / 2, (ARENA_H / 4) * i, ARENA_W, 2, 0x777788, 0.4);
+      // Driveway seams
+      for (let i = 1; i < 4; i++) {
+        this.add.rectangle(ARENA_W / 2, (ARENA_H / 4) * i, ARENA_W, 2, 0x777788, 0.4);
+      }
+
+      // House wall at top with garage door
+      this.add.rectangle(ARENA_W / 2, 14, ARENA_W, 28, 0xc8b898);
+      this.add.rectangle(ARENA_W / 2 - 60, 14, 100, 22, 0x888877); // garage door
+      this.add.rectangle(ARENA_W / 2 + 80, 14, 60, 22, 0x777766);  // side door
+
+      // Lawn edges
+      this.add.rectangle(30, ARENA_H / 2, 60, ARENA_H, 0x336633);  // left lawn
+      txt(this, 10, ARENA_H / 2 - 10, "MJ'S\nYARD", { fontSize: '8px', color: '#88ff88' });
+
+      // Footballs lying around (decorative)
+      [[120, 35], [320, 200], [80, 190]].forEach(([fx, fy]) => {
+        this.add.ellipse(fx, fy, 14, 10, 0x8b4513);
+        this.add.rectangle(fx, fy, 8, 2, 0xffffff);
+      });
     }
 
-    // House wall at top with garage door
-    this.add.rectangle(ARENA_W / 2, 14, ARENA_W, 28, 0xc8b898);
-    this.add.rectangle(ARENA_W / 2 - 60, 14, 100, 22, 0x888877); // garage door
-    this.add.rectangle(ARENA_W / 2 + 80, 14, 60, 22, 0x777766);  // side door
-
-    // Parked car (obstacle)
+    // Parked car (obstacle) — always drawn so its collision stays visible
     this.add.rectangle(CAR_X, CAR_Y, CAR_W, CAR_H, 0x3355aa);         // body
     this.add.rectangle(CAR_X, CAR_Y - 8, CAR_W - 20, CAR_H / 2, 0x4466bb); // roof
     this.add.rectangle(CAR_X - 28, CAR_Y + 10, 12, 8, 0x222233);      // wheel L
     this.add.rectangle(CAR_X + 28, CAR_Y + 10, 12, 8, 0x222233);      // wheel R
-
-    // Lawn edges
-    this.add.rectangle(30, ARENA_H / 2, 60, ARENA_H, 0x336633);  // left lawn
-    txt(this, 10, ARENA_H / 2 - 10, "MJ'S\nYARD", { fontSize: '8px', color: '#88ff88' });
-
-    // Footballs lying around (decorative)
-    [[120, 35], [320, 200], [80, 190]].forEach(([fx, fy]) => {
-      const fb = this.add.ellipse(fx, fy, 14, 10, 0x8b4513);
-      this.add.rectangle(fx, fy, 8, 2, 0xffffff);
-    });
   }
 
   // ─── Max visual ─────────────────────────────────────────────────────────────

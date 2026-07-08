@@ -55,9 +55,13 @@ export default class PreloadScene extends Phaser.Scene {
       { frameWidth: 16, frameHeight: 16 }
     );
 
-    // Boss arena backgrounds
-    this.load.image('bg-grace', 'assets/backgrounds/grace_pool.png');
-    this.load.image('bg-nora',  'assets/backgrounds/nora_boss_level.png');
+    // Boss arena backgrounds (480×270). Missing files 404 harmlessly — the scene
+    // falls back to its procedural arena via this.textures.exists() checks.
+    this.load.image('bg-grace',      'assets/backgrounds/grace_pool.png');
+    this.load.image('bg-nora',       'assets/backgrounds/nora_boss_level.png');
+    this.load.image('bg-max',        'assets/backgrounds/max_football.png');
+    this.load.image('bg-justin-max', 'assets/backgrounds/justin_max_baseball.png');
+    this.load.image('bg-edie',       'assets/backgrounds/edie_livingroom.png');
 
     // Seamless 128×128 surface textures — used for large tileSprite fills
     ['grass', 'park', 'golf', 'road', 'sidewalk', 'water', 'water-lt', 'shore']
