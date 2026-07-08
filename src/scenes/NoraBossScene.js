@@ -277,7 +277,7 @@ export default class NoraBossScene extends Phaser.Scene {
   _enterHideState() {
     if (this._defeated) return;
     this._noraState   = 'MOVING_TO_CABINET';
-    this._vulnerable  = false;
+    this._vulnerable  = true; // exposed while running to cover — Leo can still hit her
     this._hidingLabel.setVisible(false);
     this._emergeLabel.setVisible(false);
 
@@ -425,8 +425,10 @@ export default class NoraBossScene extends Phaser.Scene {
     this._noraBallDot.setPosition(this._noraX + 16, this._noraY + 6);
     this._alertLabel.setPosition(this._noraX, this._noraY - 28);
 
-    // Hide Nora fully behind the bar when in hiding states
-    const hiding = (this._noraState === 'SHOOT' || this._noraState === 'MOVING_TO_CABINET');
+    // Nora is only hidden once she's actually behind the bar (SHOOT). While she's
+    // travelling to a cabinet she stays visible so the player sees her run to cover
+    // instead of vanishing and reappearing elsewhere.
+    const hiding = (this._noraState === 'SHOOT');
     this._noraBody.setAlpha(hiding ? 0 : 1);
     this._noraShirt.setAlpha(hiding ? 0 : 1);
     this._noraBall.setAlpha(hiding ? 0 : 1);
