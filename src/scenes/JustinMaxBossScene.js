@@ -1,5 +1,5 @@
 import {
-  SCENE_JUSTIN_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET,
+  SCENE_JUSTIN_MAX_BOSS, SCENE_DIALOGUE, SCENE_NEIGHBORHOOD, SCENE_BOSS_GAUNTLET, SCENE_HUD,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, SPRITE_LEO, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
@@ -108,6 +108,9 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
     // Boss fights always start at full energy (5 hearts)
     this._resources.applyChanges({ energy: 100 - this._resources.energy });
+
+    // Hide the neighborhood HUD during the fight
+    this.scene.sleep(SCENE_HUD);
 
     this._abilities.register('lightning_fart', (scene, player) => {
       AudioManager.playFart(scene);
@@ -622,9 +625,12 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
     if (!this._gauntlet) {
       this.cameras.main.fade(600, 0, 0, 0, false, (cam, progress) => {
-        if (progress === 1) this.scene.start(SCENE_NEIGHBORHOOD, {
-          bossLost: 'justinmax', bossScene: SCENE_JUSTIN_MAX_BOSS, spawnCol: 312, spawnRow: 123,
-        });
+        if (progress === 1) {
+          this.scene.wake(SCENE_HUD);
+          this.scene.start(SCENE_NEIGHBORHOOD, {
+            bossLost: 'justinmax', bossScene: SCENE_JUSTIN_MAX_BOSS, spawnCol: 312, spawnRow: 123,
+          });
+        }
       });
       return;
     }
@@ -728,7 +734,10 @@ export default class JustinMaxBossScene extends Phaser.Scene {
           });
         } else {
           this.cameras.main.fade(500, 0, 0, 0);
-          this.time.delayedCall(520, () => this.scene.start(SCENE_NEIGHBORHOOD, { justinMaxDefeated: true, spawnCol: 312, spawnRow: 123 }));
+          this.time.delayedCall(520, () => {
+            this.scene.wake(SCENE_HUD);
+            this.scene.start(SCENE_NEIGHBORHOOD, { justinMaxDefeated: true, spawnCol: 312, spawnRow: 123 });
+          });
         }
       });
     });

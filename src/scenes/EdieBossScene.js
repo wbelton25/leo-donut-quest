@@ -1,5 +1,5 @@
 import {
-  SCENE_EDIE_BOSS, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_CREDITS,
+  SCENE_EDIE_BOSS, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_CREDITS, SCENE_HUD,
   BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
@@ -36,6 +36,7 @@ export default class EdieBossScene extends Phaser.Scene {
 
   create() {
     AudioManager.playMusic(this, MUSIC_BOSS);
+    this.scene.sleep(SCENE_HUD); // hide the neighborhood HUD during the fight
     // ── Arena — Leo's living room ──────────────────────────────────────────────
     // Full-scene background art drops in here; otherwise fall back to the
     // procedural room. The wall border marks Leo's play boundary, so it's always
