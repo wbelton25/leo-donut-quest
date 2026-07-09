@@ -44,8 +44,8 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('sprite-baseball',        'assets/sprites/baseball.png');
     this.load.image('sprite-football',        'assets/sprites/football.png');
     this.load.image('sprite-golfball',        'assets/sprites/golfball.png');
-    // Golfer swing sheet: 4x4 grid of 256px frames (0-7 = golfer poses)
-    this.load.spritesheet('sprite-golfer', 'assets/sprites/golfer.png', { frameWidth: 256, frameHeight: 256 });
+    // Golfer swing sheet: 8 uniform frames (0-3 swing, 4-7 idle)
+    this.load.spritesheet('sprite-golfer', 'assets/sprites/golfer.png', { frameWidth: 196, frameHeight: 248 });
 
     // Obstacle sprites (48×48, 12 frames: 4 dirs × 3)
     this.load.atlas('sprite-deer',      'assets/sprites/deer.png',      'assets/sprites/deer.json');

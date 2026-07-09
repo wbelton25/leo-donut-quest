@@ -38,7 +38,7 @@ export default class GolfBallSpawner {
     if (scene.textures.exists(GOLFER_KEY)) {
       this._registerAnims();
       this._golfer = scene.add.sprite(x, y, GOLFER_KEY, 5)
-        .setDisplaySize(56, 56).setOrigin(0.5, 0.82).setDepth(3);
+        .setDisplaySize(30, 38).setOrigin(0.5, 0.97).setDepth(3); // smaller; feet at (x,y)
       if (this._dirX < -0.1) this._golfer.setFlipX(true); // face the way he hits
       this._golfer.play('golfer-idle');
       this._marker = null;
