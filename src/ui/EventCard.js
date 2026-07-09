@@ -35,9 +35,14 @@ export default class EventCard {
     const choices     = event.choices;
     const choiceCount = choices.length;
 
+    // Taller buttons (with a second "cost / risk" preview line) whenever any choice
+    // actually carries effects — so the player can weigh safe vs. fast/risky.
+    const showPreviews = choices.some(c => c.effects && Object.keys(c.effects).length > 0);
+    const btnH = showPreviews ? 34 : BTN_H;
+
     // Compute card height to fit everything
     const descH  = DESC_LINES * LINE_H;
-    const btnsH  = choiceCount * BTN_H + (choiceCount - 1) * BTN_GAP;
+    const btnsH  = choiceCount * btnH + (choiceCount - 1) * BTN_GAP;
     const cardH  = TITLE_H + PAD + descH + PAD + btnsH + PAD;
     const cardX  = BASE_WIDTH  / 2;
     const cardY  = BASE_HEIGHT / 2 - cardH / 2;
@@ -66,23 +71,36 @@ export default class EventCard {
     const btnLeft    = cardX - CARD_W / 2 + PAD;
 
     choices.forEach((choice, i) => {
-      const by  = btnAreaTop + i * (BTN_H + BTN_GAP);
-      const bcy = by + BTN_H / 2;
+      const by  = btnAreaTop + i * (btnH + BTN_GAP);
+      const bcy = by + btnH / 2;
 
-      const bg = this._scene.add.rectangle(cardX, bcy, btnW, BTN_H, 0x1a2a3a)
+      const bg = this._scene.add.rectangle(cardX, bcy, btnW, btnH, 0x1a2a3a)
         .setInteractive({ useHandCursor: true });
+      this._container.add(bg);
+      this._dynamicObjs.push(bg);
 
-      const label = txt(this._scene, btnLeft + 4, bcy, choice.text, {
-        fontSize: '8px', color: '#f5e642',
-        wordWrap: { width: btnW - 8 },
-      }).setOrigin(0, 0.5);
+      if (showPreviews) {
+        // Choice text at the top, cost/risk preview at the bottom.
+        const label = txt(this._scene, btnLeft + 4, by + 3, choice.text, {
+          fontSize: '8px', color: '#f5e642', wordWrap: { width: btnW - 8 },
+        }).setOrigin(0, 0);
+        const preview = this._effectPreview(choice);
+        const prev = txt(this._scene, btnLeft + 4, by + btnH - 3, preview.text, {
+          fontSize: '8px', color: preview.color, wordWrap: { width: btnW - 8 },
+        }).setOrigin(0, 1);
+        this._container.add([label, prev]);
+        this._dynamicObjs.push(label, prev);
+      } else {
+        const label = txt(this._scene, btnLeft + 4, bcy, choice.text, {
+          fontSize: '8px', color: '#f5e642', wordWrap: { width: btnW - 8 },
+        }).setOrigin(0, 0.5);
+        this._container.add(label);
+        this._dynamicObjs.push(label);
+      }
 
       bg.on('pointerover', () => bg.setFillStyle(0x2a4a6a));
       bg.on('pointerout',  () => bg.setFillStyle(0x1a2a3a));
       bg.on('pointerdown', () => this._pick(i));
-
-      this._container.add([bg, label]);
-      this._dynamicObjs.push(bg, label);
     });
 
     this._container.setVisible(true);
@@ -106,6 +124,32 @@ export default class EventCard {
   _clearDynamic() {
     this._dynamicObjs.forEach(o => o.destroy());
     this._dynamicObjs = [];
+  }
+
+  // Compact "what this choice costs / risks" line shown under each choice, so the
+  // player can weigh a safe option against a faster/riskier one.
+  _effectPreview(choice) {
+    const e = choice.effects ?? {};
+    const parts = [];
+    if (e.time)          parts.push(`${e.time} time`);                              // time is a cost (<=0)
+    if (e.energy)        parts.push(`${e.energy > 0 ? '+' : ''}${e.energy} energy`);
+    if (e.bikeCondition) parts.push(`${e.bikeCondition > 0 ? '+' : ''}${e.bikeCondition} bike`);
+    if (e.distance)      parts.push(`+${e.distance} ahead`);
+    if (e.money)         parts.push(`${e.money > 0 ? '+$' : '-$'}${Math.abs(e.money)}`);
+    if (e.snacks)        parts.push(`${e.snacks > 0 ? '+' : ''}${e.snacks} snack`);
+
+    if (e.partyLossRisk) {
+      const pct = Math.round(e.partyLossRisk * 100);
+      const lead = parts.length ? parts.join(', ') + '   ' : '';
+      return { text: `${lead}RISK ${pct}%: may lose a rider`, color: '#ff5555' };
+    }
+    if (parts.length === 0) return { text: 'safe - no cost', color: '#77bb99' };
+
+    const good = (e.energy > 0 ? e.energy : 0) + (e.bikeCondition > 0 ? e.bikeCondition : 0)
+               + (e.distance || 0) / 20 + (e.money > 0 ? e.money : 0);
+    const bad  = (e.energy < 0 ? -e.energy : 0) + (e.bikeCondition < 0 ? -e.bikeCondition : 0);
+    const color = bad > good ? '#ffa077' : good > 0 ? '#88cc88' : '#99aabb';
+    return { text: parts.join(', '), color };
   }
 
   _pick(index) {

@@ -538,12 +538,19 @@ export default class OregonTrailScene extends Phaser.Scene {
     );
   }
 
-  _updatePaceEta(pace) {
-    if (pace >= 0.85)      this._paceText.setText('PACE: FAST').setColor('#44cc44');
-    else if (pace >= 0.60) this._paceText.setText('PACE: OK').setColor('#f5a623');
-    else                   this._paceText.setText('PACE: SLOW').setColor('#ff3333');
+  // Right-hand strip = SCHEDULE status (are you ahead or behind the clock), so the
+  // player knows whether to play a leg safe or take a faster/riskier choice.
+  _updatePaceEta() {
     this._legText.setText(`LEG ${Math.min(this._legIndex + 1, LEGS.length)}/${LEGS.length}`);
     this._etaText.setText(`TIME ${timeToDisplay(this._resources.time)}`);
+
+    // margin > 0 → spent less time than your share of the trip so far (ahead).
+    const f      = this._distance / TOTAL_DISTANCE;
+    const margin = f * 100 - (100 - this._resources.time);
+    if      (f < 0.05)     this._paceText.setText('ON PACE').setColor('#f5a623');
+    else if (margin > 8)   this._paceText.setText('AHEAD').setColor('#44cc44');
+    else if (margin < -8)  this._paceText.setText('BEHIND').setColor('#ff3333');
+    else                   this._paceText.setText('ON PACE').setColor('#f5a623');
   }
 
   // Push average bike condition to ResourceSystem so HUD bar stays current
