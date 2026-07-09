@@ -8,6 +8,7 @@ import PartySystem from '../systems/PartySystem.js';
 import EventSystem from '../systems/EventSystem.js';
 import EventCard from '../ui/EventCard.js';
 import WalmartShopCard from '../ui/WalmartShopCard.js';
+import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 
 // ── Ride constants ─────────────────────────────────────────────────────────────
 const TOTAL_DISTANCE  = 2000;
@@ -1165,17 +1166,26 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     all.forEach((m, i) => {
       const x = startX + i * spacing;
-      this._bikerMap[m.id] = this._makeBiker(x, roadY, m.color);
+      this._bikerMap[m.id] = this._makeBiker(m.id, x, roadY, m.color);
       this._buildMemberBars(m.id, x, roadY);
     });
   }
 
-  _makeBiker(x, y, color) {
+  _makeBiker(id, x, y, color) {
+    const key = `sprite-${id}`;
+    // Real character-on-bike sprite when available; else the colored-rectangle fallback.
+    if (this.textures.exists(key)) {
+      registerCharacterAnims(this.anims, key);
+      const spr = this.add.sprite(x, y - 4, key, 'right-0').setDisplaySize(30, 30).setDepth(6);
+      if (this.anims.exists(`${key}-walk-right`)) spr.play(`${key}-walk-right`);
+      const tween = this.tweens.add({ targets: spr, y: '-=2', yoyo: true, repeat: -1, duration: 250 + Math.random() * 100 });
+      return { body: spr, wheel1: null, wheel2: null, tween, baseColor: color, isSprite: true };
+    }
     const body   = this.add.rectangle(x, y - 6, 8, 10, color);
     const wheel1 = this.add.circle(x - 5, y, 5, 0x333333);
     const wheel2 = this.add.circle(x + 5, y, 5, 0x333333);
-    const tween  = this.tweens.add({ targets: [body, wheel1, wheel2], y: `+=2`, yoyo: true, repeat: -1, duration: 250 + Math.random() * 100 });
-    return { body, wheel1, wheel2, tween, baseColor: color };
+    const tween  = this.tweens.add({ targets: [body, wheel1, wheel2], y: '+=2', yoyo: true, repeat: -1, duration: 250 + Math.random() * 100 });
+    return { body, wheel1, wheel2, tween, baseColor: color, isSprite: false };
   }
 
   _buildMemberBars(id, x, roadY) {
@@ -1199,7 +1209,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     const biker = this._bikerMap[memberId];
     if (!biker) return;
     biker.tween?.stop();
-    this.tweens.add({ targets: [biker.body, biker.wheel1, biker.wheel2], y: `+=${BASE_HEIGHT}`, alpha: 0, duration: 800 });
+    this.tweens.add({ targets: [biker.body, biker.wheel1, biker.wheel2].filter(Boolean), y: `+=${BASE_HEIGHT}`, alpha: 0, duration: 800 });
     const sb = this._staminaBars[memberId];
     const bb = this._bikeBars[memberId];
     if (sb) this.tweens.add({ targets: [sb.bg, sb.fill], alpha: 0, duration: 400 });
@@ -1217,7 +1227,11 @@ export default class OregonTrailScene extends Phaser.Scene {
       bars.fill.setFillStyle(st > 50 ? 0x44cc44 : st > 25 ? 0xf5a623 : 0xff3333);
       const biker = this._bikerMap[id];
       if (biker) {
-        biker.body.setFillStyle(st < FATIGUE_CRIT ? 0xff2222 : st >= FATIGUE_WARN ? biker.baseColor : biker.baseColor);
+        if (biker.isSprite) {
+          if (st < FATIGUE_CRIT) biker.body.setTint(0xff5555); else biker.body.clearTint();
+        } else {
+          biker.body.setFillStyle(st < FATIGUE_CRIT ? 0xff2222 : biker.baseColor);
+        }
       }
     });
   }
@@ -1232,8 +1246,7 @@ export default class OregonTrailScene extends Phaser.Scene {
       const biker = this._bikerMap[id];
       if (biker) {
         const wc = hp < 25 ? 0x881111 : hp < 50 ? 0x664422 : 0x333333;
-        biker.wheel1.setFillStyle(wc);
-        biker.wheel2.setFillStyle(wc);
+        if (biker.wheel1) { biker.wheel1.setFillStyle(wc); biker.wheel2.setFillStyle(wc); }
       }
     });
   }
