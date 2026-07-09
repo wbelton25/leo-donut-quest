@@ -33,12 +33,11 @@ const FART_RADIUS = 64;
 const FART_CD     = 1500;
 
 // ── Vertical layout ──────────────────────────────────────────────────────────
-const PERCH_Y   = 45;                 // Edie's upstairs perch (feet on the balcony floor)
+const PERCH_Y   = 47;                 // Edie's upstairs perch (feet on the balcony floor)
 const RAIL_Y    = 66;                 // landing ledge / railing line
 const FLOOR_TOP = 205;                // front edge of the real hardwood floor
 const FLOOR_BOT = ARENA_H - 16;       // Leo's band is the floor only (no floating on the wall)
-const PERCH_L   = 34, PERCH_R = 160;  // flat left landing only (the rail goes diagonal past the newel post)
-const HANDRAIL_Y = 28;                // y of the handrail overlay strip
+const PERCH_L   = 58, PERCH_R = ARENA_W - 58; // paces the full balcony width
 const PERCH_SPEED = 78;   // paces the landing quickly + erratically
 const EDIE_FLOOR_Y = FLOOR_BOT - 24;  // where Edie ends up when down at floor level
 
@@ -81,7 +80,7 @@ export default class EdieBossScene extends Phaser.Scene {
     this._edieY     = PERCH_Y;
     if (this.textures.exists('sprite-edie-char')) {
       this._edieSprite = this.add.image(this._edieX, this._edieY, 'sprite-edie-char').setDepth(6);
-      this._edieSprite.setScale(54 / this._edieSprite.height); // head clears the handrail, feet on the floor
+      this._edieSprite.setScale(48 / this._edieSprite.height); // feet on the balcony floor
       this._edieImg = true;
     } else {
       this._edieSprite = this.add.rectangle(this._edieX, this._edieY, 16, 22, EDIE_COLOR).setDepth(6);
@@ -155,10 +154,6 @@ export default class EdieBossScene extends Phaser.Scene {
     if (this.textures.exists('bg-edie')) {
       // Real background already depicts the landing + railing, so no procedural rail.
       this.add.image(0, 0, 'bg-edie').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(-1);
-      // Handrail strip re-drawn in FRONT of Edie so she reads as behind the railing
-      if (this.textures.exists('bg-edie-rail')) {
-        this.add.image(0, HANDRAIL_Y, 'bg-edie-rail').setOrigin(0, 0).setDepth(8);
-      }
       return;
     }
 
