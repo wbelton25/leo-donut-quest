@@ -9,6 +9,7 @@ import EventSystem from '../systems/EventSystem.js';
 import EventCard from '../ui/EventCard.js';
 import WalmartShopCard from '../ui/WalmartShopCard.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
+import { classifyChoice } from '../utils/choiceRisk.js';
 
 // ── Ride constants ─────────────────────────────────────────────────────────────
 const TOTAL_DISTANCE  = 2000;
@@ -377,24 +378,99 @@ export default class OregonTrailScene extends Phaser.Scene {
     return { timeCost: this._travel?.timeCost ?? 0, incidents };
   }
 
-  // Draws one Act-2 road event as an untimed card, then calls onDone.
+  // Draws one Act-2 road event as an untimed card. Picking a choice rolls a
+  // hidden optimal/sub-optimal outcome and reveals what actually happened.
   _triggerCampEvent(onDone) {
     const event = this._events.drawEvent('act2');
     if (!event) { onDone(); return; }
     this._eventCard.show(event, (choiceIndex) => {
-      const result = this._events.applyChoice(event, choiceIndex);
-      if (result.resourceChanges) this._applyPerMemberEffects(result.resourceChanges);
-      this._lastEventOutcome = this._formatEventOutcome(result.resourceChanges);
-      if (result.usedMember && this._stamina[result.usedMember] !== undefined) {
-        this._stamina[result.usedMember] = Math.max(0, this._stamina[result.usedMember] - SKILL_USE_COST);
-      }
-      if (result.partyLoss) {
-        this._dropMember(result.partyLoss);
-        this._announceMemberLost(result.partyLoss, onDone);  // clear, blocking notice
-        return;
-      }
-      onDone();
+      this._resolveChoiceAndReveal(event.choices[choiceIndex], onDone);
     });
+  }
+
+  // Spread of a choice's effects by risk profile: how much better a 'good' roll
+  // gets and how much worse a 'bad' roll gets (applied to the negative parts).
+  static get _SPREAD() {
+    return {
+      safe:   { good: 0.75, bad: 1.25 },
+      skill:  { good: 0.55, bad: 1.30 },
+      risky:  { good: 0.40, bad: 1.85 },
+      gamble: { good: 0.45, bad: 1.85 },
+    };
+  }
+
+  // Rolls an outcome quality for a choice and scales its effects accordingly.
+  _resolveChoice(choice) {
+    const e       = choice.effects ?? {};
+    const profile = classifyChoice(choice);
+    const r       = Math.random();
+
+    let quality;   // 'good' | 'normal' | 'bad'
+    if (profile === 'skill')       quality = r < 0.55 ? 'good' : r < 0.95 ? 'normal' : 'bad';
+    else if (profile === 'safe')   quality = r < 0.20 ? 'good' : r < 0.90 ? 'normal' : 'bad';
+    else if (profile === 'gamble') {
+      const p = e.partyLossRisk ?? 0.3;
+      quality = r < p ? 'bad' : (r < p + (1 - p) * 0.5 ? 'good' : 'normal');
+    } else /* risky */             quality = r < 0.35 ? 'good' : r < 0.60 ? 'normal' : 'bad';
+
+    const spread   = OregonTrailScene._SPREAD[profile];
+    const negScale = quality === 'good' ? spread.good : quality === 'bad' ? spread.bad : 1;
+    const posScale = quality === 'good' ? 1.25        : quality === 'bad' ? 0.5        : 1;
+    const resolved = {};
+    for (const k of ['time', 'energy', 'bikeCondition', 'distance', 'money', 'snacks']) {
+      if (e[k] === undefined) continue;
+      resolved[k] = Math.round(e[k] < 0 ? e[k] * negScale : e[k] * posScale);
+    }
+
+    let partyLoss = null;
+    if (profile === 'gamble' && quality === 'bad' && this._party.getSize() > 0) {
+      const p = this._party.getParty();
+      partyLoss = p[Math.floor(Math.random() * p.length)];
+    }
+    return { profile, quality, resolved, partyLoss };
+  }
+
+  // Resolves + applies a choice, then shows an Oregon-Trail-style result card that
+  // reveals what happened. Calls done() when the player dismisses the result.
+  _resolveChoiceAndReveal(choice, done) {
+    const res = this._resolveChoice(choice);
+    this._applyEventEffects(res.resolved);
+    if (choice.requiresPartyMember && this._stamina[choice.requiresPartyMember] !== undefined) {
+      this._stamina[choice.requiresPartyMember] =
+        Math.max(0, this._stamina[choice.requiresPartyMember] - SKILL_USE_COST);
+    }
+    this._lastEventOutcome = this._formatEventOutcome(res.resolved);
+
+    if (res.partyLoss) {
+      this._dropMember(res.partyLoss);
+      this._announceMemberLost(res.partyLoss, done);   // the loss notice IS the reveal
+      return;
+    }
+
+    const effText = this._effectsToText(res.resolved);
+    const title   = { good: 'IT PAID OFF!', normal: 'YOU MADE IT', bad: 'BAD LUCK!' }[res.quality];
+    const blurb   = {
+      good:   this._pick(['That went better than you hoped.', 'Couldn\'t have gone smoother.', 'Lucky break — nailed it.']),
+      normal: this._pick(['You got through it.', 'About what you\'d expect.', 'No drama — you pushed on.']),
+      bad:    this._pick(['That did not go your way.', 'Rough — it cost you.', 'Should\'ve seen that coming.']),
+    }[res.quality];
+    this._eventCard.show({
+      title,
+      description: effText ? `${blurb}\n\n${effText}` : `${blurb}\n\nNo harm done.`,
+      choices:     [{ text: 'Continue' }],
+    }, () => done());
+  }
+
+  // Plain readable summary of resolved effects for the reveal card.
+  _effectsToText(e) {
+    const parts = [];
+    if (e.time)          parts.push(`${e.time} time`);
+    if (e.energy)        parts.push(`${e.energy > 0 ? '+' : ''}${e.energy} energy`);
+    if (e.bikeCondition) parts.push(`${e.bikeCondition > 0 ? '+' : ''}${e.bikeCondition} bike health`);
+    if (e.distance)      parts.push(`${e.distance} closer to donuts`);
+    if (e.money)         parts.push(`${e.money > 0 ? '+$' : '-$'}${Math.abs(e.money)}`);
+    if (e.snacks)        parts.push(`${e.snacks > 0 ? '+' : ''}${e.snacks} snack`);
+    return parts.join(', ');
   }
 
   // Blocking notice when a DECISION costs a teammate (an intentional drop already
@@ -636,15 +712,8 @@ export default class OregonTrailScene extends Phaser.Scene {
               const choices = evt.choices.filter(c => !c.requiresPartyMember || this._party.hasMember(c.requiresPartyMember));
               const finalChoices = choices.length > 0 ? choices : [evt.choices[0]];
               this._eventCard.show({ title: evt.title, description: evt.description, choices: finalChoices }, (idx) => {
-                const choice = finalChoices[idx];
-                if (choice.effects && Object.keys(choice.effects).length > 0) {
-                  this._applyEventEffects(choice.effects);
-                }
-                this._lastEventOutcome = this._formatEventOutcome(choice.effects);
-                if (choice.requiresPartyMember && this._stamina[choice.requiresPartyMember] !== undefined) {
-                  this._stamina[choice.requiresPartyMember] = Math.max(0, this._stamina[choice.requiresPartyMember] - SKILL_USE_COST);
-                }
-                this._fadeOutLocation(locCon, onDone);
+                // Roll + reveal the outcome, then fade the location back to the ride.
+                this._resolveChoiceAndReveal(finalChoices[idx], () => this._fadeOutLocation(locCon, onDone));
               });
             } else {
               this.time.delayedCall(1200, () => this._fadeOutLocation(locCon, onDone));

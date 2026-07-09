@@ -1,4 +1,5 @@
 import { BASE_WIDTH, BASE_HEIGHT, txt } from '../constants.js';
+import { classifyChoice, stakesOf } from '../utils/choiceRisk.js';
 
 // EventCard: an event overlay drawn directly into OregonTrailScene.
 // Shows an Oregon Trail-style event card with title, description, and choice
@@ -108,30 +109,21 @@ export default class EventCard {
 
   // ── Internal ────────────────────────────────────────────────────────────────
 
-  // Compact, plain-language "what this choice costs / gives" line shown under each
-  // choice so the player can weigh a safe option against a faster/riskier one.
+  // Risk "vibe" shown under each choice — deliberately no exact numbers. It tells
+  // the player how big a gamble the choice is and what's on the line; the real
+  // result is rolled and revealed only after they commit.
   _effectPreview(choice) {
-    const e = choice.effects ?? {};
-    const parts = [];
-    if (e.time)          parts.push(`${e.time} time`);                                    // time is a cost (<= 0)
-    if (e.energy)        parts.push(`${e.energy > 0 ? '+' : ''}${e.energy} energy`);
-    if (e.bikeCondition) parts.push(`${e.bikeCondition > 0 ? '+' : ''}${e.bikeCondition} bike health`);
-    if (e.distance)      parts.push(`${e.distance} closer to donuts`);
-    if (e.money)         parts.push(`${e.money > 0 ? '+$' : '-$'}${Math.abs(e.money)}`);
-    if (e.snacks)        parts.push(`${e.snacks > 0 ? '+' : ''}${e.snacks} snack`);
-
-    if (e.partyLossRisk) {
-      const pct  = Math.round(e.partyLossRisk * 100);
-      const lead = parts.length ? parts.join(', ') + '   ' : '';
-      return { text: `${lead}RISK ${pct}%: might lose a rider`, color: '#ff5555' };
+    const profile = classifyChoice(choice);
+    const stakes  = stakesOf(choice);
+    const hint    = stakes.length ? ` (${stakes.slice(0, 3).join(' / ')})` : '';
+    switch (profile) {
+      case 'gamble': return { text: 'Big gamble - a rider might bail',            color: '#ff5555' };
+      case 'risky':  return { text: `Risky - could pay off or backfire${hint}`,   color: '#ffa077' };
+      case 'skill':  return { text: `Skilled - usually reliable${hint}`,          color: '#88cc88' };
+      default:       return hint
+        ? { text: `Safe & steady${hint}`, color: '#99bbaa' }
+        : { text: 'Safe & steady - no real cost', color: '#77bb99' };
     }
-    if (parts.length === 0) return { text: 'safe - no cost', color: '#77bb99' };
-
-    const good = (e.energy > 0 ? e.energy : 0) + (e.bikeCondition > 0 ? e.bikeCondition : 0)
-               + (e.distance || 0) / 20 + (e.money > 0 ? e.money : 0);
-    const bad  = (e.energy < 0 ? -e.energy : 0) + (e.bikeCondition < 0 ? -e.bikeCondition : 0);
-    const color = bad > good ? '#ffa077' : good > 0 ? '#88cc88' : '#99aabb';
-    return { text: parts.join(', '), color };
   }
 
   _buildStatic() {
