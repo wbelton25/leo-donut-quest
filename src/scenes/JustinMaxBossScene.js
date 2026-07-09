@@ -20,7 +20,6 @@ import PartySystem from '../systems/PartySystem.js';
 //   PATROL    → walks back and forth across the back of the yard
 //   CHASE     → moves toward Leo
 //   PITCH     → throws a baseball at Leo every 3s
-//   SWING     → melee bat swing when Leo gets close (wide arc, hard to dodge)
 //   ELECTRIC  → charges then releases an expanding electric shockwave every 7s
 //   STUNNED   → recovers after a fart hit
 //   DEFEATED  → spins + fades
@@ -53,8 +52,6 @@ const PATROL_SPEED      = 55;
 const CHASE_SPEED       = 84;
 const CHASE_RANGE       = 150;
 const PITCH_INTERVAL    = 3000;
-const SWING_RANGE       = 55;
-const SWING_DURATION    = 400;   // ms arc
 const ELECTRIC_INTERVAL = 7000;
 const ELECTRIC_WIND_UP  = 1200;  // ms
 const ELECTRIC_EXPAND   = 600;   // ms expansion
@@ -64,7 +61,6 @@ const FART_HIT_RANGE    = 80;
 
 // Damage
 const PITCH_DAMAGE      = 14;
-const SWING_DAMAGE      = 20;
 const ELECTRIC_DAMAGE   = 25;
 const CONTACT_DAMAGE    = 15;
 const CONTACT_COOLDOWN  = 1400;
@@ -129,7 +125,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._fartReady      = true;
     this._fartCooldownMs = 4000;
     this._pitches        = [];   // flying baseballs
-    this._swingActive    = false;
     this._electricActive = false;
     this._electricCharging = false;
     this._defeated       = false;
@@ -215,9 +210,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
     this._alertLabel    = txt(this, this._maxX, this._maxY - 32, '!',
       { fontSize: '8px', color: '#ffff00' }).setOrigin(0.5).setDepth(6).setVisible(false);
-
-    this._swingLabel    = txt(this, this._maxX, this._maxY - 32, 'SWING!',
-      { fontSize: '8px', color: '#ff8800' }).setOrigin(0.5).setDepth(6).setVisible(false);
 
     this._chargeLabel   = txt(this, ARENA_W / 2, ARENA_H / 2 - 30, '⚡ CHARGING ⚡',
       { fontSize: '8px', color: '#ffff00' }).setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false);
@@ -382,6 +374,11 @@ export default class JustinMaxBossScene extends Phaser.Scene {
   _updateMax() {
     const dt = 1 / 60;
 
+    // Hold still while winding up / firing the electric shock so it emanates
+    // from a fixed point (Max plants his feet to unleash it). His visuals are
+    // already in place from the prior frame, so just skip movement.
+    if (this._electricCharging || this._electricActive) return;
+
     if (this._maxState === 'PATROL') {
       this._maxX += this._maxVx * dt;
       const left = YARD_LEFT + 20, right = YARD_RIGHT - 20;
@@ -400,9 +397,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
         this._maxY += (dy / dist) * CHASE_SPEED * dt;
       }
       if (dist > CHASE_RANGE * 1.3) this._maxState = 'PATROL';
-
-      // Swing attack when very close
-      if (dist < SWING_RANGE && !this._swingActive) this._doSwing();
 
       // Contact damage
       if (dist < 22 && Date.now() - this._lastContact > CONTACT_COOLDOWN) {
@@ -427,7 +421,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._maxHelmet.setPosition(this._maxX, this._maxY - 14);
     this._maxBat.setPosition(this._maxX + 20, this._maxY + 4);
     this._alertLabel.setPosition(this._maxX, this._maxY - 32);
-    this._swingLabel.setPosition(this._maxX, this._maxY - 32);
   }
 
   _updatePitches() {
@@ -480,57 +473,31 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     }
   }
 
-  _doSwing() {
-    if (this._swingActive) return;
-    this._swingActive = true;
-    this._swingLabel.setVisible(true);
-
-    // Bat arc tween
-    this.tweens.add({
-      targets: this._maxBat,
-      angle: 180,
-      duration: SWING_DURATION,
-      ease: 'Quad.easeOut',
-      onComplete: () => {
-        this._maxBat.angle = 0;
-        this._swingLabel.setVisible(false);
-        this._swingActive = false;
-      },
-    });
-
-    // Damage if Leo is still close mid-swing
-    this.time.delayedCall(SWING_DURATION / 2, () => {
-      const dx = this._leoX - this._maxX, dy = this._leoY - this._maxY;
-      if (Math.sqrt(dx * dx + dy * dy) < SWING_RANGE + 10) {
-        this._resources.applyChanges({ energy: -SWING_DAMAGE });
-        this.cameras.main.shake(200, 0.012);
-        this._leoHurtFx(SWING_DAMAGE);
-        if (!this._defeated && this._resources.isExhausted()) this._gameOver();
-      }
-    });
-  }
-
   _startElectric() {
     if (this._maxState === 'STUNNED' || this._defeated || this._inputLocked) return;
     if (this._electricCharging || this._electricActive) return;
 
     this._electricCharging = true;
 
-    // Warning flash on Max
+    // Plant the shock's origin where Max is standing (he's frozen in _updateMax)
+    this._elecX = this._maxX;
+    this._elecY = this._maxY;
+
+    // Warning flash on Max (crackling cyan)
     this._chargeLabel.setVisible(true);
     let flashCount = 0;
-    const flashTimer = this.time.addEvent({
+    this.time.addEvent({
       delay: 150, repeat: 7,
-      callback: () => {
-        flashCount++;
-        this._maxTint(flashCount % 2 === 0 ? null : 0xffff00);
-      },
+      callback: () => { flashCount++; this._maxTint(flashCount % 2 === 0 ? null : 0x88ddff); },
     });
 
-    // Also show warning ring on arena floor
+    // Pulsing danger-zone telegraph centered on the origin
     const warnRing = this.add.graphics().setDepth(4);
-    warnRing.lineStyle(3, 0xffff00, 0.5);
-    warnRing.strokeCircle(ARENA_W / 2, ARENA_H / 2, ELECTRIC_RADIUS);
+    warnRing.fillStyle(0x66ddff, 0.12);
+    warnRing.fillCircle(this._elecX, this._elecY, ELECTRIC_RADIUS);
+    warnRing.lineStyle(2, 0x88ddff, 0.7);
+    warnRing.strokeCircle(this._elecX, this._elecY, ELECTRIC_RADIUS);
+    this.tweens.add({ targets: warnRing, alpha: 0.35, duration: 200, yoyo: true, repeat: -1 });
 
     this.time.delayedCall(ELECTRIC_WIND_UP, () => {
       this._electricCharging = false;
@@ -545,31 +512,51 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
   _releaseElectric() {
     this._electricActive = true;
-    this.cameras.main.shake(300, 0.01);
+    this.cameras.main.shake(300, 0.012);
 
-    // Expanding electric ring from Max's position
+    const ox = this._elecX, oy = this._elecY;
+
+    // Bright burst at the origin as the shock erupts
+    FX.burst(this, ox, oy, {
+      count: 18, colors: [0x66ddff, 0xffffff, 0xbdf0ff],
+      minSpeed: 70, maxSpeed: 190, minSize: 1, maxSize: 3, duration: 420, depth: 9,
+    });
+
+    // Jagged, crackling electric ring that flickers as it expands
     const ring = this.add.graphics().setDepth(9);
-    let radius = 5;
-    let electricHit = false; // guard: ring can only hit Leo once per wave
+    const N = 44;
+    let radius = 8;
+    let electricHit = false; // ring can only hit Leo once per wave
 
-    const expand = this.time.addEvent({
+    this.time.addEvent({
       delay: 16, repeat: Math.floor(ELECTRIC_EXPAND / 16),
       callback: () => {
+        // Build a closed jagged polygon (fresh jitter each frame = crackle/flicker)
+        const pts = [];
+        for (let k = 0; k <= N; k++) {
+          const ang = (k / N) * Math.PI * 2;
+          const jr  = radius + (Math.random() - 0.5) * 11;
+          pts.push([ox + Math.cos(ang) * jr, oy + Math.sin(ang) * jr]);
+        }
+        const stroke = (w, c, a) => {
+          ring.lineStyle(w, c, a);
+          ring.beginPath();
+          ring.moveTo(pts[0][0], pts[0][1]);
+          for (let k = 1; k < pts.length; k++) ring.lineTo(pts[k][0], pts[k][1]);
+          ring.strokePath();
+        };
         ring.clear();
-        ring.lineStyle(6, 0xffff00, 0.85);
-        ring.strokeCircle(this._maxX, this._maxY, radius);
-        ring.lineStyle(3, 0xffffff, 0.5);
-        ring.strokeCircle(this._maxX, this._maxY, radius - 4);
+        stroke(7, 0x2288ff, 0.30); // outer glow
+        stroke(3, 0x66ddff, 0.9);  // mid arc
+        stroke(1.5, 0xffffff, 1);  // white-hot core
 
-        // Check Leo hit as ring passes through him — only once per wave
+        // Hit Leo as the ring passes through him — once per wave
         if (!electricHit) {
-          const leoR = Math.sqrt(
-            (this._leoX - this._maxX) ** 2 + (this._leoY - this._maxY) ** 2
-          );
-          if (Math.abs(leoR - radius) < 14) {
+          const leoR = Math.hypot(this._leoX - ox, this._leoY - oy);
+          if (Math.abs(leoR - radius) < 16) {
             electricHit = true;
             this._resources.applyChanges({ energy: -ELECTRIC_DAMAGE });
-            this.cameras.main.flash(200, 255, 255, 0);
+            this.cameras.main.flash(200, 120, 200, 255); // electric-blue flash
             this.cameras.main.shake(200, 0.014);
             this._leoHurtFx(ELECTRIC_DAMAGE, true);
             if (!this._defeated && this._resources.isExhausted()) this._gameOver();
@@ -591,11 +578,11 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._heartsUpdate(this._resources.energy / 100);
     FX.burst(this, this._leoX, this._leoY, {
       count: 9,
-      colors: isElectric ? [0xffff00, 0xfff59d, 0xffffff] : [0xff5252, 0xff8a80, 0xffffff],
+      colors: isElectric ? [0x66ddff, 0xbdf0ff, 0xffffff] : [0xff5252, 0xff8a80, 0xffffff],
       minSpeed: 35, maxSpeed: 100, minSize: 1, maxSize: 3, duration: 420, depth: 30,
     });
     FX.popText(this, this._leoX, this._leoY - 18, `-${amount}`, {
-      color: isElectric ? '#ffee58' : '#ff5252', fontSize: '9px', rise: 22, duration: 600,
+      color: isElectric ? '#88ddff' : '#ff5252', fontSize: '9px', rise: 22, duration: 600,
     });
   }
 
@@ -632,7 +619,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     }
 
     this._maxState = 'STUNNED';
-    this._swingLabel.setVisible(false);
     this._chargeLabel.setVisible(false);
     this._electricCharging = false;
     this.time.delayedCall(STUN_DURATION, () => {
@@ -715,7 +701,6 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._pitches.forEach(b => b.sprite.destroy());
     this._pitches = [];
     this._chargeLabel.setVisible(false);
-    this._swingLabel.setVisible(false);
 
     this.tweens.add({
       targets: [this._maxBody, this._maxHelmet, this._maxBat],
