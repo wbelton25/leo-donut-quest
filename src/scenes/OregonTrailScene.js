@@ -291,6 +291,14 @@ export default class OregonTrailScene extends Phaser.Scene {
     const k = Math.min(1, t.elapsed / t.duration);
     this._distance = t.startDist + (t.endDist - t.startDist) * k;
 
+    // Spend the leg's time cost gradually as the bikes travel, and tick the clock.
+    const target = t.timeCost * k;
+    if (target > t.timeApplied) {
+      this._resources.applyChanges({ time: -(target - t.timeApplied) });
+      t.timeApplied = target;
+      this._etaText.setText(`TIME ${timeToDisplay(this._resources.time)}`);
+    }
+
     this._scrollLayers(dt, t.scrollSpeed);
     this._updateProgressBar();
     this._updateStaminaBars();
@@ -314,6 +322,10 @@ export default class OregonTrailScene extends Phaser.Scene {
       elapsed:     0,
       duration:    LEG_TRAVEL_MS / Math.max(0.35, pace),
       scrollSpeed: SCROLL_SPEED,
+      // Time cost accrues gradually WHILE the bikes roll (see update()), then
+      // freezes at the stop — the clock never ticks while you're deciding.
+      timeCost:    Math.round(4 / Math.max(0.35, pace) + Math.random() * 2),
+      timeApplied: 0,
     };
     this._phase  = 'travel';
     this._riding = true;
@@ -352,19 +364,15 @@ export default class OregonTrailScene extends Phaser.Scene {
     }
   }
 
-  // One-shot leg cost: time (scaled by how much the group is struggling) plus a
-  // single round of per-member stamina/bike drain. Returns a summary for the board.
+  // Arrival cost: one round of per-member stamina/bike drain (the leg's TIME cost
+  // was already spent gradually during travel). Returns a summary for the board.
   _applyLegCost(leg) {
-    const pace     = this._calcSpeedMult();
-    const timeCost = Math.round(4 / Math.max(0.35, pace) + Math.random() * 2);
-    this._resources.applyChanges({ time: -timeCost });
-
     const incidents = [];
     incidents.push(...this._drainStaminaOnce());
     incidents.push(...this._drainBikesOnce());
     this._syncBikeToHud();
 
-    return { timeCost, incidents };
+    return { timeCost: this._travel?.timeCost ?? 0, incidents };
   }
 
   // Draws one Act-2 road event as an untimed card, then calls onDone.
@@ -675,11 +683,11 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._buildRestStopUI();
   }
 
-  // Assembles the "what this leg cost" line from the last leg summary.
+  // Recaps the leg just ridden (its time was already spent en route).
   _legSummaryLine() {
     const s = this._lastLegSummary;
     if (!s) return 'Ready to ride.';
-    const parts = [`-${s.timeCost} time`];
+    const parts = [`Last leg cost ${s.timeCost} time`];
     if (s.incidents.length) parts.push(...s.incidents.slice(0, 2));
     else parts.push('smooth stretch, no trouble');
     return parts.join('  -  ');
