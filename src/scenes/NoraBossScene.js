@@ -173,7 +173,8 @@ export default class NoraBossScene extends Phaser.Scene {
 
   _buildNora() {
     if (this.textures.exists('sprite-nora-char')) {
-      this._noraBody = this.add.image(this._noraX, this._noraY, 'sprite-nora-char').setDisplaySize(40, 56).setDepth(6);
+      this._noraBody = this.add.image(this._noraX, this._noraY, 'sprite-nora-char').setDepth(6);
+      this._noraBody.setScale(58 / this._noraBody.height); // scale to ~58px tall, keep aspect
       this._noraImg = true;
     } else {
       this._noraBody = this.add.rectangle(this._noraX, this._noraY, T * 2, T * 2.8, 0xff8c00).setDepth(6);

@@ -67,7 +67,8 @@ export default class EdieBossScene extends Phaser.Scene {
     this._edieX      = ARENA_W / 2;
     this._edieY      = 80;
     if (this.textures.exists('sprite-edie-char')) {
-      this._edieSprite = this.add.image(this._edieX, this._edieY, 'sprite-edie-char').setDisplaySize(30, 44).setDepth(5);
+      this._edieSprite = this.add.image(this._edieX, this._edieY, 'sprite-edie-char').setDepth(5);
+      this._edieSprite.setScale(52 / this._edieSprite.height); // scale to ~52px tall, keep aspect
       this._edieImg = true;
     } else {
       this._edieSprite = this.add.rectangle(this._edieX, this._edieY, 14, 18, EDIE_COLOR).setDepth(5);

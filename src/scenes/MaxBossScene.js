@@ -150,7 +150,8 @@ export default class MaxBossScene extends Phaser.Scene {
 
   _buildMax() {
     if (this.textures.exists('sprite-max-char')) {
-      this._maxBody = this.add.image(this._maxX, this._maxY, 'sprite-max-char').setDisplaySize(44, 56).setDepth(5);
+      this._maxBody = this.add.image(this._maxX, this._maxY, 'sprite-max-char').setDepth(5);
+      this._maxBody.setScale(58 / this._maxBody.height); // scale to ~58px tall, keep aspect
       this._maxImg = true;
     } else {
       this._maxBody = this.add.rectangle(this._maxX, this._maxY, T * 2.5, T * 3, 0x334488).setDepth(5);

@@ -196,7 +196,8 @@ export default class JustinMaxBossScene extends Phaser.Scene {
 
   _buildMax() {
     if (this.textures.exists('sprite-justin-max-char')) {
-      this._maxBody = this.add.image(this._maxX, this._maxY, 'sprite-justin-max-char').setDisplaySize(46, 58).setDepth(5);
+      this._maxBody = this.add.image(this._maxX, this._maxY, 'sprite-justin-max-char').setDepth(5);
+      this._maxBody.setScale(60 / this._maxBody.height); // scale to ~60px tall, keep aspect
       this._maxImg = true;
     } else {
       this._maxBody = this.add.rectangle(this._maxX, this._maxY, T * 2.5, T * 3, 0xcc4400).setDepth(5);
