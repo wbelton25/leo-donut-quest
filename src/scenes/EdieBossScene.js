@@ -146,8 +146,6 @@ export default class EdieBossScene extends Phaser.Scene {
 
     this._heartsUpdate = createHearts(this, ARENA_W);
 
-    txt(this, ARENA_W / 2, FLOOR_TOP - 8, 'THROW HER STUFFIES BACK, THEN FART HER!',
-      { fontSize: '8px', color: '#ffaad4' }).setOrigin(0.5).setDepth(10);
     txt(this, ARENA_W / 2, ARENA_H - 9, 'WASD: MOVE   F: THROW / FART   SPACE: JUMP',
       { fontSize: '8px', color: '#778899' }).setOrigin(0.5).setDepth(10);
   }
