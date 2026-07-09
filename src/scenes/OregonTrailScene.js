@@ -19,24 +19,11 @@ const FATIGUE_CRIT    = 15;    // stamina level that tints a rider red
 const BIKE_WARN       = 40;    // bike level that flags a '!' warning on the board
 const SKILL_USE_COST  = 18;    // stamina cost when a member uses a skill
 
-// Per-member stamina drain per leg (compressed spread — over ~10 legs even the
-// neediest rider stays survivable with a snack or two, not a guaranteed bottom-out)
-const STAMINA_RATES = {
-  leo:    4,
-  warren: 4,   // methodical pacer
-  mj:     5,   // explosive but burns out fast
-  carson: 3,   // most efficient rider
-  justin: 6,   // all-out sprinter, drains quickest
-};
-
-// Per-member bike condition drain per leg
-const BIKE_DRAIN_RATES = {
-  leo:    3,
-  warren: 3,   // careful, gentle rider
-  mj:     4,   // hard on equipment
-  carson: 2,   // smooth, low wear
-  justin: 4,   // reckless — hard on bikes
-};
+// Everyone drains at the same baseline per leg. Who ends up being the weak link
+// is randomized PER RUN via per-member multipliers assigned in create() — so no
+// rider is inherently weaker, and a different person tends to struggle each game.
+const STAMINA_BASE = 4;  // baseline stamina drain per leg
+const BIKE_BASE    = 3;  // baseline bike wear per leg
 
 // Snack effect on stamina (0–100 scale)
 const SNACK_STAMINA = { gatorade: 33, granola: 67, hotdog: 100 };
@@ -186,6 +173,19 @@ export default class OregonTrailScene extends Phaser.Scene {
     this.game.registry.set('resources', this._resources);
     this.game.registry.set('party',     this._party);
     this._events = new EventSystem(this._resources, this._party);
+
+    // Snapshot the party + resources AS ARRIVED from Act 1, so a failed ride can be
+    // retried unlimited times from this exact starting point (no redoing Act 1).
+    this._entryParty     = this._party.getParty();       // member ids (leo is implicit)
+    this._entryResources = this._resources.getAll();
+
+    // Per-run random drain multipliers — randomize who becomes the weak link.
+    this._staminaMult = {};
+    this._bikeMult    = {};
+    ['leo', ...this._party.getParty()].forEach(id => {
+      this._staminaMult[id] = 0.7 + Math.random() * 0.7;  // 0.7–1.4×
+      this._bikeMult[id]    = 0.7 + Math.random() * 0.7;
+    });
 
     // ── Inventory (filled at Walmart, consumed on road) ───────────────────────
     this._snackInv = { gatorade: 0, granola: 0, hotdog: 0 };
@@ -465,7 +465,7 @@ export default class OregonTrailScene extends Phaser.Scene {
   _drainStaminaOnce() {
     const incidents = [];
     Object.keys(this._stamina).forEach(id => {
-      const base = STAMINA_RATES[id] ?? 5;
+      const base = STAMINA_BASE * (this._staminaMult[id] ?? 1);
       let drain;
       if (Math.random() < 0.06) {
         drain = 15 + Math.random() * 13;  // flat 15-28 mishap (not base-scaled)
@@ -484,7 +484,7 @@ export default class OregonTrailScene extends Phaser.Scene {
   _drainBikesOnce() {
     const incidents = [];
     Object.keys(this._bikeHP).forEach(id => {
-      const base = BIKE_DRAIN_RATES[id] ?? 3;
+      const base = BIKE_BASE * (this._bikeMult[id] ?? 1);
       let drain;
       if (Math.random() < 0.06) {
         drain = 14 + Math.random() * 12;  // flat 14-26 mishap (not base-scaled)
@@ -725,21 +725,20 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._buildRestStopUI();
   }
 
-  // Recaps the leg just ridden (its time was already spent en route).
-  _legSummaryLine() {
-    const s = this._lastLegSummary;
-    if (!s) return 'Ready to ride.';
-    const parts = [`Last leg cost ${s.timeCost} time`];
-    if (s.incidents.length) parts.push(...s.incidents.slice(0, 2));
-    else parts.push('smooth stretch, no trouble');
-    return parts.join('  -  ');
-  }
-
   _buildRestStopUI() {
-    const members = ['leo', ...this._party.getParty()];
-    const rowH  = 26;
+    const members    = ['leo', ...this._party.getParty()];
+    const rowH       = 26;
+    const allInc     = this._lastLegSummary?.incidents ?? [];
+    const incidents  = allInc.slice(0, 4);           // cap lines so the card fits 270px
+    const extraInc   = allInc.length - incidents.length;
     const hasOutcome = !!this._lastEventOutcome;
-    const headH = hasOutcome ? 47 : 34;
+
+    // Header = title + leg-cost line + ONE line per incident (so nothing runs off
+    // screen when several riders take a hit) + the color-coded choice outcome.
+    const lineH     = 11;
+    const headLines = 2 + incidents.length + (extraInc > 0 ? 1 : 0) + (hasOutcome ? 1 : 0);
+    const headH     = headLines * lineH + 12;
+
     const cardH = headH + members.length * rowH + 10 + 22 + 8;
     const cardW = 462;
     const cardX = (BASE_WIDTH - cardW) / 2;
@@ -750,18 +749,25 @@ export default class OregonTrailScene extends Phaser.Scene {
     const overlay = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.78);
     const bg      = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0x06080f, 0.98);
     const border  = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0, 0).setStrokeStyle(2, 0xf5a623);
+    this._restStopCon.add([overlay, bg, border]);
 
+    const line = (y, s, color) => {
+      this._restStopCon.add(txt(this, BASE_WIDTH / 2, y, s, { fontSize: '8px', color }).setOrigin(0.5, 0));
+    };
+
+    let ly = cardY + 5;
     const landmark = this._campCp ? this._campCp.label : 'REST STOP';
-    const header   = `${landmark}   -   LEG ${this._legIndex + 1}/${LEGS.length}   -   ${timeToDisplay(this._resources.time)}`;
-    const title    = txt(this, BASE_WIDTH / 2, cardY + 5, header, { fontSize: '8px', color: '#f5a623' }).setOrigin(0.5, 0);
-    const summary  = txt(this, BASE_WIDTH / 2, cardY + 18, this._legSummaryLine(), { fontSize: '8px', color: '#99aabb' }).setOrigin(0.5, 0);
-    this._restStopCon.add([overlay, bg, border, title, summary]);
+    line(ly, `${landmark}   -   LEG ${this._legIndex + 1}/${LEGS.length}   -   ${timeToDisplay(this._resources.time)}`, '#f5a623');
+    ly += lineH;
 
-    // Color-coded outcome of the choice you just made this leg (if any).
-    if (hasOutcome) {
-      const oc = txt(this, BASE_WIDTH / 2, cardY + 31, this._lastEventOutcome.text, { fontSize: '8px', color: this._lastEventOutcome.color }).setOrigin(0.5, 0);
-      this._restStopCon.add(oc);
-    }
+    const s = this._lastLegSummary;
+    const costText = s
+      ? `Last leg cost ${s.timeCost} time` + (incidents.length === 0 ? '   -   smooth stretch' : '')
+      : 'Ready to ride.';
+    line(ly, costText, '#99aabb'); ly += lineH;
+    incidents.forEach(inc => { line(ly, inc, '#ff9966'); ly += lineH; });
+    if (extraInc > 0) { line(ly, `(+${extraInc} more mishap${extraInc > 1 ? 's' : ''})`, '#ff9966'); ly += lineH; }
+    if (hasOutcome) { line(ly, this._lastEventOutcome.text, this._lastEventOutcome.color); ly += lineH; }
 
     let rowY = cardY + headH;
     members.forEach(id => {
@@ -941,7 +947,13 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._gameOverFlag = true;
     this._riding = false;
     this.cameras.main.fade(500, 0, 0, 0);
-    this.time.delayedCall(520, () => this.scene.start(SCENE_GAME_OVER, { reason }));
+    // Retry restarts the ride from the Act-1 finish line (same party + resources),
+    // not the whole game — unlimited attempts with the crew you brought.
+    this.time.delayedCall(520, () => this.scene.start(SCENE_GAME_OVER, {
+      reason,
+      retryScene: SCENE_OREGON_TRAIL,
+      retryData:  { party: this._entryParty, resources: this._entryResources },
+    }));
   }
 
   _triggerArrival() {

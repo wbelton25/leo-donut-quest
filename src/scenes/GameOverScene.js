@@ -11,6 +11,10 @@ export default class GameOverScene extends Phaser.Scene {
   init(data) {
     // data.reason: 'energy' | 'bike' | 'time'
     this._reason = data?.reason ?? 'energy';
+    // Optional retry target: restart THIS scene with THIS data instead of Act 1.
+    // Used by Act 2 so a failed ride retries from the Act-1 finish line.
+    this._retryScene = data?.retryScene ?? null;
+    this._retryData  = data?.retryData ?? null;
   }
 
   create() {
@@ -46,7 +50,8 @@ export default class GameOverScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Prompt
-    const prompt = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 50, 'PRESS SPACE TO TRY AGAIN', {
+    const promptText = this._retryScene ? 'PRESS SPACE TO RETRY THE RIDE' : 'PRESS SPACE TO TRY AGAIN';
+    const prompt = txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 50, promptText, {
       fontSize: '8px', color: '#ffffff',
     }).setOrigin(0.5);
 
@@ -61,10 +66,14 @@ export default class GameOverScene extends Phaser.Scene {
     // Input
     this.input.keyboard.once('keydown-SPACE', () => {
       this.cameras.main.fade(400, 0, 0, 0, false, (cam, progress) => {
-        if (progress === 1) {
-          // Clear saved state so they restart fresh
+        if (progress !== 1) return;
+        this.scene.stop(SCENE_GAME_OVER);
+        if (this._retryScene) {
+          // Retry the failed act with the party/resources you brought into it.
+          this.scene.start(this._retryScene, this._retryData);
+        } else {
+          // Full restart from Act 1 — clear saved state.
           this.game.registry.remove('gameState');
-          this.scene.stop(SCENE_GAME_OVER);
           this.scene.start(SCENE_NEIGHBORHOOD);
         }
       });
