@@ -19,22 +19,23 @@ const FATIGUE_CRIT    = 15;    // stamina level that tints a rider red
 const BIKE_WARN       = 40;    // bike level that flags a '!' warning on the board
 const SKILL_USE_COST  = 18;    // stamina cost when a member uses a skill
 
-// Per-member stamina drain per passive tick
+// Per-member stamina drain per leg (compressed spread — over ~10 legs even the
+// neediest rider stays survivable with a snack or two, not a guaranteed bottom-out)
 const STAMINA_RATES = {
-  leo:    5,
+  leo:    4,
   warren: 4,   // methodical pacer
-  mj:     8,   // explosive but burns out fast
+  mj:     5,   // explosive but burns out fast
   carson: 3,   // most efficient rider
-  justin: 10,  // all-out sprinter, drains quickest
+  justin: 6,   // all-out sprinter, drains quickest
 };
 
-// Per-member bike condition drain per passive tick
+// Per-member bike condition drain per leg
 const BIKE_DRAIN_RATES = {
   leo:    3,
-  warren: 2,   // careful, gentle rider
-  mj:     5,   // hard on equipment
+  warren: 3,   // careful, gentle rider
+  mj:     4,   // hard on equipment
   carson: 2,   // smooth, low wear
-  justin: 7,   // reckless — destroys bikes
+  justin: 4,   // reckless — hard on bikes
 };
 
 // Snack effect on stamina (0–100 scale)
@@ -199,6 +200,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._phase             = 'travel';
     this._travel            = null;   // active leg animation state
     this._lastLegSummary    = null;   // { timeCost, incidents } shown on the camp board
+    this._lastEventOutcome  = null;   // { text, color } outcome of this leg's choice
     this._campCp            = null;   // checkpoint being camped at (null for a plain camp)
 
     // Stamina tracking
@@ -382,6 +384,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._eventCard.show(event, (choiceIndex) => {
       const result = this._events.applyChoice(event, choiceIndex);
       if (result.resourceChanges) this._applyPerMemberEffects(result.resourceChanges);
+      this._lastEventOutcome = this._formatEventOutcome(result.resourceChanges);
       if (result.usedMember && this._stamina[result.usedMember] !== undefined) {
         this._stamina[result.usedMember] = Math.max(0, this._stamina[result.usedMember] - SKILL_USE_COST);
       }
@@ -405,6 +408,26 @@ export default class OregonTrailScene extends Phaser.Scene {
     }, () => done());
   }
 
+  // Turns a choice's resource deltas into a plain, color-coded outcome line so the
+  // player can see what their decision actually did. Returns { text, color } | null.
+  _formatEventOutcome(changes) {
+    if (!changes) return null;
+    const bits = [];
+    if (changes.time)          bits.push(`${changes.time > 0 ? '+' : ''}${Math.round(changes.time)} time`);
+    if (changes.energy)        bits.push(`${changes.energy > 0 ? '+' : ''}${Math.round(changes.energy)} energy`);
+    if (changes.bikeCondition) bits.push(`${changes.bikeCondition > 0 ? '+' : ''}${Math.round(changes.bikeCondition)} bikes`);
+    if (bits.length === 0) return null;
+
+    const dmg  = Math.max(0, -(changes.energy || 0)) + Math.max(0, -(changes.bikeCondition || 0));
+    const gain = Math.max(0,  (changes.energy || 0)) + Math.max(0,  (changes.bikeCondition || 0));
+    let lead, color;
+    if      (gain > dmg)                { lead = 'Good call!';     color = '#66dd66'; }
+    else if (dmg > 0)                   { lead = 'That hurt.';     color = '#ff6644'; }
+    else if ((changes.time || 0) <= -8) { lead = 'Cost some time.'; color = '#f5a623'; }
+    else                                { lead = 'Done.';          color = '#cccccc'; }
+    return { text: `${lead}  ${bits.join(', ')}`, color };
+  }
+
   _openCamp(cp) {
     this._campCp = cp;
     this._phase  = 'camp';
@@ -417,6 +440,7 @@ export default class OregonTrailScene extends Phaser.Scene {
   _continueFromCamp() {
     if (this._restStopCon) { this._restStopCon.destroy(true); this._restStopCon = null; }
     this._campCp = null;
+    this._lastEventOutcome = null;  // outcome line belongs to the leg just finished
     this._legIndex++;
     this._startLeg();
   }
@@ -444,9 +468,10 @@ export default class OregonTrailScene extends Phaser.Scene {
       const base = STAMINA_RATES[id] ?? 5;
       let drain;
       if (Math.random() < 0.06) {
-        drain = base * (4 + Math.random() * 4);
+        drain = 15 + Math.random() * 13;  // flat 15-28 mishap (not base-scaled)
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        incidents.push(this._pick([`${name} took a tumble`, `${name} hit a cramp`, `${name} nearly wiped out`]));
+        const what = this._pick([`${name} took a tumble`, `${name} hit a cramp`, `${name} nearly wiped out`]);
+        incidents.push(`${what} (-${Math.round(drain)} stam)`);
       } else {
         drain = base * (0.5 + Math.random() * 1.2);
       }
@@ -462,9 +487,10 @@ export default class OregonTrailScene extends Phaser.Scene {
       const base = BIKE_DRAIN_RATES[id] ?? 3;
       let drain;
       if (Math.random() < 0.06) {
-        drain = base * (5 + Math.random() * 5);
+        drain = 14 + Math.random() * 12;  // flat 14-26 mishap (not base-scaled)
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        incidents.push(this._pick([`${name} hit a pothole`, `${name}'s chain slipped`, `${name} clipped a curb`]));
+        const what = this._pick([`${name} hit a pothole`, `${name}'s chain slipped`, `${name} clipped a curb`]);
+        incidents.push(`${what} (-${Math.round(drain)} bike)`);
       } else {
         drain = base * (0.5 + Math.random() * 1.2);
       }
@@ -577,6 +603,7 @@ export default class OregonTrailScene extends Phaser.Scene {
                 if (choice.effects && Object.keys(choice.effects).length > 0) {
                   this._applyEventEffects(choice.effects);
                 }
+                this._lastEventOutcome = this._formatEventOutcome(choice.effects);
                 if (choice.requiresPartyMember && this._stamina[choice.requiresPartyMember] !== undefined) {
                   this._stamina[choice.requiresPartyMember] = Math.max(0, this._stamina[choice.requiresPartyMember] - SKILL_USE_COST);
                 }
@@ -711,7 +738,8 @@ export default class OregonTrailScene extends Phaser.Scene {
   _buildRestStopUI() {
     const members = ['leo', ...this._party.getParty()];
     const rowH  = 26;
-    const headH = 34;
+    const hasOutcome = !!this._lastEventOutcome;
+    const headH = hasOutcome ? 47 : 34;
     const cardH = headH + members.length * rowH + 10 + 22 + 8;
     const cardW = 462;
     const cardX = (BASE_WIDTH - cardW) / 2;
@@ -728,6 +756,12 @@ export default class OregonTrailScene extends Phaser.Scene {
     const title    = txt(this, BASE_WIDTH / 2, cardY + 5, header, { fontSize: '8px', color: '#f5a623' }).setOrigin(0.5, 0);
     const summary  = txt(this, BASE_WIDTH / 2, cardY + 18, this._legSummaryLine(), { fontSize: '8px', color: '#99aabb' }).setOrigin(0.5, 0);
     this._restStopCon.add([overlay, bg, border, title, summary]);
+
+    // Color-coded outcome of the choice you just made this leg (if any).
+    if (hasOutcome) {
+      const oc = txt(this, BASE_WIDTH / 2, cardY + 31, this._lastEventOutcome.text, { fontSize: '8px', color: this._lastEventOutcome.color }).setOrigin(0.5, 0);
+      this._restStopCon.add(oc);
+    }
 
     let rowY = cardY + headH;
     members.forEach(id => {
