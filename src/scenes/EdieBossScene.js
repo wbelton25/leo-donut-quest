@@ -38,12 +38,12 @@ const RAIL_Y    = 66;                 // landing ledge / railing line
 const FLOOR_TOP = 100;                // Leo can't go above this (railing)
 const FLOOR_BOT = ARENA_H - 16;
 const PERCH_L   = 58, PERCH_R = ARENA_W - 58;
-const PERCH_SPEED = 46;
+const PERCH_SPEED = 78;   // paces the landing quickly + erratically
 const EDIE_FLOOR_Y = FLOOR_BOT - 24;  // where Edie ends up when down at floor level
 
 // ── Stuffies ─────────────────────────────────────────────────────────────────
 const STUFFIE_GRAV     = 340;   // downward accel for falling stuffies
-const THROW_UP_SPEED   = 330;   // reflect speed
+const THROW_UP_SPEED   = 375;   // reflect speed (helps land on a faster-moving Edie)
 const STUFFIE_LIFESPAN = 6000;  // ms a landed stuffie waits to be grabbed
 const STUFFIE_COLORS   = [0xd98cc8, 0x8cc8d9, 0xd9c88c, 0xa8d98c, 0xd98c8c, 0xb0a0e0];
 
@@ -225,25 +225,27 @@ export default class EdieBossScene extends Phaser.Scene {
     const s = this._edieState;
 
     if (s === 'PERCH') {
-      // Pace along the landing
+      // Pace along the landing — fast, with occasional erratic direction changes
       this._edieX += this._perchDir * PERCH_SPEED * dt;
       if (this._edieX <= PERCH_L || this._edieX >= PERCH_R) {
         this._perchDir *= -1;
         this._edieX = Phaser.Math.Clamp(this._edieX, PERCH_L, PERCH_R);
+      } else if (Math.random() < 0.01) {
+        this._perchDir *= -1; // random juke — harder to predict/aim at
       }
-      // Throw stuffies down
+      // Throw stuffies down on an unpredictable cadence
       this._throwTimer -= delta;
       if (this._throwTimer <= 0) {
         this._throwDown();
-        this._throwTimer = [2400, 1700, 1250][this._phase() - 1];
+        this._throwTimer = this._throwInterval();
       }
-      // Ground-pound (phase 2+)
+      // Ground-pound — more frequent the more she's been hit (phase 2+)
       if (this._phase() >= 2) {
         this._slamTimer -= delta;
         if (this._slamTimer <= 0) {
           this._edieState = 'WINDUP';
           this._stateTimer = WINDUP_MS;
-          this._slamTimer = [0, 6500, 4800][this._phase() - 1];
+          this._slamTimer = this._slamInterval();
         }
       }
 
@@ -288,18 +290,37 @@ export default class EdieBossScene extends Phaser.Scene {
     if (this._slamWarnMark) this._slamWarnMark.setVisible(false);
   }
 
-  _throwDown() {
+  // Randomised gap between throws — faster and more erratic each phase
+  _throwInterval() {
+    const [lo, hi] = [[1400, 2300], [850, 1600], [600, 1150]][this._phase() - 1];
+    return Phaser.Math.Between(lo, hi);
+  }
+
+  // Slam cadence tightens with every hit (only phase 2+; phase 1 never slams)
+  _slamInterval() {
+    return ({ 3: 5000, 2: 3800, 1: 2600 })[this._edieHP] ?? Infinity;
+  }
+
+  _throwDown(isBurst = false) {
     const count = this._phase() >= 3 ? (Math.random() < 0.5 ? 3 : 1)
                 : this._phase() >= 2 ? (Math.random() < 0.35 ? 2 : 1)
                 : 1;
     for (let i = 0; i < count; i++) {
       const spreadX = (i - (count - 1) / 2) * 60;
-      const targetX = Phaser.Math.Clamp(this._leoX + spreadX, 20, ARENA_W - 20);
+      const jitter  = Phaser.Math.Between(-24, 24); // aim isn't perfectly on Leo
+      const targetX = Phaser.Math.Clamp(this._leoX + spreadX + jitter, 20, ARENA_W - 20);
       const st = this._makeStuffie(this._edieX, PERCH_Y + 8);
       st.state = 'fall';
       st.vx = (targetX - this._edieX) * 0.55;
       st.vy = 40;
       this._stuffies.push(st);
+    }
+
+    // Erratic burst: sometimes a quick surprise follow-up throw (phase 2+)
+    if (!isBurst && this._phase() >= 2 && Math.random() < 0.3) {
+      this.time.delayedCall(230, () => {
+        if (!this._defeated && this._edieState === 'PERCH') this._throwDown(true);
+      });
     }
   }
 
