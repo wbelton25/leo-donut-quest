@@ -27,7 +27,7 @@ const ARENA_W = BASE_WIDTH;
 const ARENA_H = BASE_HEIGHT;
 
 const EDIE_COLOR = 0xff69b4;
-const EDIE_HP    = 3;
+const EDIE_HP    = 5;
 const LEO_SPEED  = 160;
 const FART_RADIUS = 64;
 const FART_CD     = 1500;
@@ -50,7 +50,7 @@ const STUFFIE_COLORS   = [0xd98cc8, 0x8cc8d9, 0xd9c88c, 0xa8d98c, 0xd98c8c, 0xb0
 // ── Timing ───────────────────────────────────────────────────────────────────
 const STUN_MS      = 2600;   // dazed-on-floor window after a reflect hit
 const SLAM_VULN_MS = 1300;   // brief vulnerable window after a ground-pound
-const WINDUP_MS    = 750;    // ground-pound telegraph
+const WINDUP_MS    = 1150;   // ground-pound telegraph (long, clearly readable)
 
 // ── Jump (dodge the shockwave) ───────────────────────────────────────────────
 const JUMP_MS = 500;
@@ -88,6 +88,12 @@ export default class EdieBossScene extends Phaser.Scene {
     }
     this._edieBaseScale = this._edieSprite.scaleX;
     this._edieBarUpdate = createBossBar(this, ARENA_W, EDIE_COLOR);
+
+    // Ground-pound telegraph — a danger column + "!" shown during the wind-up
+    this._slamWarnLine = this.add.rectangle(0, (RAIL_Y + FLOOR_BOT) / 2, 46, FLOOR_BOT - RAIL_Y, 0xff4466, 0.16)
+      .setDepth(2).setVisible(false);
+    this._slamWarnMark = txt(this, 0, 0, '!', { fontSize: '14px', color: '#ff5566', stroke: '#000', strokeThickness: 3 })
+      .setOrigin(0.5).setDepth(11).setVisible(false);
 
     // Dizzy stars (shown while stunned) — drawn shapes (font is ASCII-only)
     this._stars = this.add.container(0, 0).setDepth(9).setVisible(false);
@@ -242,11 +248,15 @@ export default class EdieBossScene extends Phaser.Scene {
       }
 
     } else if (s === 'WINDUP') {
-      // Telegraph: flash + hold position
-      this._edieTint(Math.floor(this.time.now / 90) % 2 ? 0xffee66 : null);
+      // Telegraph: bright flash + danger column + "!" so the slam is well-signalled
+      const on = Math.floor(this.time.now / 110) % 2 === 0;
+      this._edieTint(on ? 0xffffff : 0xffdd33);
+      this._slamWarnLine.setVisible(true).setX(this._edieX).setAlpha(on ? 0.32 : 0.12);
+      this._slamWarnMark.setVisible(true).setPosition(this._edieX, this._edieY - 22).setAlpha(on ? 1 : 0.35);
       this._stateTimer -= delta;
       if (this._stateTimer <= 0) {
         this._edieTint(null);
+        this._hideSlamWarn();
         this._startSlam();
       }
 
@@ -266,7 +276,17 @@ export default class EdieBossScene extends Phaser.Scene {
     this._edieSprite.setPosition(this._edieX, this._edieY);
   }
 
-  _phase() { return EDIE_HP - this._edieHP + 1; } // 1 at full HP → 3 at 1 HP
+  // Map remaining HP to 3 escalating phases (slams begin at phase 2).
+  _phase() {
+    if (this._edieHP >= 4) return 1; // HP 5-4: learn the reflect loop, no slams
+    if (this._edieHP >= 2) return 2; // HP 3-2: slams begin
+    return 3;                        // HP 1: full aggression
+  }
+
+  _hideSlamWarn() {
+    if (this._slamWarnLine) this._slamWarnLine.setVisible(false);
+    if (this._slamWarnMark) this._slamWarnMark.setVisible(false);
+  }
 
   _throwDown() {
     const count = this._phase() >= 3 ? (Math.random() < 0.5 ? 3 : 1)
@@ -335,6 +355,7 @@ export default class EdieBossScene extends Phaser.Scene {
 
   _stunEdie() {
     if (this._edieState !== 'PERCH' && this._edieState !== 'WINDUP') return;
+    this._hideSlamWarn();
     this._edieState = 'STUNNED';
     this._edieVuln = true;
     this._stateTimer = STUN_MS;
@@ -516,6 +537,7 @@ export default class EdieBossScene extends Phaser.Scene {
     this._edieState = 'DEFEATED';
     this._edieVuln = false;
     this._stars.setVisible(false);
+    this._hideSlamWarn();
     this._edieTint(0x555555);
     this._stuffies.forEach(st => st.c.destroy()); this._stuffies = [];
     this._shocks.forEach(s => s.obj.destroy());  this._shocks = [];
