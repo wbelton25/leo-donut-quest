@@ -71,6 +71,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('bg-max',        'assets/backgrounds/max_football.png');
     this.load.image('bg-justin-max', 'assets/backgrounds/justin_max_baseball.png');
     this.load.image('bg-edie',       'assets/backgrounds/edie_livingroom.png');
+    this.load.image('bg-edie-rail',  'assets/backgrounds/edie_handrail.png'); // handrail overlay (drawn in front of Edie)
 
     // Seamless 128×128 surface textures — used for large tileSprite fills
     ['grass', 'park', 'golf', 'road', 'sidewalk', 'water', 'water-lt', 'shore']
