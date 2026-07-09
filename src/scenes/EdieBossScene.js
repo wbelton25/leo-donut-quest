@@ -37,7 +37,7 @@ const PERCH_Y   = 47;                 // Edie's upstairs perch (feet on the balc
 const RAIL_Y    = 66;                 // landing ledge / railing line
 const FLOOR_TOP = 205;                // front edge of the real hardwood floor
 const FLOOR_BOT = ARENA_H - 16;       // Leo's band is the floor only (no floating on the wall)
-const PERCH_L   = 58, PERCH_R = ARENA_W - 58; // paces the full balcony width
+const PERCH_L   = 45, PERCH_R = 368;  // spans the railing (left + right landings), off the far wall
 const PERCH_SPEED = 78;   // paces the landing quickly + erratically
 const EDIE_FLOOR_Y = FLOOR_BOT - 24;  // where Edie ends up when down at floor level
 
@@ -109,7 +109,7 @@ export default class EdieBossScene extends Phaser.Scene {
     this._leoShadow = this.add.ellipse(this._leoX, this._leoY + 10, 20, 6, 0x000000, 0.3).setDepth(4);
     if (this.textures.exists('sprite-leo-foot')) {
       this._leoSprite = this.add.image(this._leoX, this._leoY, 'sprite-leo-foot').setDepth(5);
-      this._leoSprite.setScale(34 / this._leoSprite.height).setOrigin(0.5, 0.62); // feet near _leoY
+      this._leoSprite.setScale(44 / this._leoSprite.height).setOrigin(0.5, 0.75); // bigger; feet near _leoY
       this._leoImg = true;
     } else {
       this._leoSprite = this.add.rectangle(this._leoX, this._leoY, 12, 16, 0x3b82f6).setDepth(5);
