@@ -41,6 +41,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('sprite-edie-char',       'assets/sprites/edie.png');
     this.load.image('sprite-soccer-ball',     'assets/sprites/soccer_ball.png');
     this.load.image('sprite-baseball',        'assets/sprites/baseball.png');
+    this.load.image('sprite-football',        'assets/sprites/football.png');
 
     // Obstacle sprites (48×48, 12 frames: 4 dirs × 3)
     this.load.atlas('sprite-deer',      'assets/sprites/deer.png',      'assets/sprites/deer.json');

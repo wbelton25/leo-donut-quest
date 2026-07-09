@@ -452,7 +452,13 @@ export default class MaxBossScene extends Phaser.Scene {
     const baseAngle = Math.atan2(dy, dx);
     const angle = baseAngle + angleOffset;
 
-    const fb = this.add.ellipse(this._maxX, this._maxY, 14, 10, 0x8b4513).setDepth(4);
+    let fb;
+    if (this.textures.exists('sprite-football')) {
+      fb = this.add.image(this._maxX, this._maxY, 'sprite-football').setDepth(4);
+      fb.setScale(20 / fb.width); // ~20px wide, keep aspect
+    } else {
+      fb = this.add.ellipse(this._maxX, this._maxY, 14, 10, 0x8b4513).setDepth(4);
+    }
     this._projectiles.push({
       obj: fb, vx: Math.cos(angle) * FOOTBALL_SPEED, vy: Math.sin(angle) * FOOTBALL_SPEED,
       damage: FOOTBALL_DAMAGE, type: 'football',
@@ -519,6 +525,7 @@ export default class MaxBossScene extends Phaser.Scene {
       const p = this._projectiles[i];
       p.obj.x += p.vx * dt;
       p.obj.y += p.vy * dt;
+      p.obj.angle += 9; // tumble in flight
 
       if (p.obj.x < 0 || p.obj.x > ARENA_W || p.obj.y < 0 || p.obj.y > ARENA_H) {
         p.obj.destroy();
