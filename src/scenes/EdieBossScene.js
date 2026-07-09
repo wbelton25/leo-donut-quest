@@ -101,7 +101,14 @@ export default class EdieBossScene extends Phaser.Scene {
     this._leoX = ARENA_W / 2;
     this._leoY = FLOOR_BOT - 24;
     this._leoShadow = this.add.ellipse(this._leoX, this._leoY + 10, 20, 6, 0x000000, 0.3).setDepth(4);
-    this._leoSprite = this.add.rectangle(this._leoX, this._leoY, 12, 16, 0x3b82f6).setDepth(5);
+    if (this.textures.exists('sprite-leo-foot')) {
+      this._leoSprite = this.add.image(this._leoX, this._leoY, 'sprite-leo-foot').setDepth(5);
+      this._leoSprite.setScale(34 / this._leoSprite.height).setOrigin(0.5, 0.62); // feet near _leoY
+      this._leoImg = true;
+    } else {
+      this._leoSprite = this.add.rectangle(this._leoX, this._leoY, 12, 16, 0x3b82f6).setDepth(5);
+      this._leoImg = false;
+    }
 
     // ── Input ─────────────────────────────────────────────────────────────────
     this._cursors = this.input.keyboard.createCursorKeys();
@@ -530,8 +537,8 @@ export default class EdieBossScene extends Phaser.Scene {
   _damageLeo(amount) {
     this._leoHP = Math.max(0, this._leoHP - amount);
     this._leoHitCd = 800;
-    this._leoSprite.setFillStyle(0xff0000);
-    this.time.delayedCall(200, () => { if (!this._gameover) this._leoSprite.setFillStyle(0x3b82f6); });
+    this._leoFlash(true);
+    this.time.delayedCall(200, () => { if (!this._gameover) this._leoFlash(false); });
     this.cameras.main.flash(160, 255, 60, 90);
     this._heartsUpdate(this._leoHP / 5);
 
@@ -564,6 +571,15 @@ export default class EdieBossScene extends Phaser.Scene {
       this.cameras.main.fade(400, 0, 0, 0);
       this.time.delayedCall(420, () => this.scene.start(SCENE_CREDITS, { party: this._gauntletData.party ?? [], donuts: newDonuts }));
     });
+  }
+
+  // Leo hurt flash — image (setTint) or rectangle (setFillStyle)
+  _leoFlash(on) {
+    if (this._leoImg) {
+      if (on) this._leoSprite.setTint(0xff5555); else this._leoSprite.clearTint();
+    } else {
+      this._leoSprite.setFillStyle(on ? 0xff0000 : 0x3b82f6);
+    }
   }
 
   // ── Tint helper (image setTint / rectangle setFillStyle) ─────────────────────

@@ -39,6 +39,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('sprite-max-char',        'assets/sprites/max.png');
     this.load.image('sprite-justin-max-char', 'assets/sprites/justin_max.png');
     this.load.image('sprite-edie-char',       'assets/sprites/edie.png');
+    this.load.image('sprite-leo-foot',        'assets/sprites/leo_foot.png');
     this.load.image('sprite-soccer-ball',     'assets/sprites/soccer_ball.png');
     this.load.image('sprite-baseball',        'assets/sprites/baseball.png');
     this.load.image('sprite-football',        'assets/sprites/football.png');
