@@ -1,7 +1,9 @@
 # Act 2 (Oregon Trail) — Staged-Legs Pacing Rework
 
-**Status:** PLANNED, not yet implemented. Biker-sprite swap is DONE + committed
-(bikers now use real character-on-bike sprites, commit on `main`).
+**Status:** IMPLEMENTED (build clean; needs in-browser playtest). Biker-sprite
+swap + staged-legs restructure + dead-code cleanup all committed on `main`.
+Rollback tag: `pre-act2-staged-legs`. Remaining: playtest tuning (leg count,
+LEG_TRAVEL_MS pace feel, per-leg time/stamina/bike cost balance, event frequency).
 **Goal (user's words):** more time for decisions, less time-critical/chaotic
 gameplay, modeled on the real Oregon Trail's stop-and-decide pacing. User picked
 the **Staged legs** option (full restructure) over quick-win tuning.
