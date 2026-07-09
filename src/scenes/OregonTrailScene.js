@@ -850,7 +850,8 @@ export default class OregonTrailScene extends Phaser.Scene {
     const stam = Math.round(this._stamina[id] ?? 0);
     const bike = Math.round(this._bikeHP[id] ?? 0);
     // A non-Leo rider at 0 stamina or 0 bike goes home on Continue unless fixed here.
-    const atRisk = id !== 'leo' && (stam <= 0 || bike <= 0);
+    // Use RAW values so this matches the go-home check exactly (no rounding false alarms).
+    const atRisk = id !== 'leo' && ((this._stamina[id] ?? 1) <= 0 || (this._bikeHP[id] ?? 1) <= 0);
 
     // Row background — red when a rider is about to leave
     makeRect(BASE_WIDTH / 2, cy, 462 - 4, rowH - 2, atRisk ? 0x3a0a0a : 0x0a0f1a);
