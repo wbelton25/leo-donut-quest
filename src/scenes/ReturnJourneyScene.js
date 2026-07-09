@@ -3,6 +3,7 @@ import {
   BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
+import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 
 // ReturnJourneyScene: sunset cutscene — the crew rides home with donuts.
 // No events, no input. Pure visual with auto-transition after RIDE_DURATION ms.
@@ -140,10 +141,19 @@ export default class ReturnJourneyScene extends Phaser.Scene {
 
     all.forEach((m, i) => {
       const x = startX + i * spacing;
-      const body   = this.add.rectangle(x, roadY - 6, 8, 10, m.color);
-      const wheel1 = this.add.circle(x - 5, roadY, 5, 0x222222);
-      const wheel2 = this.add.circle(x + 5, roadY, 5, 0x222222);
-      this.tweens.add({ targets: [body, wheel1, wheel2], y: `+=2`, yoyo: true, repeat: -1, duration: 240 + Math.random() * 80 });
+      const key = `sprite-${m.id}`;
+      // Real character-on-bike sprite when available; else the rectangle fallback.
+      if (this.textures.exists(key)) {
+        registerCharacterAnims(this.anims, key);
+        const spr = this.add.sprite(x, roadY - 4, key, 'right-0').setDisplaySize(30, 30).setDepth(6);
+        if (this.anims.exists(`${key}-walk-right`)) spr.play(`${key}-walk-right`);
+        this.tweens.add({ targets: spr, y: '-=2', yoyo: true, repeat: -1, duration: 240 + Math.random() * 80 });
+      } else {
+        const body   = this.add.rectangle(x, roadY - 6, 8, 10, m.color);
+        const wheel1 = this.add.circle(x - 5, roadY, 5, 0x222222);
+        const wheel2 = this.add.circle(x + 5, roadY, 5, 0x222222);
+        this.tweens.add({ targets: [body, wheel1, wheel2], y: '+=2', yoyo: true, repeat: -1, duration: 240 + Math.random() * 80 });
+      }
     });
 
     // Donut bag on Leo's back

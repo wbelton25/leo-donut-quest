@@ -385,9 +385,24 @@ export default class OregonTrailScene extends Phaser.Scene {
       if (result.usedMember && this._stamina[result.usedMember] !== undefined) {
         this._stamina[result.usedMember] = Math.max(0, this._stamina[result.usedMember] - SKILL_USE_COST);
       }
-      if (result.partyLoss) this._dropMember(result.partyLoss);
+      if (result.partyLoss) {
+        this._dropMember(result.partyLoss);
+        this._announceMemberLost(result.partyLoss, onDone);  // clear, blocking notice
+        return;
+      }
       onDone();
     });
+  }
+
+  // Blocking notice when a DECISION costs a teammate (an intentional drop already
+  // has its own confirm dialog, so this only fires for event-driven losses).
+  _announceMemberLost(id, done) {
+    const name = MEMBER_NAMES[id] ?? id.toUpperCase();
+    this._eventCard.show({
+      title:       `${name} LEFT THE GROUP`,
+      description: `That choice cost you a teammate — ${name} split off and headed home. The rest of the crew rides on without them.`,
+      choices:     [{ text: 'Ride on...' }],
+    }, () => done());
   }
 
   _openCamp(cp) {
