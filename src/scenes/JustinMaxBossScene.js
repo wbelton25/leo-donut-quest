@@ -468,7 +468,13 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     for (let i = 0; i < count; i++) {
       const spread = i === 0 ? 0 : (Math.random() - 0.5) * 0.4;
       const a = angleToLeo + spread;
-      const sprite = this.add.circle(this._maxX, this._maxY, 7, 0xffeedd).setDepth(6);
+      let sprite;
+      if (this.textures.exists('sprite-baseball')) {
+        sprite = this.add.image(this._maxX, this._maxY, 'sprite-baseball').setDepth(6);
+        sprite.setScale(16 / sprite.height); // ~16px ball, keep aspect
+      } else {
+        sprite = this.add.circle(this._maxX, this._maxY, 7, 0xffeedd).setDepth(6);
+      }
       this._pitches.push({ x: this._maxX, y: this._maxY,
         vx: Math.cos(a) * BALL_SPEED, vy: Math.sin(a) * BALL_SPEED, sprite });
     }
