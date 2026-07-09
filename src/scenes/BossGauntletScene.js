@@ -16,6 +16,10 @@ const SIBLING_SCENES = {
   justin: SCENE_JUSTIN_MAX_BOSS,
 };
 
+// Fixed return-home fight order by where the siblings live (not party join order):
+// Nora (carson) → Justin's Max (justin) → Max (mj) → Grace (warren), then Edie last.
+const BOSS_ORDER = ['carson', 'justin', 'mj', 'warren'];
+
 // Human-readable names for the pre-fight announcement
 const SIBLING_NAMES = {
   warren: 'GRACE',
@@ -54,8 +58,8 @@ export default class BossGauntletScene extends Phaser.Scene {
 
     // ── Build the queue of remaining fights ───────────────────────────────────
     // Siblings of surviving party members that haven't been beaten yet
-    const queue = party
-      .filter(id => SIBLING_SCENES[id] && !defeatedBosses.includes(id))
+    const queue = BOSS_ORDER
+      .filter(id => party.includes(id) && SIBLING_SCENES[id] && !defeatedBosses.includes(id))
       .map(id => ({ id, scene: SIBLING_SCENES[id], name: SIBLING_NAMES[id] }));
 
     // If no sibling fights remain, go straight to Edie

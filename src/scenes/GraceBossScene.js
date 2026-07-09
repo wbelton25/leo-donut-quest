@@ -247,9 +247,6 @@ export default class GraceBossScene extends Phaser.Scene {
     txt(this, 8, 18, 'SPACE: JUMP', { fontSize: '8px', color: '#88eeff' }).setScrollFactor(0).setDepth(20);
     txt(this, 8, 28, 'WASD: MOVE',  { fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setDepth(20);
 
-    txt(this, ARENA_W / 2, ARENA_H - 10, 'AVOID THE POOL!', { fontSize: '8px', color: '#ff4444' })
-      .setOrigin(0.5).setScrollFactor(0).setDepth(20);
-
     // Hearts — 5 hearts × 20 energy each
     txt(this, ARENA_W - 6, 5, 'LEO', { fontSize: '8px', color: '#cccccc' })
       .setOrigin(1, 0).setScrollFactor(0).setDepth(20);

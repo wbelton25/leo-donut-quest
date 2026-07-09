@@ -438,11 +438,41 @@ export default class OregonTrailScene extends Phaser.Scene {
   }
 
   _continueFromCamp() {
+    // Any party member still at 0 stamina or 0 bike when you leave the camp has to
+    // go home — this is your one chance to feed/fix them. (Leo never leaves.)
+    const goingHome = this._party.getParty().filter(
+      id => (this._stamina[id] ?? 1) <= 0 || (this._bikeHP[id] ?? 1) <= 0,
+    );
+    if (goingHome.length > 0) { this._sendMembersHome(goingHome); return; }
+    this._advanceLeg();
+  }
+
+  _advanceLeg() {
     if (this._restStopCon) { this._restStopCon.destroy(true); this._restStopCon = null; }
     this._campCp = null;
     this._lastEventOutcome = null;  // outcome line belongs to the leg just finished
     this._legIndex++;
     this._startLeg();
+  }
+
+  // Drops members who bottomed out, each taking their equal share of the pooled
+  // cash home with them (share = current pot / current crew size, Leo included).
+  _sendMembersHome(ids) {
+    const lines = [];
+    ids.forEach(id => {
+      const name     = MEMBER_NAMES[id] ?? id.toUpperCase();
+      const reason   = (this._stamina[id] ?? 1) <= 0 ? 'too exhausted' : 'bike broke down';
+      const crewSize = 1 + this._party.getParty().length;               // Leo + current party
+      const share    = Math.floor(this._resources.money / crewSize);
+      if (share > 0) this._resources.applyChanges({ money: -share });
+      lines.push(`${name} (${reason}) took $${share}`);
+      this._dropMember(id);
+    });
+    this._eventCard.show({
+      title:       ids.length > 1 ? 'RIDERS HEADED HOME' : `${MEMBER_NAMES[ids[0]] ?? 'A RIDER'} HEADED HOME`,
+      description: `${lines.join('.  ')}.  They each took their share of the pooled cash.`,
+      choices:     [{ text: 'Ride on...' }],
+    }, () => this._advanceLeg());
   }
 
   // ── Speed modulation ──────────────────────────────────────────────────────────
@@ -732,6 +762,9 @@ export default class OregonTrailScene extends Phaser.Scene {
     const incidents  = allInc.slice(0, 4);           // cap lines so the card fits 270px
     const extraInc   = allInc.length - incidents.length;
     const hasOutcome = !!this._lastEventOutcome;
+    const atRisk     = members.filter(
+      id => id !== 'leo' && ((this._stamina[id] ?? 1) <= 0 || (this._bikeHP[id] ?? 1) <= 0),
+    );
 
     // Header = title + leg-cost line + ONE line per incident (so nothing runs off
     // screen when several riders take a hit) + the color-coded choice outcome.
@@ -739,7 +772,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     const headLines = 2 + incidents.length + (extraInc > 0 ? 1 : 0) + (hasOutcome ? 1 : 0);
     const headH     = headLines * lineH + 12;
 
-    const cardH = headH + members.length * rowH + 10 + 22 + 8;
+    const cardH = headH + members.length * rowH + 10 + (atRisk.length ? lineH : 0) + 22 + 8;
     const cardW = 462;
     const cardX = (BASE_WIDTH - cardW) / 2;
     const cardY = (BASE_HEIGHT - cardH) / 2;
@@ -776,10 +809,19 @@ export default class OregonTrailScene extends Phaser.Scene {
     });
 
     rowY += 8;
-    const contBg  = this.add.rectangle(BASE_WIDTH / 2, rowY + 10, 260, 20, 0x1a3a1a).setInteractive({ useHandCursor: true });
-    const contLbl = txt(this, BASE_WIDTH / 2, rowY + 10, 'CONTINUE  →   [ENTER]', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5);
-    contBg.on('pointerover', () => contBg.setFillStyle(0x2a6a2a));
-    contBg.on('pointerout',  () => contBg.setFillStyle(0x1a3a1a));
+
+    // Red alert: riders at 0 will leave (and take their cash) if you continue now.
+    if (atRisk.length) {
+      const names = atRisk.map(id => MEMBER_NAMES[id] ?? id.toUpperCase()).join(' & ');
+      line(rowY + 2, `${names} head home unless you feed/fix them here!`, '#ff4444');
+      rowY += lineH;
+    }
+
+    const contLabel = atRisk.length ? 'CONTINUE (lose riders)  →   [ENTER]' : 'CONTINUE  →   [ENTER]';
+    const contBg  = this.add.rectangle(BASE_WIDTH / 2, rowY + 10, 260, 20, atRisk.length ? 0x3a1a1a : 0x1a3a1a).setInteractive({ useHandCursor: true });
+    const contLbl = txt(this, BASE_WIDTH / 2, rowY + 10, contLabel, { fontSize: '8px', color: atRisk.length ? '#ffaaaa' : '#88ff88' }).setOrigin(0.5);
+    contBg.on('pointerover', () => contBg.setFillStyle(atRisk.length ? 0x5a2a2a : 0x2a6a2a));
+    contBg.on('pointerout',  () => contBg.setFillStyle(atRisk.length ? 0x3a1a1a : 0x1a3a1a));
     contBg.on('pointerdown', () => this._continueFromCamp());
     this._restStopCon.add([contBg, contLbl]);
   }
@@ -798,18 +840,22 @@ export default class OregonTrailScene extends Phaser.Scene {
     };
     const cy = rowY + rowH / 2;
 
-    // Row background
-    makeRect(BASE_WIDTH / 2, cy, 462 - 4, rowH - 2, 0x0a0f1a);
+    const stam = Math.round(this._stamina[id] ?? 0);
+    const bike = Math.round(this._bikeHP[id] ?? 0);
+    // A non-Leo rider at 0 stamina or 0 bike goes home on Continue unless fixed here.
+    const atRisk = id !== 'leo' && (stam <= 0 || bike <= 0);
+
+    // Row background — red when a rider is about to leave
+    makeRect(BASE_WIDTH / 2, cy, 462 - 4, rowH - 2, atRisk ? 0x3a0a0a : 0x0a0f1a);
 
     // Name (4 chars max to fit)
     const name = (MEMBER_NAMES[id] ?? id).substring(0, 4);
-    makeText(x, cy, name, { color: '#cccccc' }).setOrigin(0, 0.5);
-
-    const stam = Math.round(this._stamina[id] ?? 0);
-    const bike = Math.round(this._bikeHP[id] ?? 0);
+    makeText(x, cy, name, { color: atRisk ? '#ff6666' : '#cccccc' }).setOrigin(0, 0.5);
 
     // Persistent warning flag (stays until the condition clears — no fading text)
-    if (stam < FATIGUE_WARN || bike < BIKE_WARN) {
+    if (atRisk) {
+      makeText(x + 30, cy, '!!', { color: '#ff2222' }).setOrigin(0.5);
+    } else if (stam < FATIGUE_WARN || bike < BIKE_WARN) {
       makeText(x + 32, cy, '!', { color: '#ff3333' }).setOrigin(0.5);
     }
 

@@ -240,8 +240,6 @@ export default class NoraBossScene extends Phaser.Scene {
   _buildHud() {
     txt(this, 8, 8,  'F: FART',   { fontSize: '8px', color: '#f5e642' }).setScrollFactor(0).setDepth(20);
     txt(this, 8, 20, 'WASD: MOVE',{ fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setDepth(20);
-    txt(this, ARENA_W / 2, ARENA_H - 10, 'FART NORA WHEN SHE EMERGES!',
-      { fontSize: '8px', color: '#ffaa44' }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
     // Leo hearts — matches Grace's fight
     this._heartsUpdate = createHearts(this, ARENA_W);

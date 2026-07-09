@@ -156,11 +156,10 @@ export default class ReturnJourneyScene extends Phaser.Scene {
       }
     });
 
-    // Donut bag on Leo's back
+    // Donut bag on Leo's back (no count label)
     if (donuts > 0) {
       const leoX = startX;
-      const bag = this.add.rectangle(leoX + 6, roadY - 8, 6, 6, 0xf5a623);
-      txt(this, leoX + 6, roadY - 16, `×${donuts}`, { fontSize: '8px', color: '#f5a623' }).setOrigin(0.5);
+      this.add.rectangle(leoX + 6, roadY - 8, 6, 6, 0xf5a623);
     }
   }
 }
