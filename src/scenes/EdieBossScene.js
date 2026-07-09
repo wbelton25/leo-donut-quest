@@ -6,11 +6,11 @@ import AudioManager from '../systems/AudioManager.js';
 import FX from '../systems/FX.js';
 import { createHearts, createBossBar } from '../ui/BossHud.js';
 
-// EdieBossScene: Leo's little sister Edie — the FINAL boss, deliberately unlike
-// the four sibling chase-fights.
+// EdieBossScene: Edie — Leo's older sister (2 years older) — the FINAL boss,
+// deliberately unlike the four sibling chase-fights. She's after Leo's donuts.
 //
-// She perches upstairs on a landing (out of fart range) throwing her stuffed
-// animals down at Leo. The loop:
+// She holds the high ground upstairs on a landing (out of fart range), pelting
+// Leo with her stuffed animals. The loop:
 //   1. Dodge the falling stuffies (run; jump the shockwave).
 //   2. Grab a landed stuffie (run over it) and THROW it back up at Edie (F).
 //   3. A reflected stuffie stuns her — she tumbles to the floor, dazed.
