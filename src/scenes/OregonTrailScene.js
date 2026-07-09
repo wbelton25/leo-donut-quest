@@ -149,6 +149,27 @@ const LOCATION_EVENTS = {
 const MEMBER_COLORS = { warren: 0xe74c3c, mj: 0x2ecc71, carson: 0x9b59b6, justin: 0xf39c12 };
 const MEMBER_NAMES  = { leo: 'LEO', warren: 'WARREN', mj: 'MJ', carson: 'CARSON', justin: 'JUSTIN' };
 
+// ── Staged legs ────────────────────────────────────────────────────────────────
+// The journey is a sequence of short ride segments ("legs") punctuated by stops.
+// You ride a leg (scripted animation, no decisions), then arrive at a stop where a
+// persistent status board shows everyone's state and ALL decisions happen with no
+// time pressure. Checkpoint stops also run their location scene / shop first.
+const LEGS = [
+  { end:  200, stop: 'camp' },
+  { end:  400, stop: 'checkpoint', cp: 'school'    },
+  { end:  600, stop: 'camp' },
+  { end:  800, stop: 'checkpoint', cp: 'walmart'   },
+  { end: 1000, stop: 'camp' },
+  { end: 1200, stop: 'checkpoint', cp: 'tire'      },
+  { end: 1400, stop: 'camp' },
+  { end: 1600, stop: 'checkpoint', cp: 'petsupply' },
+  { end: 1800, stop: 'camp' },
+  { end: 2000, stop: 'arrival' },
+];
+const LEG_TRAVEL_MS    = 3000;  // base ride duration per leg (scaled by pace)
+const LEG_EVENT_CHANCE = 0.7;   // chance a plain camp leg draws a road event
+const CHECKPOINT_BY_ID = Object.fromEntries(CHECKPOINTS.map(c => [c.id, c]));
+
 export default class OregonTrailScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_OREGON_TRAIL });
@@ -175,14 +196,14 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     // ── State ─────────────────────────────────────────────────────────────────
     this._distance          = 0;
-    this._riding            = true;
+    this._riding            = false;  // true only while a leg's travel animation plays
     this._gameOverFlag      = false;
     this._arrivalTriggered  = false;
-    this._drainTimer        = DRAIN_INTERVAL;
-    this._eventTimer        = EVENT_INTERVAL + (Math.random() * 2 - 1) * EVENT_JITTER;
-    this._passedCheckpoints = new Set();
-    this._breakThresholds   = [600, 1400];
-    this._breakOffered      = new Set();
+    this._legIndex          = 0;      // index into LEGS
+    this._phase             = 'travel';
+    this._travel            = null;   // active leg animation state
+    this._lastLegSummary    = null;   // { timeCost, incidents } shown on the camp board
+    this._campCp            = null;   // checkpoint being camped at (null for a plain camp)
 
     // Stamina tracking
     this._stamina        = { leo: 100 };
@@ -227,33 +248,27 @@ export default class OregonTrailScene extends Phaser.Scene {
       fontSize: '8px', color: '#aaaaaa',
     }).setOrigin(0.5, 0).setDepth(5);
 
-    // ── Second info strip (pace, ETA, rest stop button) ──────────────────────
+    // ── Second info strip (leg progress + clock + pace) ──────────────────────
     this.add.rectangle(BASE_WIDTH / 2, 53, BASE_WIDTH, 12, 0x000000, 0.58).setDepth(5);
 
-    // REST STOP button
-    const restBtnBg = this.add.rectangle(36, 53, 68, 12, 0x1a1a2a).setDepth(6)
-      .setInteractive({ useHandCursor: true });
-    this._restBtnLbl = txt(this, 36, 53, '[R] REST', { fontSize: '8px', color: '#aaaaaa' })
-      .setOrigin(0.5).setDepth(7);
-    restBtnBg.on('pointerover', () => restBtnBg.setFillStyle(0x2a2a3a));
-    restBtnBg.on('pointerout',  () => restBtnBg.setFillStyle(0x1a1a2a));
-    restBtnBg.on('pointerdown', () => this._openRestStop());
+    // Leg counter (left)
+    this._legText = txt(this, 6, 53, '', { fontSize: '8px', color: '#aaaaaa' })
+      .setOrigin(0, 0.5).setDepth(7);
 
-    // ETA text (center)
-    this._etaText = txt(this, BASE_WIDTH / 2, 53, '', { fontSize: '8px', color: '#44cc44' })
+    // Clock (center)
+    this._etaText = txt(this, BASE_WIDTH / 2, 53, '', { fontSize: '8px', color: '#f5e642' })
       .setOrigin(0.5).setDepth(7);
 
     // Pace indicator (right)
     this._paceText = txt(this, BASE_WIDTH - 4, 53, '', { fontSize: '8px', color: '#44cc44' })
       .setOrigin(1, 0.5).setDepth(7);
 
-    // R key: open rest stop when riding, close it when it's open
-    this.input.keyboard.addKey('R').on('down', () => {
-      if (this._restStopCon) this._closeRestStop();
-      else this._openRestStop();
-    });
+    // ENTER / SPACE advances from a camp status board to the next leg.
+    const advance = () => { if (this._phase === 'camp' && this._restStopCon) this._continueFromCamp(); };
+    this.input.keyboard.addKey('ENTER').on('down', advance);
+    this.input.keyboard.addKey('SPACE').on('down', advance);
 
-    this._restStopCon      = null;
+    this._restStopCon      = null;  // reused as the camp status-board container
     this._restStopTimerEvt = null;
 
     // ── Landmark banner ───────────────────────────────────────────────────────
@@ -264,99 +279,127 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     this._resources.applyChanges({});
     this._party._emit();
+    this._updateInvStrip();
+    this._startLeg();
   }
 
+  // ── Main loop: drives ONLY the current leg's travel animation ──────────────────
+  // No drains, events, or warnings happen here — those resolve at stops. When the
+  // leg's ride completes we hand off to _arriveAtStop().
   update(time, delta) {
-    if (!this._riding) return;
+    if (!this._riding || !this._travel) return;
     const dt = delta / 1000;
+    const t  = this._travel;
 
-    const speedMult = this._calcSpeedMult();
-    const speed = SCROLL_SPEED * speedMult;
-    this._scrollLayers(dt, speed);
-    this._distance += speed * dt;
+    t.elapsed += delta;
+    const k = Math.min(1, t.elapsed / t.duration);
+    this._distance = t.startDist + (t.endDist - t.startDist) * k;
+
+    this._scrollLayers(dt, t.scrollSpeed);
     this._updateProgressBar();
-
-    // ── Pace indicator ────────────────────────────────────────────────────────
-    if (speedMult >= 0.85)       { this._paceText.setText('PACE: FAST').setColor('#44cc44'); }
-    else if (speedMult >= 0.60)  { this._paceText.setText('PACE: OK').setColor('#f5a623'); }
-    else                         { this._paceText.setText('PACE: SLOW').setColor('#ff3333'); }
-
-    // ── ETA indicator ─────────────────────────────────────────────────────────
-    {
-      const distRemaining = TOTAL_DISTANCE - this._distance;
-      const currentSpeed  = SCROLL_SPEED * speedMult;
-      if (currentSpeed > 0 && distRemaining > 0) {
-        const secsToArrive = distRemaining / currentSpeed;
-        // Time drains 1 unit/sec passively; project what time resource will be at arrival
-        const projectedTime = this._resources.time - secsToArrive;
-        // Clamp to [0,100] — time > 100 means "before 3 PM" (show 3:00), time < 0 means "after 5 PM"
-        const clampedTime = Math.min(100, Math.max(0, projectedTime));
-        const minsPast = Math.round((100 - clampedTime) * 1.2);
-        const h = 3 + Math.floor(minsPast / 60);
-        const m = (minsPast % 60).toString().padStart(2, '0');
-        const etaColor = projectedTime > 15 ? '#44cc44' : projectedTime > 0 ? '#f5a623' : '#ff3333';
-        this._etaText.setText(`ARR: ${h}:${m}PM`).setColor(etaColor);
-      }
-    }
-
-    // ── Passive drains ────────────────────────────────────────────────────────
-    this._drainTimer -= delta;
-    if (this._drainTimer <= 0) {
-      // Global time drain — tighter: -4 per tick
-      this._resources.applyChanges({ time: -4 });
-      this._drainAllStamina();
-      this._drainAllBikes();
-      this._syncBikeToHud();
-      this._drainTimer = DRAIN_INTERVAL;
-    }
-
-    // ── Inventory strip ───────────────────────────────────────────────────────
-    const s = this._snackInv, b = this._bikeInv;
-    this._invText.setText(
-      `GATO:${s.gatorade}  GRAN:${s.granola}  DOG:${s.hotdog}    PATCH:${b.patch}  TIRE:${b.tire}  CHAIN:${b.chain}`,
-    );
-
-    // ── Per-member bar visuals ────────────────────────────────────────────────
     this._updateStaminaBars();
     this._updateBikeBars();
 
-    // ── Loss conditions ───────────────────────────────────────────────────────
+    if (k >= 1) {
+      this._riding = false;
+      this._arriveAtStop();
+    }
+  }
+
+  // ── Leg lifecycle ──────────────────────────────────────────────────────────────
+
+  _startLeg() {
+    const leg = LEGS[this._legIndex];
+    if (!leg) { this._triggerArrival(); return; }
+    const pace = this._calcSpeedMult();          // healthy group rides faster
+    this._travel = {
+      startDist:   this._distance,
+      endDist:     leg.end,
+      elapsed:     0,
+      duration:    LEG_TRAVEL_MS / Math.max(0.35, pace),
+      scrollSpeed: SCROLL_SPEED,
+    };
+    this._phase  = 'travel';
+    this._riding = true;
+    this._updatePaceEta(pace);
+  }
+
+  _arriveAtStop() {
+    const leg = LEGS[this._legIndex];
+    this._distance = leg.end;
+    this._updateProgressBar();
+
+    // Apply this leg's cost ONCE; remember the summary so the board can show it.
+    this._lastLegSummary = this._applyLegCost(leg);
+    this._updatePaceEta(this._calcSpeedMult());
+
+    // Loss is checked only at stops now — no per-frame surprises.
     if (!this._gameOverFlag) {
       if (this._resources.isTimeUp())    { this._triggerLoss('time');   return; }
       if (this._resources.isExhausted()) { this._triggerLoss('energy'); return; }
     }
 
-    if (!this._arrivalTriggered && this._distance >= TOTAL_DISTANCE) {
-      this._triggerArrival();
+    if (leg.stop === 'arrival') { this._triggerArrival(); return; }
+
+    if (leg.stop === 'checkpoint') {
+      const cp = CHECKPOINT_BY_ID[leg.cp];
+      if (cp.autoEffect) this._resources.applyChanges(cp.autoEffect);
+      this._showLocationScene(cp, () => this._openCamp(cp));
       return;
     }
 
-    // ── Checkpoints ───────────────────────────────────────────────────────────
-    this._checkCheckpoints();
-    if (!this._riding) return;
+    // Plain camp: sometimes a single road event, then the status board.
+    if (Math.random() < LEG_EVENT_CHANCE) {
+      this._triggerCampEvent(() => this._openCamp(null));
+    } else {
+      this._openCamp(null);
+    }
+  }
 
-    // ── Break opportunities ────────────────────────────────────────────────────
-    for (const threshold of this._breakThresholds) {
-      if (this._distance >= threshold && !this._breakOffered.has(threshold)) {
-        this._breakOffered.add(threshold);
-        this._riding = false;
-        this._triggerBreakEvent();
-        return;
+  // One-shot leg cost: time (scaled by how much the group is struggling) plus a
+  // single round of per-member stamina/bike drain. Returns a summary for the board.
+  _applyLegCost(leg) {
+    const pace     = this._calcSpeedMult();
+    const timeCost = Math.round(4 / Math.max(0.35, pace) + Math.random() * 2);
+    this._resources.applyChanges({ time: -timeCost });
+
+    const incidents = [];
+    incidents.push(...this._drainStaminaOnce());
+    incidents.push(...this._drainBikesOnce());
+    this._syncBikeToHud();
+
+    return { timeCost, incidents };
+  }
+
+  // Draws one Act-2 road event as an untimed card, then calls onDone.
+  _triggerCampEvent(onDone) {
+    const event = this._events.drawEvent('act2');
+    if (!event) { onDone(); return; }
+    this._eventCard.show(event, (choiceIndex) => {
+      const result = this._events.applyChoice(event, choiceIndex);
+      if (result.resourceChanges) this._applyPerMemberEffects(result.resourceChanges);
+      if (result.usedMember && this._stamina[result.usedMember] !== undefined) {
+        this._stamina[result.usedMember] = Math.max(0, this._stamina[result.usedMember] - SKILL_USE_COST);
       }
-    }
-    if (!this._riding) return;
+      if (result.partyLoss) this._dropMember(result.partyLoss);
+      onDone();
+    });
+  }
 
-    // ── Stamina / bike warnings & critical events ─────────────────────────────
-    this._checkStamina();
-    if (!this._riding) return;
-    this._checkBikes();
-    if (!this._riding) return;
+  _openCamp(cp) {
+    this._campCp = cp;
+    this._phase  = 'camp';
+    this._riding = false;
+    this._updateInvStrip();
+    this._updatePaceEta(this._calcSpeedMult());
+    this._buildRestStopUI();  // the status board
+  }
 
-    // ── Random events ─────────────────────────────────────────────────────────
-    this._eventTimer -= delta;
-    if (this._eventTimer <= 0 && !this._arrivalTriggered) {
-      this._triggerEvent();
-    }
+  _continueFromCamp() {
+    if (this._restStopCon) { this._restStopCon.destroy(true); this._restStopCon = null; }
+    this._campCp = null;
+    this._legIndex++;
+    this._startLeg();
   }
 
   // ── Speed modulation ──────────────────────────────────────────────────────────
@@ -374,41 +417,58 @@ export default class OregonTrailScene extends Phaser.Scene {
 
   // ── Passive drains ────────────────────────────────────────────────────────────
 
-  _drainAllStamina() {
+  // One leg's worth of stamina drain. Returns short incident strings (rare
+  // tumbles/cramps) for the camp board to display — no transient floats.
+  _drainStaminaOnce() {
+    const incidents = [];
     Object.keys(this._stamina).forEach(id => {
       const base = STAMINA_RATES[id] ?? 5;
-      const roll = Math.random();
       let drain;
-      if (roll < 0.03) {
-        // Rare incident: fall / stumble / cramp
-        drain = base * (5 + Math.random() * 4);
+      if (Math.random() < 0.06) {
+        drain = base * (4 + Math.random() * 4);
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        const msgs = [`${name} TOOK A TUMBLE!`, `${name} HIT A CRAMP!`, `${name} ALMOST WIPED OUT!`];
-        this._showFloat(msgs[Math.floor(Math.random() * msgs.length)], BASE_WIDTH / 2, BASE_HEIGHT * 0.42, '#ff4444');
+        incidents.push(this._pick([`${name} took a tumble`, `${name} hit a cramp`, `${name} nearly wiped out`]));
       } else {
-        // Normal variation: 0.4× to 1.8×
-        drain = base * (0.4 + Math.random() * 1.4);
+        drain = base * (0.5 + Math.random() * 1.2);
       }
       this._stamina[id] = Math.max(0, this._stamina[id] - drain);
     });
+    return incidents;
   }
 
-  _drainAllBikes() {
+  // One leg's worth of bike wear. Returns incident strings for the board.
+  _drainBikesOnce() {
+    const incidents = [];
     Object.keys(this._bikeHP).forEach(id => {
       const base = BIKE_DRAIN_RATES[id] ?? 3;
-      const roll = Math.random();
       let drain;
-      if (roll < 0.03) {
-        // Rare incident: pothole / curb clip / chain slip
-        drain = base * (6 + Math.random() * 5);
+      if (Math.random() < 0.06) {
+        drain = base * (5 + Math.random() * 5);
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        const msgs = [`${name} HIT A POTHOLE!`, `${name}'S CHAIN SLIPPED!`, `${name} CLIPPED A CURB!`];
-        this._showFloat(msgs[Math.floor(Math.random() * msgs.length)], BASE_WIDTH / 2, BASE_HEIGHT * 0.46, '#ef5350');
+        incidents.push(this._pick([`${name} hit a pothole`, `${name}'s chain slipped`, `${name} clipped a curb`]));
       } else {
-        drain = base * (0.4 + Math.random() * 1.4);
+        drain = base * (0.5 + Math.random() * 1.2);
       }
       this._bikeHP[id] = Math.max(0, this._bikeHP[id] - drain);
     });
+    return incidents;
+  }
+
+  _pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  _updateInvStrip() {
+    const s = this._snackInv, b = this._bikeInv;
+    this._invText.setText(
+      `GATO:${s.gatorade}  GRAN:${s.granola}  DOG:${s.hotdog}    PATCH:${b.patch}  TIRE:${b.tire}  CHAIN:${b.chain}`,
+    );
+  }
+
+  _updatePaceEta(pace) {
+    if (pace >= 0.85)      this._paceText.setText('PACE: FAST').setColor('#44cc44');
+    else if (pace >= 0.60) this._paceText.setText('PACE: OK').setColor('#f5a623');
+    else                   this._paceText.setText('PACE: SLOW').setColor('#ff3333');
+    this._legText.setText(`LEG ${Math.min(this._legIndex + 1, LEGS.length)}/${LEGS.length}`);
+    this._etaText.setText(`TIME ${timeToDisplay(this._resources.time)}`);
   }
 
   // Push average bike condition to ResourceSystem so HUD bar stays current
@@ -844,32 +904,31 @@ export default class OregonTrailScene extends Phaser.Scene {
     }
   }
 
-  // ── Rest stop ─────────────────────────────────────────────────────────────────
+  // ── Camp status board ──────────────────────────────────────────────────────────
+  // Persistent, untimed stop shown between legs. Decisions happen here with no time
+  // pressure. Rebuilt in place after any item use.
 
-  _openRestStop() {
-    if (!this._riding) return; // another event is already showing
-    this._riding = false;
-    this._restStopTimerEvt = this.time.addEvent({
-      delay: 3000, loop: true,
-      callback: () => this._resources.applyChanges({ time: -1 }),
-    });
+  _rebuildRestStop() {
+    if (this._restStopCon) { this._restStopCon.destroy(true); this._restStopCon = null; }
+    this._updateInvStrip();
     this._buildRestStopUI();
   }
 
-  _rebuildRestStop() {
-    if (this._restStopTimerEvt) { this._restStopTimerEvt.remove(); this._restStopTimerEvt = null; }
-    if (this._restStopCon)      { this._restStopCon.destroy(true); this._restStopCon = null; }
-    this._restStopTimerEvt = this.time.addEvent({
-      delay: 3000, loop: true,
-      callback: () => this._resources.applyChanges({ time: -1 }),
-    });
-    this._buildRestStopUI();
+  // Assembles the "what this leg cost" line from the last leg summary.
+  _legSummaryLine() {
+    const s = this._lastLegSummary;
+    if (!s) return 'Ready to ride.';
+    const parts = [`-${s.timeCost} time`];
+    if (s.incidents.length) parts.push(...s.incidents.slice(0, 2));
+    else parts.push('smooth stretch, no trouble');
+    return parts.join('  -  ');
   }
 
   _buildRestStopUI() {
     const members = ['leo', ...this._party.getParty()];
     const rowH  = 26;
-    const cardH = 20 + members.length * rowH + 10 + 22 + 8;
+    const headH = 34;
+    const cardH = headH + members.length * rowH + 10 + 22 + 8;
     const cardW = 462;
     const cardX = (BASE_WIDTH - cardW) / 2;
     const cardY = (BASE_HEIGHT - cardH) / 2;
@@ -879,24 +938,26 @@ export default class OregonTrailScene extends Phaser.Scene {
     const overlay = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.78);
     const bg      = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0x06080f, 0.98);
     const border  = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0, 0).setStrokeStyle(2, 0xf5a623);
-    const title   = txt(this, BASE_WIDTH / 2, cardY + 6, 'REST STOP  —  time ticks while stopped, [R] to resume', {
-      fontSize: '8px', color: '#f5a623',
-    }).setOrigin(0.5, 0);
-    this._restStopCon.add([overlay, bg, border, title]);
 
-    let rowY = cardY + 22;
+    const landmark = this._campCp ? this._campCp.label : 'REST STOP';
+    const header   = `${landmark}   -   LEG ${this._legIndex + 1}/${LEGS.length}   -   ${timeToDisplay(this._resources.time)}`;
+    const title    = txt(this, BASE_WIDTH / 2, cardY + 5, header, { fontSize: '8px', color: '#f5a623' }).setOrigin(0.5, 0);
+    const summary  = txt(this, BASE_WIDTH / 2, cardY + 18, this._legSummaryLine(), { fontSize: '8px', color: '#99aabb' }).setOrigin(0.5, 0);
+    this._restStopCon.add([overlay, bg, border, title, summary]);
+
+    let rowY = cardY + headH;
     members.forEach(id => {
       this._buildRestStopRow(id, cardX + 6, rowY, rowH);
       rowY += rowH;
     });
 
     rowY += 8;
-    const resumeBg  = this.add.rectangle(BASE_WIDTH / 2, rowY + 10, 210, 20, 0x1a3a1a).setInteractive({ useHandCursor: true });
-    const resumeLbl = txt(this, BASE_WIDTH / 2, rowY + 10, 'RESUME RIDING  →', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5);
-    resumeBg.on('pointerover', () => resumeBg.setFillStyle(0x2a6a2a));
-    resumeBg.on('pointerout',  () => resumeBg.setFillStyle(0x1a3a1a));
-    resumeBg.on('pointerdown', () => this._closeRestStop());
-    this._restStopCon.add([resumeBg, resumeLbl]);
+    const contBg  = this.add.rectangle(BASE_WIDTH / 2, rowY + 10, 260, 20, 0x1a3a1a).setInteractive({ useHandCursor: true });
+    const contLbl = txt(this, BASE_WIDTH / 2, rowY + 10, 'CONTINUE  →   [ENTER]', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5);
+    contBg.on('pointerover', () => contBg.setFillStyle(0x2a6a2a));
+    contBg.on('pointerout',  () => contBg.setFillStyle(0x1a3a1a));
+    contBg.on('pointerdown', () => this._continueFromCamp());
+    this._restStopCon.add([contBg, contLbl]);
   }
 
   _buildRestStopRow(id, x, rowY, rowH) {
@@ -922,6 +983,11 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     const stam = Math.round(this._stamina[id] ?? 0);
     const bike = Math.round(this._bikeHP[id] ?? 0);
+
+    // Persistent warning flag (stays until the condition clears — no fading text)
+    if (stam < FATIGUE_WARN || bike < BIKE_WARN) {
+      makeText(x + 32, cy, '!', { color: '#ff3333' }).setOrigin(0.5);
+    }
 
     // Stamina bar
     const sBarX = x + 40;
