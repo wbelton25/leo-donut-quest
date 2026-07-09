@@ -172,10 +172,17 @@ export default class NoraBossScene extends Phaser.Scene {
   // ─── Nora visual ──────────────────────────────────────────────────────────
 
   _buildNora() {
-    this._noraBody  = this.add.rectangle(this._noraX, this._noraY, T * 2, T * 2.8, 0xff8c00).setDepth(6);
-    this._noraShirt = this.add.rectangle(this._noraX, this._noraY - 3, T * 2, T * 1.4, 0xdd2200).setDepth(7);
-    this._noraBall  = this.add.circle(this._noraX + 16, this._noraY + 6, 7, 0xffffff).setDepth(7);
-    this._noraBallDot = this.add.circle(this._noraX + 16, this._noraY + 6, 3, 0x222222).setDepth(8);
+    if (this.textures.exists('sprite-nora-char')) {
+      this._noraBody = this.add.image(this._noraX, this._noraY, 'sprite-nora-char').setDisplaySize(40, 56).setDepth(6);
+      this._noraImg = true;
+    } else {
+      this._noraBody = this.add.rectangle(this._noraX, this._noraY, T * 2, T * 2.8, 0xff8c00).setDepth(6);
+      this._noraImg = false;
+    }
+    // Shirt + held ball — only shown for the rectangle fallback (art includes them)
+    this._noraShirt = this.add.rectangle(this._noraX, this._noraY - 3, T * 2, T * 1.4, 0xdd2200).setDepth(7).setVisible(!this._noraImg);
+    this._noraBall  = this.add.circle(this._noraX + 16, this._noraY + 6, 7, 0xffffff).setDepth(7).setVisible(!this._noraImg);
+    this._noraBallDot = this.add.circle(this._noraX + 16, this._noraY + 6, 3, 0x222222).setDepth(8).setVisible(!this._noraImg);
 
     this._noraHpBg   = this.add.rectangle(ARENA_W / 2, 16, 160, 8, 0x440000).setScrollFactor(0).setDepth(20);
     this._noraHpFill = this.add.rectangle(ARENA_W / 2 - 78, 16, 156, 6, 0xff6600)
@@ -464,6 +471,16 @@ export default class NoraBossScene extends Phaser.Scene {
     }
   }
 
+  // Tint the boss body — image (setTint) or fallback rectangle (setFillStyle).
+  _noraTint(color) {
+    if (this._noraImg) {
+      if (color === null) this._noraBody.clearTint();
+      else this._noraBody.setTint(color);
+    } else {
+      this._noraBody.setFillStyle(color === null ? 0xff8c00 : color);
+    }
+  }
+
   _inFirepit(x, y) {
     const dx = (x - FIREPIT.x) / (FIREPIT.rx + 7);
     const dy = (y - FIREPIT.y) / (FIREPIT.ry + 7);
@@ -565,9 +582,9 @@ export default class NoraBossScene extends Phaser.Scene {
     this._noraHp--;
     this._noraHpFill.scaleX = Math.max(0, this._noraHp / NORA_MAX_HP);
 
-    this._noraBody.setFillStyle(0xffffff);
+    this._noraTint(0xffffff);
     this.time.delayedCall(120, () => {
-      if (!this._defeated) this._noraBody.setFillStyle(0xff8c00);
+      if (!this._defeated) this._noraTint(null);
     });
 
     // ── Juice ──────────────────────────────────────────────────────────────

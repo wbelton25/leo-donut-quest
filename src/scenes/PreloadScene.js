@@ -31,9 +31,14 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('sprite-tree',  'assets/sprites/tree.png');
     this.load.image('sprite-house', 'assets/sprites/house.png');
 
-    // Boss character + weapon sprites (AI-generated, replaced from rectangles)
-    this.load.image('sprite-grace-char',  'assets/sprites/grace.png');
-    this.load.image('sprite-pool-noodle', 'assets/sprites/pool_noodle.png');
+    // Boss character + weapon sprites (AI-generated, replaced from rectangles).
+    // Missing files 404 harmlessly — each boss falls back to its drawn rectangle.
+    this.load.image('sprite-grace-char',      'assets/sprites/grace.png');
+    this.load.image('sprite-pool-noodle',     'assets/sprites/pool_noodle.png');
+    this.load.image('sprite-nora-char',       'assets/sprites/nora.png');
+    this.load.image('sprite-max-char',        'assets/sprites/max.png');
+    this.load.image('sprite-justin-max-char', 'assets/sprites/justin_max.png');
+    this.load.image('sprite-edie-char',       'assets/sprites/edie.png');
 
     // Obstacle sprites (48×48, 12 frames: 4 dirs × 3)
     this.load.atlas('sprite-deer',      'assets/sprites/deer.png',      'assets/sprites/deer.json');

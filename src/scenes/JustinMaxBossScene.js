@@ -195,10 +195,16 @@ export default class JustinMaxBossScene extends Phaser.Scene {
   // ─── Max visual ───────────────────────────────────────────────────────────
 
   _buildMax() {
-    this._maxBody    = this.add.rectangle(this._maxX, this._maxY, T * 2.5, T * 3, 0xcc4400).setDepth(5);
-    this._maxHelmet  = this.add.rectangle(this._maxX, this._maxY - 14, T * 2.5, T, 0x992200).setDepth(6);
-    // Bat
-    this._maxBat     = this.add.rectangle(this._maxX + 20, this._maxY + 4, T * 0.5, T * 2.5, 0x9b6820).setDepth(6);
+    if (this.textures.exists('sprite-justin-max-char')) {
+      this._maxBody = this.add.image(this._maxX, this._maxY, 'sprite-justin-max-char').setDisplaySize(46, 58).setDepth(5);
+      this._maxImg = true;
+    } else {
+      this._maxBody = this.add.rectangle(this._maxX, this._maxY, T * 2.5, T * 3, 0xcc4400).setDepth(5);
+      this._maxImg = false;
+    }
+    // Helmet + bat — only shown for the rectangle fallback (the art includes them)
+    this._maxHelmet  = this.add.rectangle(this._maxX, this._maxY - 14, T * 2.5, T, 0x992200).setDepth(6).setVisible(!this._maxImg);
+    this._maxBat     = this.add.rectangle(this._maxX + 20, this._maxY + 4, T * 0.5, T * 2.5, 0x9b6820).setDepth(6).setVisible(!this._maxImg);
 
     this._maxHpBg   = this.add.rectangle(ARENA_W / 2, 16, 160, 8, 0x440000).setScrollFactor(0).setDepth(20);
     this._maxHpFill = this.add.rectangle(ARENA_W / 2 - 78, 16, 156, 6, 0xff4400)
@@ -352,6 +358,16 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     }
   }
 
+  // Tint the boss body — image (setTint) or fallback rectangle (setFillStyle).
+  _maxTint(color) {
+    if (this._maxImg) {
+      if (color === null) this._maxBody.clearTint();
+      else this._maxBody.setTint(color);
+    } else {
+      this._maxBody.setFillStyle(color === null ? 0xcc4400 : color);
+    }
+  }
+
   _blockedByTree(x, y) {
     const pad = 7;
     for (const t of TREES) {
@@ -500,7 +516,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
       delay: 150, repeat: 7,
       callback: () => {
         flashCount++;
-        this._maxBody.setFillStyle(flashCount % 2 === 0 ? 0xcc4400 : 0xffff00);
+        this._maxTint(flashCount % 2 === 0 ? null : 0xffff00);
       },
     });
 
@@ -512,7 +528,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this.time.delayedCall(ELECTRIC_WIND_UP, () => {
       this._electricCharging = false;
       this._chargeLabel.setVisible(false);
-      this._maxBody.setFillStyle(0xcc4400);
+      this._maxTint(null);
       warnRing.destroy();
 
       if (this._maxState === 'STUNNED' || this._defeated) return;
@@ -586,8 +602,8 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._maxHp--;
     this._maxHpFill.scaleX = Math.max(0, this._maxHp / MAX_HP);
 
-    this._maxBody.setFillStyle(0xffffff);
-    this.time.delayedCall(120, () => this._maxBody.setFillStyle(0xcc4400));
+    this._maxTint(0xffffff);
+    this.time.delayedCall(120, () => this._maxTint(null));
 
     // ── Juice ──────────────────────────────────────────────────────────────
     FX.freeze(this, 60);

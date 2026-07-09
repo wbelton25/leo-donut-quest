@@ -66,7 +66,13 @@ export default class EdieBossScene extends Phaser.Scene {
     this._edieHP     = EDIE_HP;
     this._edieX      = ARENA_W / 2;
     this._edieY      = 80;
-    this._edieSprite = this.add.rectangle(this._edieX, this._edieY, 14, 18, EDIE_COLOR).setDepth(5);
+    if (this.textures.exists('sprite-edie-char')) {
+      this._edieSprite = this.add.image(this._edieX, this._edieY, 'sprite-edie-char').setDisplaySize(30, 44).setDepth(5);
+      this._edieImg = true;
+    } else {
+      this._edieSprite = this.add.rectangle(this._edieX, this._edieY, 14, 18, EDIE_COLOR).setDepth(5);
+      this._edieImg = false;
+    }
 
     // ── Edie HP header (top-centre) — matches Grace's fight ─────────────────────
     this._edieBarUpdate = createBossBar(this, ARENA_W, 0xff69b4);
@@ -170,7 +176,8 @@ export default class EdieBossScene extends Phaser.Scene {
     // Hit flash
     if (this._hitFlashTimer > 0) {
       this._hitFlashTimer -= delta;
-      this._edieSprite.setFillStyle(this._hitFlashTimer % 200 < 100 ? 0xffffff : EDIE_COLOR);
+      this._edieTint(this._hitFlashTimer % 200 < 100 ? 0xffffff : null);
+      if (this._hitFlashTimer <= 0) this._edieTint(null);
     }
 
     this._edieSprite.setPosition(this._edieX, this._edieY);
@@ -184,7 +191,18 @@ export default class EdieBossScene extends Phaser.Scene {
     this._chargeVy = (dy / dist) * CHARGE_SPEED;
     this._chargeMs = CHARGE_DURATION;
     this._charging = true;
-    this._edieSprite.setFillStyle(0xff0088);
+    this._edieTint(0xff0088);
+  }
+
+  // Tint the boss body — works whether it's an image (setTint) or the fallback
+  // rectangle (setFillStyle). Pass null to reset to normal.
+  _edieTint(color) {
+    if (this._edieImg) {
+      if (color === null) this._edieSprite.clearTint();
+      else this._edieSprite.setTint(color);
+    } else {
+      this._edieSprite.setFillStyle(color === null ? EDIE_COLOR : color);
+    }
   }
 
   _throwProjectile() {
@@ -259,7 +277,7 @@ export default class EdieBossScene extends Phaser.Scene {
 
   _defeatEdie() {
     this._defeated = true;
-    this._edieSprite.setFillStyle(0x444444);
+    this._edieTint(0x444444);
     this._projectiles.forEach(p => p.sprite.destroy());
     this._projectiles = [];
 

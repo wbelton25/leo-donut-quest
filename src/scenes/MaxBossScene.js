@@ -149,8 +149,16 @@ export default class MaxBossScene extends Phaser.Scene {
   // ─── Max visual ─────────────────────────────────────────────────────────────
 
   _buildMax() {
-    this._maxBody  = this.add.rectangle(this._maxX, this._maxY, T * 2.5, T * 3, 0x334488).setDepth(5);
-    this._maxBat   = this.add.rectangle(this._maxX + 22, this._maxY, T * 0.4, T * 2.5, 0x8b4513).setDepth(5);
+    if (this.textures.exists('sprite-max-char')) {
+      this._maxBody = this.add.image(this._maxX, this._maxY, 'sprite-max-char').setDisplaySize(44, 56).setDepth(5);
+      this._maxImg = true;
+    } else {
+      this._maxBody = this.add.rectangle(this._maxX, this._maxY, T * 2.5, T * 3, 0x334488).setDepth(5);
+      this._maxImg = false;
+    }
+    // Held bat — only shown for the rectangle fallback (the art includes it)
+    this._maxBat = this.add.rectangle(this._maxX + 22, this._maxY, T * 0.4, T * 2.5, 0x8b4513)
+      .setDepth(5).setVisible(!this._maxImg);
 
     // Tackle warning indicator (hidden until charge winds up)
     this._tackleWarn = this.add.rectangle(this._maxX, this._maxY, T * 3, T * 3, 0xff4400, 0).setDepth(4);
@@ -309,6 +317,17 @@ export default class MaxBossScene extends Phaser.Scene {
   }
 
 
+  // Tint the boss body — image (setTint) or fallback rectangle (setFillStyle).
+  // Pass null to reset to normal.
+  _maxTint(color) {
+    if (this._maxImg) {
+      if (color === null) this._maxBody.clearTint();
+      else this._maxBody.setTint(color);
+    } else {
+      this._maxBody.setFillStyle(color === null ? 0x334488 : color);
+    }
+  }
+
   _blockedByTree(x, y) {
     const pad = 7; // Leo's rough radius
     for (const t of TREES) {
@@ -332,8 +351,8 @@ export default class MaxBossScene extends Phaser.Scene {
     AudioManager.playSfx(this, 'sfx-coyote-max-mj', { volume: 0.9 });
     this._maxHp--;
     this._maxState = 'STUNNED';
-    this._maxBody.setFillStyle(0xffffff);
-    this.time.delayedCall(150, () => this._maxBody.setFillStyle(0x334488));
+    this._maxTint(0xffffff);
+    this.time.delayedCall(150, () => this._maxTint(null));
     this.time.delayedCall(STUN_DURATION, () => {
       if (this._maxState !== 'DEFEATED') {
         this._maxState = this._maxHp > 0 ? 'PATROL' : 'DEFEATED';
@@ -445,7 +464,7 @@ export default class MaxBossScene extends Phaser.Scene {
 
     // Flash red warning for 800ms, then charge
     this._tackleWarn.setAlpha(0.6);
-    this._maxBody.setFillStyle(0xff2200);
+    this._maxTint(0xff2200);
     this._maxState = 'WINDUP';
 
     // Lock in Leo's position as the charge target
@@ -459,7 +478,7 @@ export default class MaxBossScene extends Phaser.Scene {
     this.time.delayedCall(800, () => {
       if (this._maxState === 'STUNNED' || this._maxState === 'DEFEATED') return;
       this._tackleWarn.setAlpha(0);
-      this._maxBody.setFillStyle(0x334488);
+      this._maxTint(null);
       this._isCharging = true;
       this._maxState = 'CHASE';
       // Stop charging after 600ms
