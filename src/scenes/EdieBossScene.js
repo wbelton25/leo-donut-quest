@@ -301,8 +301,11 @@ export default class EdieBossScene extends Phaser.Scene {
   }
 
   _spawnShock(dir) {
-    const obj = this.add.ellipse(this._edieX, FLOOR_BOT - 6, 10, 26, 0xff9ad0, 0.85)
-      .setStrokeStyle(2, 0xffffff, 0.9).setDepth(7);
+    // A full-height wave across the play area — can't be walked around, only jumped.
+    const cy = (FLOOR_TOP + FLOOR_BOT) / 2;
+    const h  = FLOOR_BOT - FLOOR_TOP + 4;
+    const obj = this.add.rectangle(this._edieX, cy, 9, h, 0xff9ad0, 0.45)
+      .setStrokeStyle(2, 0xffffff, 0.85).setDepth(7);
     this._shocks.push({ obj, dir });
   }
 
@@ -445,8 +448,8 @@ export default class EdieBossScene extends Phaser.Scene {
     for (let i = this._shocks.length - 1; i >= 0; i--) {
       const s = this._shocks[i];
       s.obj.x += s.dir * SHOCK_SPEED * dt;
-      s.obj.scaleY = 1 + 0.15 * Math.sin(this.time.now / 60); // crackle
-      // Hit Leo if grounded
+      s.obj.setAlpha(0.35 + Math.random() * 0.25); // crackle/flicker
+      // Full-height wave: only jumping (airborne) clears it — position can't dodge
       if (this._leoHitCd <= 0 && !this._leoAirborne && Math.abs(s.obj.x - this._leoX) < 12) {
         this._damageLeo(1);
       }
