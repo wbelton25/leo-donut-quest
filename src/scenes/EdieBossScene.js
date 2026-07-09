@@ -152,16 +152,16 @@ export default class EdieBossScene extends Phaser.Scene {
 
   _buildArena() {
     if (this.textures.exists('bg-edie')) {
+      // Real background already depicts the landing + railing, so no procedural rail.
       this.add.image(0, 0, 'bg-edie').setOrigin(0, 0).setDisplaySize(ARENA_W, ARENA_H).setDepth(-1);
-    } else {
-      this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a2a2e);
-      // Upstairs band
-      this.add.rectangle(ARENA_W / 2, RAIL_Y / 2, ARENA_W, RAIL_Y, 0x2c2028);
-      // Floor
-      this.add.rectangle(ARENA_W / 2, (RAIL_Y + ARENA_H) / 2, ARENA_W, ARENA_H - RAIL_Y, 0x4a3630);
+      return;
     }
 
-    // Landing ledge / railing — Edie's perch (drawn over art so the tiers read)
+    // ── Procedural fallback: two-tier room + drawn railing ─────────────────────
+    this.add.rectangle(ARENA_W / 2, ARENA_H / 2, ARENA_W, ARENA_H, 0x3a2a2e);
+    this.add.rectangle(ARENA_W / 2, RAIL_Y / 2, ARENA_W, RAIL_Y, 0x2c2028);               // upstairs band
+    this.add.rectangle(ARENA_W / 2, (RAIL_Y + ARENA_H) / 2, ARENA_W, ARENA_H - RAIL_Y, 0x4a3630); // floor
+
     this.add.rectangle(ARENA_W / 2, RAIL_Y, ARENA_W, 6, 0x6b4a5a).setDepth(1);
     for (let x = 12; x < ARENA_W; x += 22) {
       this.add.rectangle(x, RAIL_Y - 7, 3, 12, 0x8a6a7a, 0.9).setDepth(1);
