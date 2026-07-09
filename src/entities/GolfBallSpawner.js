@@ -47,8 +47,11 @@ export default class GolfBallSpawner {
       this._marker = scene.add.circle(x, y, 5, 0xffffff, 0.5).setDepth(3);
     }
 
+    // Random startAt phase-shifts each golfer so they don't all swing in unison.
+    const period = interval ?? DEFAULT_INTERVAL;
     this._timer = scene.time.addEvent({
-      delay:    interval ?? DEFAULT_INTERVAL,
+      delay:    period,
+      startAt:  Phaser.Math.Between(0, period - 1),
       loop:     true,
       callback: this._fire,
       callbackScope: this,
