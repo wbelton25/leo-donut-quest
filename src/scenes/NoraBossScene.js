@@ -450,11 +450,11 @@ export default class NoraBossScene extends Phaser.Scene {
       b.x  += b.vx * dt;
       b.y  += b.vy * dt;
       b.sprite.setPosition(b.x, b.y);
-      b.dot.setPosition(b.x, b.y);
+      if (b.dot) b.dot.setPosition(b.x, b.y);
       b.sprite.angle += b.vx > 0 ? 7 : -7;
 
       if (b.x < -20 || b.x > ARENA_W + 20 || b.y < -20 || b.y > ARENA_H + 20) {
-        b.sprite.destroy(); b.dot.destroy();
+        b.sprite.destroy(); if (b.dot) b.dot.destroy();
         this._balls.splice(i, 1);
         continue;
       }
@@ -466,7 +466,7 @@ export default class NoraBossScene extends Phaser.Scene {
         this.cameras.main.shake(120, 0.006);
         this._leoHurtFx(BALL_DAMAGE);
         if (!this._defeated && this._resources.isExhausted()) this._gameOver();
-        b.sprite.destroy(); b.dot.destroy();
+        b.sprite.destroy(); if (b.dot) b.dot.destroy();
         this._balls.splice(i, 1);
       }
     }
@@ -541,9 +541,15 @@ export default class NoraBossScene extends Phaser.Scene {
     // Small random spread
     const spread = (Math.random() - 0.5) * 0.3;
     const a = angle + spread;
-    const sprite = this.add.circle(this._noraX, this._noraY, 9, 0xffffff).setDepth(6);
-    const dot    = this.add.circle(this._noraX, this._noraY, 3, 0x333333).setDepth(7);
-    // Black pentagon detail
+
+    let sprite, dot = null;
+    if (this.textures.exists('sprite-soccer-ball')) {
+      sprite = this.add.image(this._noraX, this._noraY, 'sprite-soccer-ball').setDepth(6);
+      sprite.setScale(18 / sprite.height); // ~18px ball, keep aspect
+    } else {
+      sprite = this.add.circle(this._noraX, this._noraY, 9, 0xffffff).setDepth(6);
+      dot    = this.add.circle(this._noraX, this._noraY, 3, 0x333333).setDepth(7);
+    }
     this._balls.push({
       x: this._noraX, y: this._noraY,
       vx: Math.cos(a) * BALL_SPEED,
@@ -689,7 +695,7 @@ export default class NoraBossScene extends Phaser.Scene {
     this._hidingLabel.setVisible(false);
     this._emergeLabel.setVisible(false);
 
-    this._balls.forEach(b => { b.sprite.destroy(); b.dot.destroy(); });
+    this._balls.forEach(b => { b.sprite.destroy(); if (b.dot) b.dot.destroy(); });
     this._balls = [];
 
     this.tweens.add({
