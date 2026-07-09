@@ -35,8 +35,8 @@ const FART_CD     = 1500;
 // ── Vertical layout ──────────────────────────────────────────────────────────
 const PERCH_Y   = 46;                 // Edie's upstairs perch
 const RAIL_Y    = 66;                 // landing ledge / railing line
-const FLOOR_TOP = 100;                // Leo can't go above this (railing)
-const FLOOR_BOT = ARENA_H - 16;
+const FLOOR_TOP = 205;                // front edge of the real hardwood floor
+const FLOOR_BOT = ARENA_H - 16;       // Leo's band is the floor only (no floating on the wall)
 const PERCH_L   = 58, PERCH_R = ARENA_W - 58;
 const PERCH_SPEED = 78;   // paces the landing quickly + erratically
 const EDIE_FLOOR_Y = FLOOR_BOT - 24;  // where Edie ends up when down at floor level
