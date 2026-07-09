@@ -1,4 +1,4 @@
-// GolfBallSpawner: fires golf balls from a fixed position at timed intervals.
+// GolfBallSpawner: a golfer who tees off, firing golf balls at Leo on a timer.
 // Balls fly in a specified direction and destroy on screen exit or player hit.
 //
 // Constructor:
@@ -16,6 +16,9 @@ const DEFAULT_INTERVAL = 3000;
 const BALL_RADIUS      = 4;
 const SCREEN_MARGIN    = 100; // destroy ball when this far off-screen
 
+const GOLFER_KEY = 'sprite-golfer';
+const BALL_KEY   = 'sprite-golfball';
+
 export default class GolfBallSpawner {
   constructor(scene, x, y, angle = 0, interval, speed, damage, onHitPlayer) {
     this._scene       = scene;
@@ -25,13 +28,24 @@ export default class GolfBallSpawner {
     this._speed       = speed ?? DEFAULT_SPEED;
     this._damage      = damage ?? DEFAULT_DAMAGE;
     this._balls       = [];
+    this._destroyed   = false;
 
     const rad = (angle * Math.PI) / 180;
     this._dirX = Math.cos(rad);
     this._dirY = Math.sin(rad);
 
-    // Show a small tee marker at the spawn point
-    this._marker = scene.add.circle(x, y, 5, 0xffffff, 0.5).setDepth(3);
+    // Golfer sprite (animated swing) when the art is loaded; else a tee marker.
+    if (scene.textures.exists(GOLFER_KEY)) {
+      this._registerAnims();
+      this._golfer = scene.add.sprite(x, y, GOLFER_KEY, 5)
+        .setDisplaySize(56, 56).setOrigin(0.5, 0.82).setDepth(3);
+      if (this._dirX < -0.1) this._golfer.setFlipX(true); // face the way he hits
+      this._golfer.play('golfer-idle');
+      this._marker = null;
+    } else {
+      this._golfer = null;
+      this._marker = scene.add.circle(x, y, 5, 0xffffff, 0.5).setDepth(3);
+    }
 
     this._timer = scene.time.addEvent({
       delay:    interval ?? DEFAULT_INTERVAL,
@@ -41,10 +55,40 @@ export default class GolfBallSpawner {
     });
   }
 
+  _registerAnims() {
+    const a = this._scene.anims;
+    if (!a.exists('golfer-idle')) {
+      a.create({ key: 'golfer-idle',  frames: a.generateFrameNumbers(GOLFER_KEY, { frames: [4, 5, 6, 7] }), frameRate: 4,  repeat: -1 });
+    }
+    if (!a.exists('golfer-swing')) {
+      a.create({ key: 'golfer-swing', frames: a.generateFrameNumbers(GOLFER_KEY, { frames: [0, 1, 2, 3] }), frameRate: 14, repeat: 0 });
+    }
+  }
+
   _fire() {
-    const ball = this._scene.add.circle(this._x, this._y, BALL_RADIUS, 0xffffff).setDepth(4);
+    if (this._destroyed) return;
+    if (this._golfer) {
+      // Swing, spawn the ball at contact, then settle back to idle
+      this._golfer.play('golfer-swing');
+      this._golfer.once('animationcomplete-golfer-swing', () => {
+        if (this._golfer && this._golfer.active) this._golfer.play('golfer-idle');
+      });
+      this._scene.time.delayedCall(170, () => this._spawnBall());
+    } else {
+      this._spawnBall();
+    }
+  }
+
+  _spawnBall() {
+    if (this._destroyed) return;
+    let sprite;
+    if (this._scene.textures.exists(BALL_KEY)) {
+      sprite = this._scene.add.image(this._x, this._y - 4, BALL_KEY).setDisplaySize(11, 11).setDepth(4);
+    } else {
+      sprite = this._scene.add.circle(this._x, this._y, BALL_RADIUS, 0xffffff).setDepth(4);
+    }
     this._balls.push({
-      sprite: ball,
+      sprite,
       vx: this._dirX * this._speed,
       vy: this._dirY * this._speed,
       hit: false,
@@ -55,6 +99,7 @@ export default class GolfBallSpawner {
     const dt = 1 / 60;
     const W  = this._scene.game.config.width;
     const H  = this._scene.game.config.height;
+    const cam = this._scene.cameras.main;
 
     for (let i = this._balls.length - 1; i >= 0; i--) {
       const b = this._balls[i];
@@ -62,9 +107,8 @@ export default class GolfBallSpawner {
 
       b.sprite.x += b.vx * dt;
       b.sprite.y += b.vy * dt;
+      b.sprite.angle += 14; // spin in flight
 
-      // Destroy when off-screen (using camera scroll to get world bounds)
-      const cam = this._scene.cameras.main;
       if (b.sprite.x < cam.scrollX - SCREEN_MARGIN ||
           b.sprite.x > cam.scrollX + W + SCREEN_MARGIN ||
           b.sprite.y < cam.scrollY - SCREEN_MARGIN ||
@@ -74,10 +118,9 @@ export default class GolfBallSpawner {
         continue;
       }
 
-      // Collision with player
       const dx = Math.abs(player.x - b.sprite.x);
       const dy = Math.abs(player.y - b.sprite.y);
-      if (dx < 14 && dy < 14) {
+      if (dx < 12 && dy < 12) {
         b.hit = true;
         b.sprite.destroy();
         this._onHitPlayer(this._damage);
@@ -88,8 +131,10 @@ export default class GolfBallSpawner {
   }
 
   destroy() {
+    this._destroyed = true;
     this._timer.remove();
-    this._marker.destroy();
+    if (this._marker) this._marker.destroy();
+    if (this._golfer) this._golfer.destroy();
     this._balls.forEach(b => b.sprite.destroy());
     this._balls = [];
   }
