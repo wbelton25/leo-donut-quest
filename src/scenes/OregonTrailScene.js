@@ -12,15 +12,11 @@ import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 
 // ── Ride constants ─────────────────────────────────────────────────────────────
 const TOTAL_DISTANCE  = 2000;
-const SCROLL_SPEED    = 45;    // px/s at full health
-const DRAIN_INTERVAL  = 4000;  // ms between passive drains (tighter than before)
-const EVENT_INTERVAL  = 7000;  // ms base between random events
-const EVENT_JITTER    = 2000;  // ±ms randomness
+const SCROLL_SPEED    = 45;    // px/s scenery scroll during a leg's travel animation
 
-const FATIGUE_WARN    = 40;    // stamina toast warning threshold
-const FATIGUE_CRIT    = 15;    // triggers forced stamina choice card
-const BIKE_WARN       = 40;    // bike toast warning threshold
-const BIKE_CRIT       = 15;    // triggers forced bike choice card
+const FATIGUE_WARN    = 40;    // stamina level that flags a '!' warning on the board
+const FATIGUE_CRIT    = 15;    // stamina level that tints a rider red
+const BIKE_WARN       = 40;    // bike level that flags a '!' warning on the board
 const SKILL_USE_COST  = 18;    // stamina cost when a member uses a skill
 
 // Per-member stamina drain per passive tick
@@ -479,151 +475,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._resources.applyChanges({ bikeCondition: avg - this._resources.bikeCondition });
   }
 
-  // ── Stamina check ─────────────────────────────────────────────────────────────
-
-  _checkStamina() {
-    for (const [id, st] of Object.entries(this._stamina)) {
-      if (st <= FATIGUE_WARN && !this._warnedStamina.has(id)) {
-        this._warnedStamina.add(id);
-        const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        const msgs = [`${name} is slowing down...`, `${name}: "I need a break..."`, `${name} is struggling!`];
-        this._showFloat(msgs[Math.floor(Math.random() * msgs.length)], BASE_WIDTH / 2, BASE_HEIGHT * 0.42, '#f5a623');
-      }
-      if (st <= FATIGUE_CRIT && !this._fatigueTriggered.has(id)) {
-        this._fatigueTriggered.add(id);
-        this._riding = false;
-        this._triggerFatigueEvent(id);
-        return;
-      }
-    }
-  }
-
-  _triggerFatigueEvent(memberId) {
-    const name = MEMBER_NAMES[memberId] ?? memberId.toUpperCase();
-    const choices = [];
-
-    // Snack options from inventory
-    if (this._snackInv.gatorade > 0) choices.push({ text: `Gatorade → ${name}  [+33 STAMINA]`,    _action: 'snack', _snack: 'gatorade', _id: memberId });
-    if (this._snackInv.granola  > 0) choices.push({ text: `Granola Bar → ${name}  [+67 STAMINA]`, _action: 'snack', _snack: 'granola',  _id: memberId });
-    if (this._snackInv.hotdog   > 0) choices.push({ text: `Hot Dog → ${name}  [FULL STAMINA]`,    _action: 'snack', _snack: 'hotdog',   _id: memberId });
-
-    choices.push({ text: `Make ${name} tough it out  [−10 NRG, small reprieve]`, _action: 'toughit', _id: memberId });
-    if (memberId !== 'leo') choices.push({ text: `Leave ${name} behind  [keeps group moving]`, _action: 'drop', _id: memberId });
-    if (memberId !== 'mj'     && this._party.hasMember('mj'))     choices.push({ text: `MJ pushes their bike a stretch`, _action: 'mj_carry', _id: memberId });
-    if (memberId !== 'carson' && this._party.hasMember('carson')) choices.push({ text: `Carson slips them a secret boost`, _action: 'carson_boost', _id: memberId });
-    if (choices.length === 0) choices.push({ text: 'Dig deep — push through', _action: 'toughit', _id: memberId });
-
-    this._eventCard.show({
-      title:       `${name} IS FALLING BEHIND!`,
-      description: `${name} is running on empty. Use a snack from your bag, or make a tough call.`,
-      choices,
-    }, (idx) => this._applyFatigueChoice(choices[idx]));
-  }
-
-  _applyFatigueChoice(choice) {
-    const id   = choice._id;
-    const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-    switch (choice._action) {
-      case 'snack': {
-        const snackId = choice._snack;
-        const boost   = SNACK_STAMINA[snackId] ?? 33;
-        this._snackInv[snackId]--;
-        this._stamina[id] = Math.min(100, this._stamina[id] + boost);
-        this._fatigueTriggered.delete(id);
-        this._warnedStamina.delete(id);
-        this._showFloat(`${name}: +${boost} STAMINA`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#66bb6a');
-        break;
-      }
-      case 'toughit':
-        this._applyEventEffects({ energy: -10 });
-        this._stamina[id] = Math.min(100, this._stamina[id] + 20);
-        this._showFloat('PUSH THROUGH IT!', BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#f5a623');
-        break;
-      case 'drop':
-        this._showFloat(`${name} TURNED BACK!`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#ff8800');
-        this._dropMember(id);
-        break;
-      case 'mj_carry':
-        this._stamina[id] = Math.min(100, this._stamina[id] + 60);
-        this._stamina['mj'] = Math.max(0, (this._stamina['mj'] ?? 100) - 15);
-        this._fatigueTriggered.delete(id);
-        this._warnedStamina.delete(id);
-        this._showFloat('MJ GIVES A PUSH!', BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#2ecc71');
-        break;
-      case 'carson_boost':
-        this._stamina[id] = Math.min(100, this._stamina[id] + 55);
-        this._fatigueTriggered.delete(id);
-        this._warnedStamina.delete(id);
-        this._showFloat(`CARSON SLIPS ${name} SOMETHING...`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#9b59b6');
-        break;
-    }
-    this._resumeRiding();
-  }
-
-  // ── Bike check ────────────────────────────────────────────────────────────────
-
-  _checkBikes() {
-    for (const [id, hp] of Object.entries(this._bikeHP)) {
-      if (hp <= BIKE_WARN && !this._warnedBike.has(id)) {
-        this._warnedBike.add(id);
-        const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        this._showFloat(`${name}'s bike is struggling!`, BASE_WIDTH / 2, BASE_HEIGHT * 0.46, '#ef5350');
-      }
-      if (hp <= BIKE_CRIT && !this._bikeTriggered.has(id)) {
-        this._bikeTriggered.add(id);
-        this._riding = false;
-        this._triggerBikeEvent(id);
-        return;
-      }
-    }
-  }
-
-  _triggerBikeEvent(memberId) {
-    const name = MEMBER_NAMES[memberId] ?? memberId.toUpperCase();
-    const choices = [];
-
-    if (this._bikeInv.patch > 0) choices.push({ text: `Tire Patch on ${name}'s bike  [+33 BIKE]`, _action: 'repair', _part: 'patch', _id: memberId });
-    if (this._bikeInv.tire  > 0) choices.push({ text: `New Tire on ${name}'s bike  [+67 BIKE]`,   _action: 'repair', _part: 'tire',  _id: memberId });
-    if (this._bikeInv.chain > 0) choices.push({ text: `New Chain on ${name}'s bike  [FULL BIKE]`, _action: 'repair', _part: 'chain', _id: memberId });
-
-    choices.push({ text: `${name} limps along  [very slow, risky]`, _action: 'limp', _id: memberId });
-    if (memberId !== 'leo') choices.push({ text: `Leave ${name} behind`, _action: 'drop', _id: memberId });
-    if (choices.length === 0) choices.push({ text: `${name} limps along`, _action: 'limp', _id: memberId });
-
-    this._eventCard.show({
-      title:       `${name}'S BIKE IS WRECKED!`,
-      description: `${name}'s bike is barely rolling. Use a part from your bag or make a hard choice.`,
-      choices,
-    }, (idx) => this._applyBikeChoice(choices[idx]));
-  }
-
-  _applyBikeChoice(choice) {
-    const id   = choice._id;
-    const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-    switch (choice._action) {
-      case 'repair': {
-        const partId  = choice._part;
-        const restore = BIKE_PART_RESTORE[partId] ?? 33;
-        this._bikeInv[partId]--;
-        this._bikeHP[id] = Math.min(100, this._bikeHP[id] + restore);
-        this._bikeTriggered.delete(id);
-        this._warnedBike.delete(id);
-        this._syncBikeToHud();
-        this._showFloat(`${name}'s BIKE: +${restore}`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#4fc3f7');
-        break;
-      }
-      case 'limp':
-        // Limping: bike stays low — heavy speed penalty already applied by _calcSpeedMult
-        this._showFloat(`${name} LIMPING ON...`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#ffaa00');
-        break;
-      case 'drop':
-        this._showFloat(`${name} TURNED BACK!`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#ff8800');
-        this._dropMember(id);
-        break;
-    }
-    this._resumeRiding();
-  }
-
   // ── Shared drop helper ────────────────────────────────────────────────────────
 
   _dropMember(id) {
@@ -670,96 +521,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     if (effects.distance) {
       // Advance the progress bar — shortcuts/downhills move you forward, not backward in time
       this._distance = Math.min(TOTAL_DISTANCE - 10, this._distance + effects.distance);
-    }
-  }
-
-  // ── Break events ──────────────────────────────────────────────────────────────
-
-  _triggerBreakEvent() {
-    const choices = [
-      { text: "Push through — no time to stop", _action: 'skip' },
-      { text: "Take a 5-min break  [time: -4, all +30 STAM]", _action: 'break' },
-    ];
-    if (this._party.hasMember('mj')) {
-      choices.push({ text: "MJ rallies the group  [time: -2, all +20 STAM]", _action: 'mj_rally' });
-    }
-    const hasSnacks = this._snackInv.gatorade > 0 || this._snackInv.granola > 0;
-    if (this._party.hasMember('carson') && hasSnacks) {
-      choices.push({ text: "Carson slips someone a snack  [pick member, uses 1]", _action: 'carson_snacks' });
-    }
-    this._eventCard.show({
-      title:       'TAKE A BREAK?',
-      description: "The crew is looking tired. A quick rest could help everyone push through to the end.",
-      choices,
-    }, (idx) => this._applyBreakChoice(choices[idx]));
-  }
-
-  _applyBreakChoice(choice) {
-    switch (choice._action) {
-      case 'break':
-        this._resources.applyChanges({ time: -4 });
-        Object.keys(this._stamina).forEach(id => {
-          this._stamina[id] = Math.min(100, this._stamina[id] + 30);
-          this._warnedStamina.delete(id);
-          this._fatigueTriggered.delete(id);
-        });
-        this._showFloat('EVERYONE CATCHES THEIR BREATH!', BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#66bb6a');
-        break;
-      case 'mj_rally':
-        this._resources.applyChanges({ time: -2 });
-        Object.keys(this._stamina).forEach(id => {
-          this._stamina[id] = Math.min(100, this._stamina[id] + 20);
-          this._warnedStamina.delete(id);
-          this._fatigueTriggered.delete(id);
-        });
-        this._showFloat('MJ RALLIES THE GROUP!', BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#2ecc71');
-        break;
-      case 'carson_snacks': {
-        // Pick the best available snack
-        const snackKey = this._snackInv.granola > 0 ? 'granola'
-          : this._snackInv.gatorade > 0 ? 'gatorade' : null;
-        if (!snackKey) { this._resumeRiding(); return; }
-        const boost = SNACK_STAMINA[snackKey];
-        // Show a member picker — inventory item targets one person only
-        const memberIds = Object.keys(this._stamina);
-        const pickerChoices = memberIds.map(id => ({
-          text: `${MEMBER_NAMES[id] ?? id.toUpperCase()}  (STAM: ${Math.round(this._stamina[id])})`,
-          _memberId: id,
-        }));
-        this._eventCard.show({
-          title:       'WHO GETS THE SNACK?',
-          description: `Carson has a ${snackKey} (+${boost} STAMINA). Pick one member.`,
-          choices:     pickerChoices,
-        }, (idx) => {
-          const targetId = pickerChoices[idx]._memberId;
-          this._snackInv[snackKey]--;
-          this._stamina[targetId] = Math.min(100, this._stamina[targetId] + boost);
-          this._warnedStamina.delete(targetId);
-          this._fatigueTriggered.delete(targetId);
-          const name = MEMBER_NAMES[targetId] ?? targetId.toUpperCase();
-          this._showFloat(`${name}: +${boost} STAMINA`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#9b59b6');
-          this._resumeRiding();
-        });
-        return; // resumeRiding is called inside the picker callback above
-      }
-      // 'skip': no effect
-    }
-    this._resumeRiding();
-  }
-
-  // ── Checkpoint logic ──────────────────────────────────────────────────────────
-
-  _checkCheckpoints() {
-    for (const cp of CHECKPOINTS) {
-      if (this._passedCheckpoints.has(cp.id)) continue;
-      if (this._distance < cp.distance) continue;
-
-      this._passedCheckpoints.add(cp.id);
-      this._riding = false;
-      if (cp.autoEffect) this._resources.applyChanges(cp.autoEffect);
-
-      this._showLocationScene(cp, () => { this._riding = true; });
-      break;
     }
   }
 
@@ -1072,12 +833,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._restStopCon.add(objs);
   }
 
-  _closeRestStop() {
-    if (this._restStopTimerEvt) { this._restStopTimerEvt.remove(); this._restStopTimerEvt = null; }
-    if (this._restStopCon)      { this._restStopCon.destroy(true); this._restStopCon = null; }
-    this._resumeRiding();
-  }
-
   // Tears down the rest stop UI without resuming — used when showing a sub-dialog.
   _tearDownRestStop() {
     if (this._restStopTimerEvt) { this._restStopTimerEvt.remove(); this._restStopTimerEvt = null; }
@@ -1121,48 +876,6 @@ export default class OregonTrailScene extends Phaser.Scene {
         });
       },
     });
-  }
-
-  // ── Random events ─────────────────────────────────────────────────────────────
-
-  _triggerEvent() {
-    this._riding = false;
-    const event = this._events.drawEvent('act2');
-    if (!event) { this._resumeRiding(); return; }
-
-    this._eventCard.show(event, (choiceIndex) => {
-      const result = this._events.applyChoice(event, choiceIndex);
-
-      if (result.resourceChanges) {
-        // EventSystem already called _resources.applyChanges — bridge to per-member values too
-        this._applyPerMemberEffects(result.resourceChanges);
-        Object.entries(result.resourceChanges).forEach(([key, delta]) => {
-          if (delta === 0) return;
-          const color = delta > 0 ? '#66bb6a' : '#ff4444';
-          const label = key === 'bikeCondition' ? 'BIKE' : key.toUpperCase();
-          this._showFloat(`${delta > 0 ? '+' : ''}${delta} ${label}`, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 20, color);
-        });
-      }
-
-      // Drain stamina from the member who used their skill
-      if (result.usedMember && this._stamina[result.usedMember] !== undefined) {
-        const mName = MEMBER_NAMES[result.usedMember] ?? result.usedMember.toUpperCase();
-        this._stamina[result.usedMember] = Math.max(0, this._stamina[result.usedMember] - SKILL_USE_COST);
-        this._showFloat(`${mName}: -${SKILL_USE_COST} STAMINA`, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 10, '#f5a623');
-      }
-
-      if (result.partyLoss) {
-        this._showFloat(`${result.partyLoss.toUpperCase()} WENT HOME!`, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 44, '#ff8800');
-        this._dropMember(result.partyLoss);
-      }
-
-      this._resumeRiding();
-    });
-  }
-
-  _resumeRiding() {
-    this._eventTimer = EVENT_INTERVAL + (Math.random() * 2 - 1) * EVENT_JITTER;
-    this._riding = true;
   }
 
   // ── Loss / arrival ────────────────────────────────────────────────────────────
