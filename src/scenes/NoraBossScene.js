@@ -65,14 +65,14 @@ const MOVE_SPEED      = 130;
 const CHASE_SPEED     = 160;
 const EMERGE_DURATION = 2200; // ms Nora stays exposed
 const HIDE_DURATION   = 1800; // ms Nora hides before shooting
-const SHOOT_INTERVAL  = 700;  // ms between shots while hiding
-const SHOTS_PER_HIDE  = 3;
+const SHOOT_INTERVAL  = 600;  // ms between shots while hiding
+const SHOTS_PER_HIDE  = 4;
 const STUN_DURATION   = 1200;
 const FART_HIT_RANGE  = 80;
 
 // Damage
-const BALL_DAMAGE      = 12;
-const CONTACT_DAMAGE   = 15;
+const BALL_DAMAGE      = 22;  // >1 heart per ball — soccer balls hit hard
+const CONTACT_DAMAGE   = 18;
 const CONTACT_COOLDOWN = 1400;
 // Pool: same stun+push penalty as Grace's fight (no energy drain)
 const POOL_STUN_MS     = 1500; // ms Leo is stunned after falling in the pool
@@ -194,10 +194,12 @@ export default class NoraBossScene extends Phaser.Scene {
     this._alertLabel = txt(this, this._noraX, this._noraY - 28, '!',
       { fontSize: '8px', color: '#ffff00' }).setOrigin(0.5).setDepth(9).setVisible(false);
 
-    this._hidingLabel = txt(this, ARENA_W / 2, ARENA_H / 2 - 10, 'NORA IS HIDING!',
+    // Mid-fight state callouts are intentionally blank — kept as objects so the
+    // various setVisible() calls in the state machine remain no-ops.
+    this._hidingLabel = txt(this, ARENA_W / 2, ARENA_H / 2 - 10, '',
       { fontSize: '8px', color: '#aaaaaa' }).setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false);
 
-    this._emergeLabel = txt(this, ARENA_W / 2, ARENA_H / 2 - 10, 'NOW! HIT HER!',
+    this._emergeLabel = txt(this, ARENA_W / 2, ARENA_H / 2 - 10, '',
       { fontSize: '8px', color: '#ffff00', stroke: '#000', strokeThickness: 3 })
       .setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false);
   }
