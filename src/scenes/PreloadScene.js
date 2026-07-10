@@ -106,7 +106,9 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.audio('sfx-car-hit',        'assets/audio/sfx/sfx_car_hit.mp3');
     this.load.audio('sfx-golf-cart-hit',  'assets/audio/sfx/sfx_golf_cart_hit.mp3');
     this.load.audio('sfx-bike-hit',       'assets/audio/sfx/sfx_bike_hit.mp3');
-    [1, 2, 3, 4].forEach(n =>
+    // Fart variety: sfx_fart_1..N. Bump this count when you add more files;
+    // AudioManager.playFart auto-discovers whatever actually loaded.
+    Array.from({ length: 20 }, (_, i) => i + 1).forEach(n =>
       this.load.audio(`sfx-fart-${n}`, `assets/audio/sfx/sfx_fart_${n}.wav`)
     );
   }

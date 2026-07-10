@@ -88,12 +88,21 @@ export default class AudioManager {
     snd.setVolume(enabled ? MUSIC_VOL : 0);
   }
 
-  // Play a random fart sound (sfx-fart-1 through sfx-fart-4).
+  // Play a random fart sound. Auto-discovers every sfx-fart-N clip that actually
+  // loaded (cached on first use), so adding more files "just works" — no count to
+  // keep in sync here.
   static playFart(scene) {
     if (!scene.game.registry.get('audio-sfx')) return;
-    const n = Phaser.Math.Between(1, 4);
-    const key = `sfx-fart-${n}`;
-    if (scene.cache.audio.exists(key)) scene.sound.play(key, { volume: 0.85 });
+    if (!AudioManager._fartKeys) {
+      AudioManager._fartKeys = [];
+      for (let n = 1; n <= 64; n++) {
+        const key = `sfx-fart-${n}`;
+        if (scene.cache.audio.exists(key)) AudioManager._fartKeys.push(key);
+      }
+    }
+    const keys = AudioManager._fartKeys;
+    if (keys.length === 0) return;
+    scene.sound.play(keys[Math.floor(Math.random() * keys.length)], { volume: 0.85 });
   }
 
   // Play a random deer grunt (sfx-deer-grunt-1 through sfx-deer-grunt-4).
