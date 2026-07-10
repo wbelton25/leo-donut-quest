@@ -9,7 +9,7 @@ import EventSystem from '../systems/EventSystem.js';
 import EventCard from '../ui/EventCard.js';
 import WalmartShopCard from '../ui/WalmartShopCard.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
-import { classifyChoice } from '../utils/choiceRisk.js';
+import { classifyChoice, RISK_SPREAD } from '../utils/choiceRisk.js';
 
 // ── Ride constants ─────────────────────────────────────────────────────────────
 const TOTAL_DISTANCE  = 2000;
@@ -388,17 +388,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     });
   }
 
-  // Spread of a choice's effects by risk profile: how much better a 'good' roll
-  // gets and how much worse a 'bad' roll gets (applied to the negative parts).
-  static get _SPREAD() {
-    return {
-      safe:   { good: 0.75, bad: 1.25 },
-      skill:  { good: 0.55, bad: 1.30 },
-      risky:  { good: 0.40, bad: 1.85 },
-      gamble: { good: 0.45, bad: 1.85 },
-    };
-  }
-
   // Rolls an outcome quality for a choice and scales its effects accordingly.
   _resolveChoice(choice) {
     const e       = choice.effects ?? {};
@@ -413,7 +402,7 @@ export default class OregonTrailScene extends Phaser.Scene {
       quality = r < p ? 'bad' : (r < p + (1 - p) * 0.5 ? 'good' : 'normal');
     } else /* risky */             quality = r < 0.35 ? 'good' : r < 0.60 ? 'normal' : 'bad';
 
-    const spread   = OregonTrailScene._SPREAD[profile];
+    const spread   = RISK_SPREAD[profile];
     const negScale = quality === 'good' ? spread.good : quality === 'bad' ? spread.bad : 1;
     const posScale = quality === 'good' ? 1.25        : quality === 'bad' ? 0.5        : 1;
     const resolved = {};
