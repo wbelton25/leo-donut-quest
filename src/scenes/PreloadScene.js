@@ -25,6 +25,8 @@ export default class PreloadScene extends Phaser.Scene {
     // Character walk sprites (32×32 px, 12 frames each: 4 dirs × 3 walk frames)
     ['leo', 'warren', 'mj', 'carson', 'justin'].forEach(id => {
       this.load.atlas(`sprite-${id}`, `assets/sprites/${id}.png`, `assets/sprites/${id}.json`);
+      // Headshot crop of the front-facing frame, for the dialogue-box portrait.
+      this.load.image(`head-${id}`, `assets/sprites/${id}_head.png`);
     });
 
     // World sprites — tree and house (extracted from tileset reference)

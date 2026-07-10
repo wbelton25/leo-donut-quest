@@ -27,7 +27,17 @@ export default class DialogueBox {
       leo: 0x3b82f6, warren: 0xe74c3c, mj: 0x2ecc71,
       carson: 0x9b59b6, justin: 0xf39c12,
     };
-    this._portrait.setFillStyle(colors[line.speaker?.toLowerCase()] ?? 0x666666);
+    const speaker = line.speaker?.toLowerCase();
+    const headKey = `head-${speaker}`;
+    if (speaker && this._scene.textures.exists(headKey)) {
+      // Real headshot from the character's sprite, framed by an accent border.
+      this._portrait.setFillStyle(0x14141f).setStrokeStyle(1, colors[speaker] ?? 0x5555cc);
+      this._portraitHead.setTexture(headKey).setDisplaySize(24, 24).setVisible(true);
+    } else {
+      // No sprite for this speaker (narrator, bosses…) — fall back to a color chip.
+      this._portrait.setFillStyle(colors[speaker] ?? 0x666666).setStrokeStyle(0);
+      this._portraitHead.setVisible(false);
+    }
 
     this._fullText = line.text;
     this._charIndex = 0;
@@ -87,6 +97,9 @@ export default class DialogueBox {
     this._portrait = this._scene.add.rectangle(
       PADDING + 13, BOX_Y + BOX_HEIGHT / 2, 26, 26, 0x666666
     );
+    // Character headshot drawn on top of the portrait box (set per-speaker).
+    this._portraitHead = this._scene.add.image(PADDING + 13, BOX_Y + BOX_HEIGHT / 2, 'head-leo')
+      .setDisplaySize(24, 24).setVisible(false);
 
     // Speaker name in accent color, body text in white — both using txt() for crispness
     this._speakerText = txt(this._scene, PADDING + 30, BOX_Y + PADDING, '', {
@@ -113,7 +126,7 @@ export default class DialogueBox {
     });
 
     this._container = this._scene.add.container(0, 0, [
-      bg, border, this._portrait,
+      bg, border, this._portrait, this._portraitHead,
       this._speakerText, this._bodyText, this._continueIndicator,
     ]);
     this._container.setScrollFactor(0);
