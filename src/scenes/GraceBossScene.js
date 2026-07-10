@@ -786,7 +786,15 @@ export default class GraceBossScene extends Phaser.Scene {
   }
 
   _createPuddle(x, y) {
-    const duration = Phaser.Math.Between(10000, 15000);
+    // Cap how many puddles coexist so the deck never gets walled off — evaporate
+    // the oldest early once we're at the limit.
+    const MAX_PUDDLES = 4;
+    while (this._puddles.length >= MAX_PUDDLES) {
+      const oldest = this._puddles.shift();
+      if (oldest?.obj?.active) { this.tweens.killTweensOf(oldest.obj); oldest.obj.destroy(); }
+    }
+
+    const duration = Phaser.Math.Between(6000, 8000);   // ~6-8s, then it evaporates
     const puddle = this.add.ellipse(x, y, 22, 11, 0x4db8f0, 0.7).setDepth(3);
     this._puddles.push({ obj: puddle });
 
