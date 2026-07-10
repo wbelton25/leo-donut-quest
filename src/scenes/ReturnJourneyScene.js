@@ -155,11 +155,5 @@ export default class ReturnJourneyScene extends Phaser.Scene {
         this.tweens.add({ targets: [body, wheel1, wheel2], y: '+=2', yoyo: true, repeat: -1, duration: 240 + Math.random() * 80 });
       }
     });
-
-    // Donut bag on Leo's back (no count label)
-    if (donuts > 0) {
-      const leoX = startX;
-      this.add.rectangle(leoX + 6, roadY - 8, 6, 6, 0xf5a623);
-    }
   }
 }
