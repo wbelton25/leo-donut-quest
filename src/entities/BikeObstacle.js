@@ -35,6 +35,7 @@ export default class BikeObstacle {
     this._x = x;
     this._y = y;
     this._lastDir = null;
+    this._knockedDown = false;   // farts topple the kid, like a deer
 
     if (this._isH) {
       this._minX = minBound; this._maxX = maxBound;
@@ -51,6 +52,7 @@ export default class BikeObstacle {
       delay: Phaser.Math.Between(4000, 8000),
       loop: true,
       callback: () => {
+        if (this._knockedDown) return;
         const prevDir = (this._isH ? this._vx : this._vy) > 0 ? 1 : -1;
         const burstSpeed = this._baseSpeed * 2;
         if (this._isH) this._vx = burstSpeed * prevDir;
@@ -103,6 +105,7 @@ export default class BikeObstacle {
   }
 
   update(player) {
+    if (this._knockedDown) return;   // toppled: frozen and harmless until it gets up
     const dt = 1 / 60;
     this._waveTimer += dt * (2 * Math.PI / WEAVE_PERIOD);
 
@@ -136,6 +139,44 @@ export default class BikeObstacle {
         if (this._scene.cache.audio.exists(SFX_BIKE_HIT))
           AudioManager.playSfx(this._scene, SFX_BIKE_HIT, { volume: 0.8 });
       }
+    }
+  }
+
+  // Farted over: the kid wipes out, lies harmless for a beat, then rights himself.
+  // (The neighborhood fart loop rewards a fresh knockdown with clawed-back time.)
+  knockdown() {
+    if (this._knockedDown) return;
+    this._knockedDown = true;
+    this._vx = 0; this._vy = 0;
+    if (this._scene.cache.audio.exists(SFX_BIKE_HIT))
+      AudioManager.playSfx(this._scene, SFX_BIKE_HIT, { volume: 0.8 });
+
+    if (this._sprite) {
+      this._scene.tweens.add({
+        targets: this._sprite, angle: 90, duration: 200, ease: 'Power2',
+        onComplete: () => {
+          this._scene.time.delayedCall(1800, () => {
+            if (!this._sprite) return; // destroyed during delay
+            this._scene.tweens.add({
+              targets: this._sprite, angle: 0, duration: 300, ease: 'Back.Out',
+              onComplete: () => { this._knockedDown = false; },
+            });
+          });
+        },
+      });
+    } else {
+      const objs = [this._parts.bikeBody, this._parts.rider, this._parts.wheelF, this._parts.wheelB];
+      this._scene.tweens.add({
+        targets: objs, scaleY: 0.25, duration: 180, ease: 'Power2',
+        onComplete: () => {
+          this._scene.time.delayedCall(1800, () => {
+            this._scene.tweens.add({
+              targets: objs, scaleY: 1, duration: 250, ease: 'Back.Out',
+              onComplete: () => { this._knockedDown = false; },
+            });
+          });
+        },
+      });
     }
   }
 
