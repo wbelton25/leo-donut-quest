@@ -447,30 +447,48 @@ export default class OregonTrailScene extends Phaser.Scene {
       return;
     }
 
-    const effText = this._effectsToText(res.resolved);
-    const title   = { good: 'IT PAID OFF!', normal: 'YOU MADE IT', bad: 'BAD LUCK!' }[res.quality];
+    // Title/blurb frame the roll RELATIVE TO EXPECTATION, so "you still paid
+    // something, but less than you feared" reads correctly.
+    const effText = this._effectsToText(res.resolved, true);
+    const title   = { good: 'BETTER THAN EXPECTED', normal: 'ABOUT AS EXPECTED', bad: 'WORSE THAN EXPECTED' }[res.quality];
     const blurb   = {
-      good:   this._pick(['That went better than you hoped.', 'Couldn\'t have gone smoother.', 'Lucky break — nailed it.']),
-      normal: this._pick(['You got through it.', 'About what you\'d expect.', 'No drama — you pushed on.']),
-      bad:    this._pick(['That did not go your way.', 'Rough — it cost you.', 'Should\'ve seen that coming.']),
+      good:   this._pick(['You got off light.', 'Lucky — could have been worse.', 'That broke your way.']),
+      normal: this._pick(['No real surprises.', 'Went about how you figured.', 'Nothing you did not expect.']),
+      bad:    this._pick(['That stung more than you hoped.', 'Rough — it cost you.', 'Worse than you wanted.']),
     }[res.quality];
     this._eventCard.show({
       title,
-      description: effText ? `${blurb}\n\n${effText}` : `${blurb}\n\nNo harm done.`,
+      description: effText ? `${blurb}\n\nThis choice: ${effText}` : `${blurb}\n\nNo harm done.`,
       choices:     [{ text: 'Continue' }],
     }, () => done());
   }
 
-  // Plain readable summary of resolved effects for the reveal card.
-  _effectsToText(e) {
-    const parts = [];
-    if (e.time)          parts.push(`${e.time} time`);
-    if (e.energy)        parts.push(`${e.energy > 0 ? '+' : ''}${e.energy} energy`);
-    if (e.bikeCondition) parts.push(`${e.bikeCondition > 0 ? '+' : ''}${e.bikeCondition} bike health`);
-    if (e.distance)      parts.push(`${e.distance} closer to donuts`);
-    if (e.money)         parts.push(`${e.money > 0 ? '+$' : '-$'}${Math.abs(e.money)}`);
-    if (e.snacks)        parts.push(`${e.snacks > 0 ? '+' : ''}${e.snacks} snack`);
-    return parts.join(', ');
+  // ── Human-readable resource deltas ─────────────────────────────────────────────
+  // Time is shown in MINUTES (matches the on-screen clock); energy/bike as % of
+  // 100. `withMag` appends a plain size word so the player knows if it's a lot.
+  _mag(a, lo, hi) { return a <= lo ? 'minor' : a <= hi ? 'moderate' : 'heavy'; }
+
+  _deltaLabel(key, v, withMag = false) {
+    if (!v) return null;
+    const sign = v > 0 ? '+' : '-';
+    const a    = Math.abs(v);
+    let core, mag = null;
+    switch (key) {
+      case 'time':          { const m = Math.round(a * 1.2); core = `${sign}${m} min`;      mag = this._mag(m, 8, 18); break; }
+      case 'energy':        core = `${sign}${a}% energy`;      mag = this._mag(a, 8, 18); break;
+      case 'bikeCondition': core = `${sign}${a}% bike`;        mag = this._mag(a, 8, 18); break;
+      case 'distance':      core = `${v} closer to donuts`;    break;
+      case 'money':         core = `${v > 0 ? '+$' : '-$'}${a}`; break;
+      case 'snacks':        core = `${sign}${a} snack${a > 1 ? 's' : ''}`; break;
+      default: return null;
+    }
+    return withMag && mag ? `${core} (${mag})` : core;
+  }
+
+  _effectsToText(e, withMag = false) {
+    return ['time', 'energy', 'bikeCondition', 'distance', 'money', 'snacks']
+      .map(k => (e[k] !== undefined ? this._deltaLabel(k, e[k], withMag) : null))
+      .filter(Boolean).join(', ');
   }
 
   // Blocking notice when a DECISION costs a teammate (an intentional drop already
@@ -484,24 +502,17 @@ export default class OregonTrailScene extends Phaser.Scene {
     }, () => done());
   }
 
-  // Turns a choice's resource deltas into a plain, color-coded outcome line so the
-  // player can see what their decision actually did. Returns { text, color } | null.
+  // Recaps your event choice's result on the camp board (labeled 'Your choice:' so
+  // it reads as separate from the ride mishaps above it). Returns {text,color}|null.
   _formatEventOutcome(changes) {
     if (!changes) return null;
-    const bits = [];
-    if (changes.time)          bits.push(`${changes.time > 0 ? '+' : ''}${Math.round(changes.time)} time`);
-    if (changes.energy)        bits.push(`${changes.energy > 0 ? '+' : ''}${Math.round(changes.energy)} energy`);
-    if (changes.bikeCondition) bits.push(`${changes.bikeCondition > 0 ? '+' : ''}${Math.round(changes.bikeCondition)} bikes`);
-    if (bits.length === 0) return null;
+    const text = this._effectsToText(changes, false);
+    if (!text) return null;
 
     const dmg  = Math.max(0, -(changes.energy || 0)) + Math.max(0, -(changes.bikeCondition || 0));
     const gain = Math.max(0,  (changes.energy || 0)) + Math.max(0,  (changes.bikeCondition || 0));
-    let lead, color;
-    if      (gain > dmg)                { lead = 'Good call!';     color = '#66dd66'; }
-    else if (dmg > 0)                   { lead = 'That hurt.';     color = '#ff6644'; }
-    else if ((changes.time || 0) <= -8) { lead = 'Cost some time.'; color = '#f5a623'; }
-    else                                { lead = 'Done.';          color = '#cccccc'; }
-    return { text: `${lead}  ${bits.join(', ')}`, color };
+    const color = gain > dmg ? '#66dd66' : dmg > 0 ? '#ff8866' : '#cccccc';
+    return { text: `Your choice: ${text}`, color };
   }
 
   _openCamp(cp) {
@@ -577,7 +588,7 @@ export default class OregonTrailScene extends Phaser.Scene {
         drain = 15 + Math.random() * 13;  // flat 15-28 mishap (not base-scaled)
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
         const what = this._pick([`${name} took a tumble`, `${name} hit a cramp`, `${name} nearly wiped out`]);
-        incidents.push(`${what} (-${Math.round(drain)} stam)`);
+        incidents.push(`${what} (-${Math.round(drain)}% energy)`);
       } else {
         drain = base * (0.5 + Math.random() * 1.2);
       }
@@ -596,7 +607,7 @@ export default class OregonTrailScene extends Phaser.Scene {
         drain = 14 + Math.random() * 12;  // flat 14-26 mishap (not base-scaled)
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
         const what = this._pick([`${name} hit a pothole`, `${name}'s chain slipped`, `${name} clipped a curb`]);
-        incidents.push(`${what} (-${Math.round(drain)} bike)`);
+        incidents.push(`${what} (-${Math.round(drain)}% bike)`);
       } else {
         drain = base * (0.5 + Math.random() * 1.2);
       }
@@ -871,7 +882,7 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     const s = this._lastLegSummary;
     const costText = s
-      ? `Last leg cost ${s.timeCost} time` + (incidents.length === 0 ? '   -   smooth stretch' : '')
+      ? `On the ride here: ~${Math.round(s.timeCost * 1.2)} min` + (incidents.length === 0 ? ', no trouble' : ':')
       : 'Ready to ride.';
     line(ly, costText, '#99aabb'); ly += lineH;
     incidents.forEach(inc => { line(ly, inc, '#ff9966'); ly += lineH; });
