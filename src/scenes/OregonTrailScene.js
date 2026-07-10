@@ -388,35 +388,52 @@ export default class OregonTrailScene extends Phaser.Scene {
     });
   }
 
-  // Rolls an outcome quality for a choice and scales its effects accordingly.
+  // Rolls a CONTINUOUS luck value and scales the choice's effects along its risk
+  // spread — so every outcome differs (no flat "nominal" result) and a risky
+  // choice swings far more than a safe one. Also returns the best/worst extremes.
   _resolveChoice(choice) {
     const e       = choice.effects ?? {};
     const profile = classifyChoice(choice);
-    const r       = Math.random();
+    const { good, bad } = RISK_SPREAD[profile];
+    const L = Math.random();   // 0 = luckiest, 1 = unluckiest
 
-    let quality;   // 'good' | 'normal' | 'bad'
-    if (profile === 'skill')       quality = r < 0.55 ? 'good' : r < 0.95 ? 'normal' : 'bad';
-    else if (profile === 'safe')   quality = r < 0.20 ? 'good' : r < 0.90 ? 'normal' : 'bad';
-    else if (profile === 'gamble') {
-      const p = e.partyLossRisk ?? 0.3;
-      quality = r < p ? 'bad' : (r < p + (1 - p) * 0.5 ? 'good' : 'normal');
-    } else /* risky */             quality = r < 0.35 ? 'good' : r < 0.60 ? 'normal' : 'bad';
+    const negMult = good + (bad - good) * L;   // cost multiplier for this roll
+    const posMult = 1.3 - 0.8 * L;             // gains shrink as luck worsens
+    const scale = (v, nm, pm) => Math.round(v < 0 ? v * nm : v * pm);
 
-    const spread   = RISK_SPREAD[profile];
-    const negScale = quality === 'good' ? spread.good : quality === 'bad' ? spread.bad : 1;
-    const posScale = quality === 'good' ? 1.25        : quality === 'bad' ? 0.5        : 1;
-    const resolved = {};
+    const resolved = {}, best = {}, worst = {};
     for (const k of ['time', 'energy', 'bikeCondition', 'distance', 'money', 'snacks']) {
       if (e[k] === undefined) continue;
-      resolved[k] = Math.round(e[k] < 0 ? e[k] * negScale : e[k] * posScale);
+      resolved[k] = scale(e[k], negMult, posMult);
+      best[k]     = scale(e[k], good, 1.3);
+      worst[k]    = scale(e[k], bad, 0.5);
     }
 
+    const quality = L < 0.3 ? 'good' : L > 0.7 ? 'bad' : 'normal';
     let partyLoss = null;
-    if (profile === 'gamble' && quality === 'bad' && this._party.getSize() > 0) {
-      const p = this._party.getParty();
-      partyLoss = p[Math.floor(Math.random() * p.length)];
+    if (profile === 'gamble' && this._party.getSize() > 0) {
+      const p = e.partyLossRisk ?? 0.3;
+      if (L > 1 - p) {   // unlucky tail loses a rider, honoring the authored odds
+        const party = this._party.getParty();
+        partyLoss = party[Math.floor(Math.random() * party.length)];
+      }
     }
-    return { profile, quality, resolved, partyLoss };
+    return { profile, quality, resolved, best, worst, partyLoss };
+  }
+
+  // "X could swing best..worst" for the dominant cost, so the player learns the
+  // spread they were gambling against.
+  _rangeText(best, worst) {
+    let domK = null, domMag = 0;
+    for (const k of ['time', 'energy', 'bikeCondition']) {
+      const w = worst[k];
+      if (w === undefined || w >= 0) continue;
+      const mag = Math.abs(w) * (k === 'time' ? 1.2 : 1);
+      if (mag > domMag) { domMag = mag; domK = k; }
+    }
+    if (!domK) return null;
+    const label = { time: 'Time', energy: 'Energy', bikeCondition: 'Bikes' }[domK];
+    return `${label} could swing ${this._deltaLabel(domK, best[domK])} to ${this._deltaLabel(domK, worst[domK])}`;
   }
 
   // Resolves + applies a choice, then shows an Oregon-Trail-style result card that
@@ -439,15 +456,18 @@ export default class OregonTrailScene extends Phaser.Scene {
     // Title/blurb frame the roll RELATIVE TO EXPECTATION, so "you still paid
     // something, but less than you feared" reads correctly.
     const effText = this._effectsToText(res.resolved, true);
+    const range   = this._rangeText(res.best, res.worst);
     const title   = { good: 'BETTER THAN EXPECTED', normal: 'ABOUT AS EXPECTED', bad: 'WORSE THAN EXPECTED' }[res.quality];
     const blurb   = {
       good:   this._pick(['You got off light.', 'Lucky — could have been worse.', 'That broke your way.']),
       normal: this._pick(['No real surprises.', 'Went about how you figured.', 'Nothing you did not expect.']),
       bad:    this._pick(['That stung more than you hoped.', 'Rough — it cost you.', 'Worse than you wanted.']),
     }[res.quality];
+    const lines = [blurb, effText ? `This choice: ${effText}` : 'No harm done.'];
+    if (range) lines.push(range);
     this._eventCard.show({
       title,
-      description: effText ? `${blurb}\n\nThis choice: ${effText}` : `${blurb}\n\nNo harm done.`,
+      description: lines.join('\n\n'),
       choices:     [{ text: 'Continue' }],
     }, () => done());
   }

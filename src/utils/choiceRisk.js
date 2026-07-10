@@ -5,10 +5,10 @@
 // Outcome spread by profile: how much a 'good' roll shrinks costs / a 'bad' roll
 // grows them. The scene rolls against this; the preview sizes stakes against it.
 export const RISK_SPREAD = {
-  safe:   { good: 0.75, bad: 1.25 },
-  skill:  { good: 0.55, bad: 1.30 },
-  risky:  { good: 0.40, bad: 1.85 },
-  gamble: { good: 0.45, bad: 1.85 },
+  safe:   { good: 0.60, bad: 1.50 },   // predictable-ish: ~±40%
+  skill:  { good: 0.50, bad: 1.50 },
+  risky:  { good: 0.25, bad: 2.30 },   // wild: a lucky roll is a quarter, unlucky 2.3x
+  gamble: { good: 0.30, bad: 2.30 },
 };
 
 // 'gamble' — a rider might bail (authored partyLossRisk).
