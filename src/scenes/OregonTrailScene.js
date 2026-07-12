@@ -9,22 +9,16 @@ import EventSystem from '../systems/EventSystem.js';
 import EventCard from '../ui/EventCard.js';
 import WalmartShopCard from '../ui/WalmartShopCard.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
-import { classifyChoice, RISK_SPREAD } from '../utils/choiceRisk.js';
 
 // ── Ride constants ─────────────────────────────────────────────────────────────
 const TOTAL_DISTANCE  = 2000;
 const SCROLL_SPEED    = 45;    // px/s scenery scroll during a leg's travel animation
 
-const FATIGUE_WARN    = 40;    // stamina level that flags a '!' warning on the board
-const FATIGUE_CRIT    = 15;    // stamina level that tints a rider red
-const BIKE_WARN       = 40;    // bike level that flags a '!' warning on the board
-const SKILL_USE_COST  = 18;    // stamina cost when a member uses a skill
-
-// Everyone drains at the same baseline per leg. Who ends up being the weak link
-// is randomized PER RUN via per-member multipliers assigned in create() — so no
-// rider is inherently weaker, and a different person tends to struggle each game.
-const STAMINA_BASE = 4;  // baseline stamina drain per leg
-const BIKE_BASE    = 3;  // baseline bike wear per leg
+// Baseline drain of the two GROUP bars per leg at STEADY pace on neutral terrain
+// (pace + terrain scale these). Tuned so a careless run bottoms out and needs the
+// stash, while smart pacing/resting keeps the crew going.
+const CREW_DRAIN = 9;   // crew-energy points per leg
+const BIKE_DRAIN = 7;   // bike-condition points per leg
 
 // Snack effect on stamina (0–100 scale)
 const SNACK_STAMINA = { gatorade: 33, granola: 67, hotdog: 100 };
@@ -204,15 +198,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._entryParty     = this._party.getParty();       // member ids (leo is implicit)
     this._entryResources = this._resources.getAll();
 
-    // Per-run random drain multipliers — randomize who becomes the weak link.
-    this._staminaMult = {};
-    this._bikeMult    = {};
-    ['leo', ...this._party.getParty()].forEach(id => {
-      this._staminaMult[id] = 0.7 + Math.random() * 0.7;  // 0.7–1.4×
-      this._bikeMult[id]    = 0.7 + Math.random() * 0.7;
-    });
-
-    // ── Inventory (filled at Walmart, consumed on road) ───────────────────────
+    // ── Shared stash (filled at Walmart, consumed on the road) ────────────────
     this._snackInv = { gatorade: 0, granola: 0, hotdog: 0 };
     this._bikeInv  = { patch: 0, tire: 0, chain: 0 };
 
@@ -224,26 +210,16 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._legIndex          = 0;      // index into LEGS
     this._phase             = 'travel';
     this._travel            = null;   // active leg animation state
-    this._lastLegSummary    = null;   // { timeCost, incidents } shown on the camp board
+    this._lastLegSummary    = null;   // { recap } shown on the camp board
     this._lastEventOutcome  = null;   // { text, color } outcome of this leg's choice
     this._campCp            = null;   // checkpoint being camped at (null for a plain camp)
     this._pace              = 'steady';           // pace chosen for the upcoming leg
     this._terrain           = this._rollTerrain(); // terrain of the upcoming leg (previewed at camps)
 
-    // Stamina tracking
-    this._stamina        = { leo: 100 };
-    this._warnedStamina  = new Set();
-    this._fatigueTriggered = new Set();
-
-    // Per-member bike condition tracking
-    this._bikeHP         = { leo: 100 };
-    this._warnedBike     = new Set();
-    this._bikeTriggered  = new Set();
-
-    (this._initData.party ?? []).forEach(id => {
-      this._stamina[id] = 100;
-      this._bikeHP[id]  = 100;
-    });
+    // Two GROUP bars (0-100) — the whole crew as a unit, Oregon-Trail style.
+    // TIME is the master resource (this._resources.time / the clock).
+    this._crew  = 100;   // crew energy/morale
+    this._bikes = 100;   // fleet bike condition
 
     // ── Background ────────────────────────────────────────────────────────────
     this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT * 0.3,  BASE_WIDTH, BASE_HEIGHT * 0.6, 0x87ceeb);
@@ -253,10 +229,8 @@ export default class OregonTrailScene extends Phaser.Scene {
     this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT * 0.7, BASE_WIDTH, BASE_HEIGHT * 0.6, 0x4a7a2a);
     this._roadStripes = this._buildRoad();
 
-    // ── Bikers + per-member bars ──────────────────────────────────────────────
+    // ── Bikers ────────────────────────────────────────────────────────────────
     this._bikerMap    = {};
-    this._staminaBars = {};
-    this._bikeBars    = {};
     this._buildBikers();
 
     // ── Progress bar ──────────────────────────────────────────────────────────
@@ -267,11 +241,19 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._walmartCard = new WalmartShopCard(this, this._resources, this._snackInv, this._bikeInv);
     this._snackPicker = null; // built on demand
 
-    // ── Inventory strip (just below HUD) ─────────────────────────────────────
+    // ── Group-bar strip: the two things you manage, always visible ────────────
     this.add.rectangle(BASE_WIDTH / 2, 38, BASE_WIDTH, 14, 0x000000, 0.70).setDepth(4);
-    this._invText = txt(this, BASE_WIDTH / 2, 35, '', {
-      fontSize: '8px', color: '#aaaaaa',
-    }).setOrigin(0.5, 0).setDepth(5);
+    const mkBar = (labelX, label, color) => {
+      txt(this, labelX, 38, label, { fontSize: '8px', color: '#ccd' }).setOrigin(0, 0.5).setDepth(6);
+      const bx = labelX + (label.length * 8) + 6;
+      this.add.rectangle(bx, 38, 60, 6, 0x222233).setOrigin(0, 0.5).setDepth(5);
+      const fill = this.add.rectangle(bx + 1, 38, 58, 4, color).setOrigin(0, 0.5).setDepth(6);
+      return { fill, w: 58 };
+    };
+    this._crewBar  = mkBar(8,   'CREW',  0x66cc66);
+    this._bikesBar = mkBar(150, 'BIKES', 0xef5350);
+    this._invText  = txt(this, BASE_WIDTH - 6, 38, '', { fontSize: '8px', color: '#8899aa' })
+      .setOrigin(1, 0.5).setDepth(6);
 
     // ── Second info strip (leg progress + clock + pace) ──────────────────────
     this.add.rectangle(BASE_WIDTH / 2, 53, BASE_WIDTH, 12, 0x000000, 0.58).setDepth(5);
@@ -304,7 +286,7 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     this._resources.applyChanges({});
     this._party._emit();
-    this._updateInvStrip();
+    this._updateGroupHud();
     this._startLeg();
   }
 
@@ -330,8 +312,7 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     this._scrollLayers(dt, t.scrollSpeed);
     this._updateProgressBar();
-    this._updateStaminaBars();
-    this._updateBikeBars();
+    this._updateGroupHud();
 
     if (k >= 1) {
       this._riding = false;
@@ -378,13 +359,11 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     // Apply this leg's cost ONCE; remember the summary so the board can show it.
     this._lastLegSummary = this._applyLegCost(leg);
-    this._updatePaceEta(this._calcSpeedMult());
+    this._updatePaceEta();
 
-    // Loss is checked only at stops now — no per-frame surprises.
-    if (!this._gameOverFlag) {
-      if (this._resources.isTimeUp())    { this._triggerLoss('time');   return; }
-      if (this._resources.isExhausted()) { this._triggerLoss('energy'); return; }
-    }
+    // TIME running out is the only hard loss — a low crew/bikes bar just slows
+    // you down (burning more time), it doesn't end the run.
+    if (!this._gameOverFlag && this._resources.isTimeUp()) { this._triggerLoss('time'); return; }
 
     if (leg.stop === 'arrival') { this._triggerArrival(); return; }
 
@@ -403,17 +382,25 @@ export default class OregonTrailScene extends Phaser.Scene {
     }
   }
 
-  // Arrival cost: one round of per-member stamina/bike drain (the leg's TIME cost
-  // was already spent gradually during travel). Returns a summary for the board.
+  // Arrival cost: drain the two GROUP bars by this leg's pace + terrain (the TIME
+  // cost was already spent gradually during travel). Returns a plain word recap.
   _applyLegCost(leg) {
     const pace = PACES[this._pace];
     const terr = this._terrain;
-    const incidents = [];
-    incidents.push(...this._drainStaminaOnce(pace.drain * terr.stam));
-    incidents.push(...this._drainBikesOnce(pace.drain * terr.bike));
-    this._syncBikeToHud();
+    const crewHit = Math.round(CREW_DRAIN * pace.drain * terr.stam * (0.7 + Math.random() * 0.6));
+    const bikeHit = Math.round(BIKE_DRAIN * pace.drain * terr.bike * (0.7 + Math.random() * 0.6));
+    this._crew  = Math.max(0, this._crew  - crewHit);
+    this._bikes = Math.max(0, this._bikes - bikeHit);
+    return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr };
+  }
 
-    return { timeCost: this._travel?.timeCost ?? 0, incidents, terrain: terr, pace: this._pace };
+  // One friendly sentence about how the leg went — no numbers.
+  _legRecap(terr, crewHit, bikeHit) {
+    const t = terr.name.toLowerCase();
+    if (crewHit + bikeHit <= 6)  return 'Smooth going — barely a scratch.';
+    if (crewHit >= 14)           return `That ${t} really wore the crew down.`;
+    if (bikeHit >= 13)           return `The ${t} was rough on the bikes.`;
+    return `You pushed through the ${t}.`;
   }
 
   // Draws one Act-2 road event as an untimed card. Picking a choice rolls a
@@ -426,140 +413,90 @@ export default class OregonTrailScene extends Phaser.Scene {
     });
   }
 
-  // Rolls a CONTINUOUS luck value and scales the choice's effects along its risk
-  // spread — so every outcome differs (no flat "nominal" result) and a risky
-  // choice swings far more than a safe one. Also returns the best/worst extremes.
-  _resolveChoice(choice) {
-    const e       = choice.effects ?? {};
-    const profile = classifyChoice(choice);
-    const { good, bad } = RISK_SPREAD[profile];
-    const L = Math.random();   // 0 = luckiest, 1 = unluckiest
+  // Applies a chosen option to the GROUP bars + clock, then shows a plain, wordy
+  // result card (Oregon-Trail style — no %, no ranges, no risk tiers). A little
+  // luck softens or worsens the cost so it isn't fully solved up front.
+  _resolveChoiceAndReveal(choice, done) {
+    const e    = choice.effects ?? {};
+    const roll = Math.random();
+    const luck = roll < 0.25 ? 'good' : roll > 0.80 ? 'bad' : 'normal';
+    const mul  = luck === 'good' ? 0.5 : luck === 'bad' ? 1.6 : 1;   // scales the COSTS only
 
-    const negMult = good + (bad - good) * L;   // cost multiplier for this roll
-    const posMult = 1.3 - 0.8 * L;             // gains shrink as luck worsens
-    const scale = (v, nm, pm) => Math.round(v < 0 ? v * nm : v * pm);
-
-    const resolved = {}, best = {}, worst = {};
+    const applied = {};
     for (const k of ['time', 'energy', 'bikeCondition', 'distance', 'money', 'snacks']) {
       if (e[k] === undefined) continue;
-      resolved[k] = scale(e[k], negMult, posMult);
-      best[k]     = scale(e[k], good, 1.3);
-      worst[k]    = scale(e[k], bad, 0.5);
+      applied[k] = Math.round(e[k] < 0 ? e[k] * mul : e[k]);
     }
+    this._applyEventEffects(applied);
+    if (choice.requiresPartyMember) this._crew = Math.max(0, this._crew - 6);  // a helper tires the crew a bit
+    this._lastEventOutcome = this._formatEventOutcome(applied);
 
-    const quality = L < 0.3 ? 'good' : L > 0.7 ? 'bad' : 'normal';
-    let partyLoss = null;
-    if (profile === 'gamble' && this._party.getSize() > 0) {
-      const p = e.partyLossRisk ?? 0.3;
-      if (L > 1 - p) {   // unlucky tail loses a rider, honoring the authored odds
-        const party = this._party.getParty();
-        partyLoss = party[Math.floor(Math.random() * party.length)];
-      }
-    }
-    return { profile, quality, resolved, best, worst, partyLoss };
-  }
-
-  // "X could swing best..worst" for the dominant cost, so the player learns the
-  // spread they were gambling against.
-  _rangeText(best, worst) {
-    let domK = null, domMag = 0;
-    for (const k of ['time', 'energy', 'bikeCondition']) {
-      const w = worst[k];
-      if (w === undefined || w >= 0) continue;
-      const mag = Math.abs(w) * (k === 'time' ? 1.2 : 1);
-      if (mag > domMag) { domMag = mag; domK = k; }
-    }
-    if (!domK) return null;
-    const label = { time: 'Time', energy: 'Energy', bikeCondition: 'Bikes' }[domK];
-    return `${label} could swing ${this._deltaLabel(domK, best[domK])} to ${this._deltaLabel(domK, worst[domK])}`;
-  }
-
-  // Resolves + applies a choice, then shows an Oregon-Trail-style result card that
-  // reveals what happened. Calls done() when the player dismisses the result.
-  _resolveChoiceAndReveal(choice, done) {
-    const res = this._resolveChoice(choice);
-    this._applyEventEffects(res.resolved);
-    if (choice.requiresPartyMember && this._stamina[choice.requiresPartyMember] !== undefined) {
-      this._stamina[choice.requiresPartyMember] =
-        Math.max(0, this._stamina[choice.requiresPartyMember] - SKILL_USE_COST);
-    }
-    this._lastEventOutcome = this._formatEventOutcome(res.resolved);
-
-    if (res.partyLoss) {
-      this._dropMember(res.partyLoss);
-      this._announceMemberLost(res.partyLoss, done);   // the loss notice IS the reveal
+    // Rare friend loss (only choices flagged risky), on bad luck.
+    if (e.partyLossRisk && this._party.getSize() > 0 && Math.random() < e.partyLossRisk) {
+      const p = this._party.getParty();
+      const lost = p[Math.floor(Math.random() * p.length)];
+      this._dropMember(lost);
+      this._announceMemberLost(lost, done);
       return;
     }
 
-    // Title/blurb frame the roll RELATIVE TO EXPECTATION, so "you still paid
-    // something, but less than you feared" reads correctly.
-    const effText = this._effectsToText(res.resolved, true);
-    const range   = this._rangeText(res.best, res.worst);
-    const title   = { good: 'BETTER THAN EXPECTED', normal: 'ABOUT AS EXPECTED', bad: 'WORSE THAN EXPECTED' }[res.quality];
-    const blurb   = {
-      good:   this._pick(['You got off light.', 'Lucky — could have been worse.', 'That broke your way.']),
-      normal: this._pick(['No real surprises.', 'Went about how you figured.', 'Nothing you did not expect.']),
-      bad:    this._pick(['That stung more than you hoped.', 'Rough — it cost you.', 'Worse than you wanted.']),
-    }[res.quality];
-    const lines = [blurb, effText ? `This choice: ${effText}` : 'No harm done.'];
-    if (range) lines.push(range);
+    const title = luck === 'good' ? 'THAT WENT WELL!' : luck === 'bad' ? 'BAD LUCK!' : 'OKAY THEN...';
     this._eventCard.show({
       title,
-      description: lines.join('\n\n'),
+      description: this._plainOutcomeLine(applied),
       choices:     [{ text: 'Continue' }],
     }, () => done());
   }
 
-  // ── Human-readable resource deltas ─────────────────────────────────────────────
-  // Time is shown in MINUTES (matches the on-screen clock); energy/bike as % of
-  // 100. `withMag` appends a plain size word so the player knows if it's a lot.
-  _mag(a, lo, hi) { return a <= lo ? 'minor' : a <= hi ? 'moderate' : 'heavy'; }
-
-  _deltaLabel(key, v, withMag = false) {
-    if (!v) return null;
-    const sign = v > 0 ? '+' : '-';
-    const a    = Math.abs(v);
-    let core, mag = null;
-    switch (key) {
-      case 'time':          { const m = Math.round(a * 1.2); core = `${sign}${m} min`;      mag = this._mag(m, 8, 18); break; }
-      case 'energy':        core = `${sign}${a}% energy`;      mag = this._mag(a, 8, 18); break;
-      case 'bikeCondition': core = `${sign}${a}% bike`;        mag = this._mag(a, 8, 18); break;
-      case 'distance':      core = `${v} closer to donuts`;    break;
-      case 'money':         core = `${v > 0 ? '+$' : '-$'}${a}`; break;
-      case 'snacks':        core = `${sign}${a} snack${a > 1 ? 's' : ''}`; break;
-      default: return null;
-    }
-    return withMag && mag ? `${core} (${mag})` : core;
+  // Apply resource deltas to the group bars + clock (energy→CREW, bikeCondition→
+  // BIKES, time→clock, distance→progress). Shared by road + checkpoint events.
+  _applyEventEffects(e) {
+    const clamp = v => Math.max(0, Math.min(100, v));
+    if (e.time)          this._resources.applyChanges({ time: e.time });
+    if (e.money)         this._resources.applyChanges({ money: e.money });
+    if (e.energy)        this._crew  = clamp(this._crew  + e.energy);
+    if (e.bikeCondition) this._bikes = clamp(this._bikes + e.bikeCondition);
+    if (e.snacks)        this._crew  = clamp(this._crew  + e.snacks * 8);   // a snack ~ a crew boost
+    if (e.distance)      this._distance = Math.min(TOTAL_DISTANCE - 10, this._distance + e.distance);
+    this._updateGroupHud();
   }
 
-  _effectsToText(e, withMag = false) {
-    return ['time', 'energy', 'bikeCondition', 'distance', 'money', 'snacks']
-      .map(k => (e[k] !== undefined ? this._deltaLabel(k, e[k], withMag) : null))
-      .filter(Boolean).join(', ');
+  // Turn resource deltas into a plain sentence — no numbers, just what happened.
+  _plainOutcomeLine(e) {
+    const parts = [];
+    if (e.time < 0)          parts.push('lost some time');
+    if (e.time > 0)          parts.push('saved some time');
+    if (e.distance > 0)      parts.push('gained ground toward the donuts');
+    if (e.energy > 0 || e.snacks > 0) parts.push('the crew feels better');
+    if (e.energy < 0)        parts.push('tired the crew out');
+    if (e.bikeCondition > 0) parts.push('patched up the bikes');
+    if (e.bikeCondition < 0) parts.push('wore the bikes down');
+    if (e.money > 0)         parts.push('found a little cash');
+    if (e.money < 0)         parts.push('spent a little cash');
+    if (parts.length === 0)  return 'No harm done.';
+    const s = parts.join(', ');
+    return s.charAt(0).toUpperCase() + s.slice(1) + '.';
   }
 
-  // Blocking notice when a DECISION costs a teammate (an intentional drop already
-  // has its own confirm dialog, so this only fires for event-driven losses).
+  // Blocking notice when a decision costs a teammate.
   _announceMemberLost(id, done) {
     const name = MEMBER_NAMES[id] ?? id.toUpperCase();
     this._eventCard.show({
-      title:       `${name} LEFT THE GROUP`,
-      description: `That choice cost you a teammate — ${name} split off and headed home. The rest of the crew rides on without them.`,
+      title:       `${name} HEADED HOME`,
+      description: `${name} split off and rode home. The rest of the crew keeps going without them.`,
       choices:     [{ text: 'Ride on...' }],
     }, () => done());
   }
 
-  // Recaps your event choice's result on the camp board (labeled 'Your choice:' so
-  // it reads as separate from the ride mishaps above it). Returns {text,color}|null.
+  // Camp-board recap line for the choice you just made (plain words).
   _formatEventOutcome(changes) {
     if (!changes) return null;
-    const text = this._effectsToText(changes, false);
-    if (!text) return null;
-
+    const text = this._plainOutcomeLine(changes);
+    if (text === 'No harm done.') return null;
     const dmg  = Math.max(0, -(changes.energy || 0)) + Math.max(0, -(changes.bikeCondition || 0));
     const gain = Math.max(0,  (changes.energy || 0)) + Math.max(0,  (changes.bikeCondition || 0));
     const color = gain > dmg ? '#66dd66' : dmg > 0 ? '#ff8866' : '#cccccc';
-    return { text: `Your choice: ${text}`, color };
+    return { text: `Your choice: ${text.toLowerCase()}`, color };
   }
 
   _openCamp(cp) {
@@ -568,18 +505,12 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._riding  = false;
     this._terrain = this._rollTerrain();   // roll the UPCOMING leg's terrain (previewed on board)
     this._pace    = 'steady';              // pace resets to steady each camp
-    this._updateInvStrip();
+    this._updateGroupHud();
     this._updatePaceEta();
     this._buildRestStopUI();  // the status board
   }
 
   _continueFromCamp() {
-    // Any party member still at 0 stamina or 0 bike when you leave the camp has to
-    // go home — this is your one chance to feed/fix them. (Leo never leaves.)
-    const goingHome = this._party.getParty().filter(
-      id => (this._stamina[id] ?? 1) <= 0 || (this._bikeHP[id] ?? 1) <= 0,
-    );
-    if (goingHome.length > 0) { this._sendMembersHome(goingHome); return; }
     this._advanceLeg();
   }
 
@@ -591,90 +522,52 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._startLeg();
   }
 
-  // Drops members who bottomed out, each taking their equal share of the pooled
-  // cash home with them (share = current pot / current crew size, Leo included).
-  _sendMembersHome(ids) {
-    const lines = [];
-    ids.forEach(id => {
-      const name     = MEMBER_NAMES[id] ?? id.toUpperCase();
-      const reason   = (this._stamina[id] ?? 1) <= 0 ? 'too exhausted' : 'bike broke down';
-      const crewSize = 1 + this._party.getParty().length;               // Leo + current party
-      const share    = Math.floor(this._resources.money / crewSize);
-      if (share > 0) this._resources.applyChanges({ money: -share });
-      lines.push(`${name} (${reason}) took $${share}`);
-      this._dropMember(id);
-    });
-    this._eventCard.show({
-      title:       ids.length > 1 ? 'RIDERS HEADED HOME' : `${MEMBER_NAMES[ids[0]] ?? 'A RIDER'} HEADED HOME`,
-      description: `${lines.join('.  ')}.  They each took their share of the pooled cash.`,
-      choices:     [{ text: 'Ride on...' }],
-    }, () => this._advanceLeg());
-  }
-
   // ── Speed modulation ──────────────────────────────────────────────────────────
-
+  // Low CREW or BIKES slows the group, which burns more TIME — the natural penalty.
   _calcSpeedMult() {
-    const minStam = Math.min(...Object.values(this._stamina));
-    const minBike = Math.min(...Object.values(this._bikeHP));
-    // Stamina: full speed at ≥60, linear decay to 0.5× at 0
-    const sM = 0.5 + 0.5 * Math.min(1, minStam / 60);
-    // Bike: full speed at ≥50, linear decay to 0.4× at 0
-    const bM = 0.4 + 0.6 * Math.min(1, minBike / 50);
-    // Worst factor wins — one struggling member drags the whole group
+    const sM = 0.5 + 0.5 * Math.min(1, this._crew  / 60);
+    const bM = 0.4 + 0.6 * Math.min(1, this._bikes / 50);
+    // Whichever bar is lower drags the group.
     return Math.max(0.30, Math.min(sM, bM));
   }
 
-  // ── Passive drains ────────────────────────────────────────────────────────────
-
   // One leg's worth of stamina drain. Returns short incident strings (rare
-  // tumbles/cramps) for the camp board to display — no transient floats.
-  // `mult` folds in the leg's pace + terrain (e.g. PUSH up a hill drains hard).
-  _drainStaminaOnce(mult = 1) {
-    const incidents = [];
-    const chance = 0.06 * Math.min(2, Math.max(0.6, mult));   // rough legs = more mishaps
-    Object.keys(this._stamina).forEach(id => {
-      const base = STAMINA_BASE * (this._staminaMult[id] ?? 1) * mult;
-      let drain;
-      if (Math.random() < chance) {
-        drain = 15 + Math.random() * 13;  // flat 15-28 mishap (not base-scaled)
-        const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        const what = this._pick([`${name} took a tumble`, `${name} hit a cramp`, `${name} nearly wiped out`]);
-        incidents.push(`${what} (-${Math.round(drain)}% energy)`);
-      } else {
-        drain = base * (0.5 + Math.random() * 1.2);
-      }
-      this._stamina[id] = Math.max(0, this._stamina[id] - drain);
-    });
-    return incidents;
-  }
-
-  // One leg's worth of bike wear. Returns incident strings for the board.
-  _drainBikesOnce(mult = 1) {
-    const incidents = [];
-    const chance = 0.06 * Math.min(2, Math.max(0.6, mult));
-    Object.keys(this._bikeHP).forEach(id => {
-      const base = BIKE_BASE * (this._bikeMult[id] ?? 1) * mult;
-      let drain;
-      if (Math.random() < chance) {
-        drain = 14 + Math.random() * 12;  // flat 14-26 mishap (not base-scaled)
-        const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-        const what = this._pick([`${name} hit a pothole`, `${name}'s chain slipped`, `${name} clipped a curb`]);
-        incidents.push(`${what} (-${Math.round(drain)}% bike)`);
-      } else {
-        drain = base * (0.5 + Math.random() * 1.2);
-      }
-      this._bikeHP[id] = Math.max(0, this._bikeHP[id] - drain);
-    });
-    return incidents;
-  }
-
   _pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-  _updateInvStrip() {
-    const s = this._snackInv, b = this._bikeInv;
-    this._invText.setText(
-      `GATO:${s.gatorade}  GRAN:${s.granola}  DOG:${s.hotdog}    PATCH:${b.patch}  TIRE:${b.tire}  CHAIN:${b.chain}`,
-    );
+  // Refresh the top CREW/BIKES bars + the stash count.
+  _updateGroupHud() {
+    if (this._crewBar)  this._crewBar.fill.setSize(Math.max(1, this._crewBar.w  * this._crew  / 100), 4);
+    if (this._bikesBar) this._bikesBar.fill.setSize(Math.max(1, this._bikesBar.w * this._bikes / 100), 4);
+    if (this._invText)  this._invText.setText(`SNACKS x${this._snackTotal()}   KITS x${this._repairTotal()}`);
+  }
+
+  _snackTotal()  { const s = this._snackInv; return s.gatorade + s.granola + s.hotdog; }
+  _repairTotal() { const b = this._bikeInv;  return b.patch + b.tire + b.chain; }
+
+  // Use one snack from the stash (best first) → refill CREW.
+  _useSnack() {
+    const order = [['hotdog', SNACK_STAMINA.hotdog], ['granola', SNACK_STAMINA.granola], ['gatorade', SNACK_STAMINA.gatorade]];
+    for (const [k, boost] of order) {
+      if (this._snackInv[k] > 0) {
+        this._snackInv[k]--;
+        this._crew = Math.min(100, this._crew + boost);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Use one repair kit → refill BIKES.
+  _useRepair() {
+    const order = [['chain', BIKE_PART_RESTORE.chain], ['tire', BIKE_PART_RESTORE.tire], ['patch', BIKE_PART_RESTORE.patch]];
+    for (const [k, restore] of order) {
+      if (this._bikeInv[k] > 0) {
+        this._bikeInv[k]--;
+        this._bikes = Math.min(100, this._bikes + restore);
+        return true;
+      }
+    }
+    return false;
   }
 
   // Right-hand strip = SCHEDULE status (are you ahead or behind the clock), so the
@@ -692,61 +585,11 @@ export default class OregonTrailScene extends Phaser.Scene {
     else                   this._paceText.setText('ON PACE').setColor('#f5a623');
   }
 
-  // Push average bike condition to ResourceSystem so HUD bar stays current
-  _syncBikeToHud() {
-    const vals = Object.values(this._bikeHP);
-    if (vals.length === 0) return;
-    const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-    this._resources.applyChanges({ bikeCondition: avg - this._resources.bikeCondition });
-  }
-
   // ── Shared drop helper ────────────────────────────────────────────────────────
 
   _dropMember(id) {
-    const multBefore = this._calcSpeedMult();
     this._removeBiker(id);
     this._party.removeMember(id);
-    delete this._stamina[id];
-    delete this._bikeHP[id];
-    this._syncBikeToHud();
-    const multAfter = this._calcSpeedMult();
-    if (multAfter > multBefore + 0.05) {
-      this._showFloat('GROUP SPEED UP!', BASE_WIDTH / 2, BASE_HEIGHT * 0.34, '#44cc44');
-    }
-  }
-
-  // ── Event effect helpers ──────────────────────────────────────────────────────
-
-  // Applies effects to BOTH ResourceSystem (HUD) AND per-member stamina/bikeHP.
-  // `distance` effects advance the progress bar directly — never sent to ResourceSystem.
-  _applyEventEffects(effects) {
-    const { distance: _d, ...resEffects } = effects;
-    this._resources.applyChanges(resEffects);
-    this._applyPerMemberEffects(effects);
-  }
-
-  // Bridges resource deltas to per-member values only (no ResourceSystem call).
-  // Use this when ResourceSystem was already updated (e.g. via EventSystem).
-  _applyPerMemberEffects(effects) {
-    if (effects.energy) {
-      const delta = effects.energy;
-      Object.keys(this._stamina).forEach(id => {
-        this._stamina[id] = Math.max(0, Math.min(100, this._stamina[id] + delta));
-        if (delta > 0) { this._warnedStamina.delete(id); this._fatigueTriggered.delete(id); }
-      });
-    }
-    if (effects.bikeCondition) {
-      const delta = effects.bikeCondition;
-      Object.keys(this._bikeHP).forEach(id => {
-        this._bikeHP[id] = Math.max(0, Math.min(100, this._bikeHP[id] + delta));
-        if (delta > 0) { this._warnedBike.delete(id); this._bikeTriggered.delete(id); }
-      });
-      this._syncBikeToHud();
-    }
-    if (effects.distance) {
-      // Advance the progress bar — shortcuts/downhills move you forward, not backward in time
-      this._distance = Math.min(TOTAL_DISTANCE - 10, this._distance + effects.distance);
-    }
   }
 
   // ── Location scenes ────────────────────────────────────────────────────────
@@ -890,254 +733,109 @@ export default class OregonTrailScene extends Phaser.Scene {
 
   _rebuildRestStop() {
     if (this._restStopCon) { this._restStopCon.destroy(true); this._restStopCon = null; }
-    this._updateInvStrip();
+    this._updateGroupHud();
     this._buildRestStopUI();
   }
 
+  // Word + color for a group bar's level.
+  _crewWord()  { return this._crew  > 66 ? ['fresh', '#8fd694'] : this._crew  > 33 ? ['getting tired', '#ffcc66'] : ['worn out!', '#ff6666']; }
+  _bikesWord() { return this._bikes > 66 ? ['holding up', '#8fd694'] : this._bikes > 33 ? ['getting rough', '#ffcc66'] : ['barely rolling!', '#ff6666']; }
+
+  // The whole camp UI: 3 bars, a heads-up, the pace lever, and two stash buttons.
   _buildRestStopUI() {
-    const members    = ['leo', ...this._party.getParty()];
-    const allInc     = this._lastLegSummary?.incidents ?? [];
-    const incidents  = allInc.slice(0, 2);           // cap lines so the card fits 270px
-    const extraInc   = allInc.length - incidents.length;
     const hasOutcome = !!this._lastEventOutcome;
-    const atRisk     = members.filter(
-      id => id !== 'leo' && ((this._stamina[id] ?? 1) <= 0 || (this._bikeHP[id] ?? 1) <= 0),
-    );
-    const terr = this._terrain;
+    const terr  = this._terrain;
     const lineH = 11;
-
-    // Header: title + leg-cost + incidents (+more) + choice outcome + NEXT terrain.
-    const headLines = 2 + incidents.length + (extraInc > 0 ? 1 : 0) + (hasOutcome ? 1 : 0) + 1;
-    const headH     = headLines * lineH + 12;
-    const paceH     = 16 + 4 + lineH + 8;   // pace buttons + blurb + gaps
-
-    const cardW = 462;
-    const cardX = (BASE_WIDTH - cardW) / 2;
-
-    // Fit: shrink member rows only if a big party + lots of content would run off
-    // the 270px screen; otherwise keep them comfortable.
-    const MAXH  = 264;
-    const fixed = headH + 10 + (atRisk.length ? lineH : 0) + paceH + 22 + 8;
-    let rowH = 26;
-    if (fixed + members.length * rowH > MAXH) {
-      rowH = Math.max(20, Math.floor((MAXH - fixed) / members.length));
-    }
-    const cardH = fixed + members.length * rowH;
+    const cardW = 300, cardX = (BASE_WIDTH - cardW) / 2;
+    const cardH = 200 + (hasOutcome ? lineH : 0);
     const cardY = (BASE_HEIGHT - cardH) / 2;
 
     this._restStopCon = this.add.container(0, 0).setDepth(31);
-    const overlay = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.78);
-    const bg      = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0x06080f, 0.98);
-    const border  = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0, 0).setStrokeStyle(2, 0xf5a623);
-    this._restStopCon.add([overlay, bg, border]);
+    const add = o => { this._restStopCon.add(o); return o; };
+    add(this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.8));
+    add(this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0x06080f, 0.98));
+    add(this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0, 0).setStrokeStyle(2, 0xf5a623));
 
-    const line = (y, s, color, x = BASE_WIDTH / 2, ox = 0.5) => {
-      this._restStopCon.add(txt(this, x, y, s, { fontSize: '8px', color }).setOrigin(ox, 0));
+    const line = (y, s, color, x = BASE_WIDTH / 2, ox = 0.5) =>
+      add(txt(this, x, y, s, { fontSize: '8px', color }).setOrigin(ox, 0.5));
+
+    // A labeled bar: NAME [====----] word
+    const bar = (y, label, value, fillColor, word, wordColor) => {
+      line(y, label, '#ccddee', cardX + 14, 0);
+      add(this.add.rectangle(cardX + 70, y, 110, 8, 0x222233).setOrigin(0, 0.5));
+      add(this.add.rectangle(cardX + 71, y, Math.max(1, 108 * value / 100), 6, fillColor).setOrigin(0, 0.5));
+      if (word) line(y, word, wordColor, cardX + 188, 0);
     };
 
-    let ly = cardY + 5;
+    let y = cardY + 12;
     const landmark = this._campCp ? this._campCp.label : 'REST STOP';
-    line(ly, `${landmark}   -   LEG ${this._legIndex + 1}/${LEGS.length}   -   ${timeToDisplay(this._resources.time)}`, '#f5a623');
-    ly += lineH;
+    line(y, landmark, '#f5a623'); y += lineH + 2;
 
-    const s = this._lastLegSummary;
-    const costText = s
-      ? `The ${s.terrain?.name ?? 'ride'} cost ~${Math.round(s.timeCost * 1.2)} min` + (incidents.length === 0 ? ', no trouble' : ':')
-      : 'Ready to ride.';
-    line(ly, costText, '#99aabb'); ly += lineH;
-    incidents.forEach(inc => { line(ly, inc, '#ff9966'); ly += lineH; });
-    if (extraInc > 0) { line(ly, `(+${extraInc} more mishap${extraInc > 1 ? 's' : ''})`, '#ff9966'); ly += lineH; }
-    if (hasOutcome) { line(ly, this._lastEventOutcome.text, this._lastEventOutcome.color); ly += lineH; }
-    line(ly, `NEXT LEG:  ${terr.name}  -  ${terr.hint}`, terr.color); ly += lineH;
+    if (this._lastLegSummary) { line(y, this._lastLegSummary.recap, '#99aabb'); y += lineH; }
+    if (hasOutcome)           { line(y, this._lastEventOutcome.text, this._lastEventOutcome.color); y += lineH; }
+    y += 4;
 
-    // Member rows
-    let rowY = cardY + headH;
-    members.forEach(id => {
-      this._buildRestStopRow(id, cardX + 6, rowY, rowH);
-      rowY += rowH;
-    });
-    rowY += 6;
+    // Three bars.
+    const timeWord = this._scheduleWord();
+    bar(y, 'TIME',  this._resources.time, 0xf5e642, timeToDisplay(this._resources.time), timeWord[1]); y += 14;
+    const cw = this._crewWord();  bar(y, 'CREW',  this._crew,  0x66cc66, cw[0], cw[1]); y += 14;
+    const bw = this._bikesWord(); bar(y, 'BIKES', this._bikes, 0xef5350, bw[0], bw[1]); y += 16;
 
-    // Red alert: riders at 0 will leave (and take their cash) if you continue now.
-    if (atRisk.length) {
-      const names = atRisk.map(id => MEMBER_NAMES[id] ?? id.toUpperCase()).join(' & ');
-      line(rowY, `${names} head home unless you feed/fix them here!`, '#ff4444');
-      rowY += lineH;
-    }
+    // Terrain heads-up.
+    line(y, `NEXT: ${terr.name} (${terr.hint})`, terr.color); y += lineH + 3;
 
-    // ── Pace selector for the upcoming leg ──────────────────────────────────────
-    const btnY = rowY + 8;
-    line(btnY, 'PACE', '#8899aa', cardX + 14, 0);
-    const bw = 74, gap = 10;
-    const groupW = PACE_ORDER.length * bw + (PACE_ORDER.length - 1) * gap;
-    let bx = BASE_WIDTH / 2 - groupW / 2 + bw / 2;
+    // Pace lever.
+    line(y, 'SET YOUR PACE:', '#8899aa'); y += lineH + 2;
+    const pw = 88, gap = 6;
+    let bx = BASE_WIDTH / 2 - (PACE_ORDER.length * pw + (PACE_ORDER.length - 1) * gap) / 2 + pw / 2;
     PACE_ORDER.forEach(pid => {
       const sel = this._pace === pid;
-      const btn = this.add.rectangle(bx, btnY + 4, bw, 16, sel ? 0x2a5a2a : 0x141420)
-        .setStrokeStyle(1, sel ? 0x66cc66 : 0x333344).setInteractive({ useHandCursor: true });
-      const lbl = txt(this, bx, btnY + 4, PACES[pid].label, { fontSize: '8px', color: sel ? '#ccffcc' : '#8899aa' }).setOrigin(0.5);
+      const btn = add(this.add.rectangle(bx, y, pw, 16, sel ? 0x2a5a2a : 0x141420)
+        .setStrokeStyle(1, sel ? 0x66cc66 : 0x333344).setInteractive({ useHandCursor: true }));
+      add(txt(this, bx, y, PACES[pid].label, { fontSize: '8px', color: sel ? '#ccffcc' : '#8899aa' }).setOrigin(0.5));
       btn.on('pointerover', () => { if (this._pace !== pid) btn.setFillStyle(0x22223a); });
       btn.on('pointerout',  () => { if (this._pace !== pid) btn.setFillStyle(0x141420); });
       btn.on('pointerdown', () => { this._pace = pid; this._rebuildRestStop(); });
-      this._restStopCon.add([btn, lbl]);
-      bx += bw + gap;
+      bx += pw + gap;
     });
-    rowY += 20;
-    line(rowY, `${PACES[this._pace].label}: ${PACES[this._pace].blurb}`, '#8899aa'); rowY += lineH + 4;
+    y += 12;
+    line(y, PACES[this._pace].blurb, '#8899aa'); y += lineH + 4;
 
-    // ── Continue ────────────────────────────────────────────────────────────────
-    const contLabel = atRisk.length ? 'CONTINUE (lose riders)  →   [ENTER]' : 'CONTINUE  →   [ENTER]';
-    const contBg  = this.add.rectangle(BASE_WIDTH / 2, rowY + 10, 260, 20, atRisk.length ? 0x3a1a1a : 0x1a3a1a).setInteractive({ useHandCursor: true });
-    const contLbl = txt(this, BASE_WIDTH / 2, rowY + 10, contLabel, { fontSize: '8px', color: atRisk.length ? '#ffaaaa' : '#88ff88' }).setOrigin(0.5);
-    contBg.on('pointerover', () => contBg.setFillStyle(atRisk.length ? 0x5a2a2a : 0x2a6a2a));
-    contBg.on('pointerout',  () => contBg.setFillStyle(atRisk.length ? 0x3a1a1a : 0x1a3a1a));
+    // Stash buttons — one snack (+CREW), one repair (+BIKES).
+    const snacks = this._snackTotal(), kits = this._repairTotal();
+    const stashBtn = (cx2, label, count, enabled, handler) => {
+      const btn = add(this.add.rectangle(cx2, y, 132, 16, enabled ? 0x1a3a2a : 0x1a1a22)
+        .setStrokeStyle(1, enabled ? 0x4a8a5a : 0x2a2a33));
+      add(txt(this, cx2, y, label, { fontSize: '8px', color: enabled ? '#aaf0c0' : '#556' }).setOrigin(0.5));
+      if (enabled) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setFillStyle(0x2a5a3a));
+        btn.on('pointerout',  () => btn.setFillStyle(0x1a3a2a));
+        btn.on('pointerdown', handler);
+      }
+    };
+    stashBtn(BASE_WIDTH / 2 - 70, `Snack +CREW (x${snacks})`, snacks, snacks > 0 && this._crew < 100,
+      () => { this._useSnack(); this._rebuildRestStop(); });
+    stashBtn(BASE_WIDTH / 2 + 70, `Fix bikes +BIKES (x${kits})`, kits, kits > 0 && this._bikes < 100,
+      () => { this._useRepair(); this._rebuildRestStop(); });
+    y += 18;
+
+    // Continue.
+    const contBg = add(this.add.rectangle(BASE_WIDTH / 2, y + 4, 200, 18, 0x1a3a1a).setInteractive({ useHandCursor: true }));
+    add(txt(this, BASE_WIDTH / 2, y + 4, 'CONTINUE  →   [ENTER]', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5));
+    contBg.on('pointerover', () => contBg.setFillStyle(0x2a6a2a));
+    contBg.on('pointerout',  () => contBg.setFillStyle(0x1a3a1a));
     contBg.on('pointerdown', () => this._continueFromCamp());
-    this._restStopCon.add([contBg, contLbl]);
   }
 
-  _buildRestStopRow(id, x, rowY, rowH) {
-    const objs = [];
-    const makeRect = (rx, ry, w, h, c, a = 1) => {
-      const o = this.add.rectangle(rx, ry, w, h, c, a);
-      objs.push(o);
-      return o;
-    };
-    const makeText = (tx, ty, s, style = {}) => {
-      const o = txt(this, tx, ty, s, { fontSize: '8px', color: '#cccccc', ...style });
-      objs.push(o);
-      return o;
-    };
-    const cy = rowY + rowH / 2;
-
-    const stam = Math.round(this._stamina[id] ?? 0);
-    const bike = Math.round(this._bikeHP[id] ?? 0);
-    // A non-Leo rider at 0 stamina or 0 bike goes home on Continue unless fixed here.
-    // Use RAW values so this matches the go-home check exactly (no rounding false alarms).
-    const atRisk = id !== 'leo' && ((this._stamina[id] ?? 1) <= 0 || (this._bikeHP[id] ?? 1) <= 0);
-
-    // Row background — red when a rider is about to leave
-    makeRect(BASE_WIDTH / 2, cy, 462 - 4, rowH - 2, atRisk ? 0x3a0a0a : 0x0a0f1a);
-
-    // Name (4 chars max to fit)
-    const name = (MEMBER_NAMES[id] ?? id).substring(0, 4);
-    makeText(x, cy, name, { color: atRisk ? '#ff6666' : '#cccccc' }).setOrigin(0, 0.5);
-
-    // Persistent warning flag (stays until the condition clears — no fading text)
-    if (atRisk) {
-      makeText(x + 30, cy, '!!', { color: '#ff2222' }).setOrigin(0.5);
-    } else if (stam < FATIGUE_WARN || bike < BIKE_WARN) {
-      makeText(x + 32, cy, '!', { color: '#ff3333' }).setOrigin(0.5);
-    }
-
-    // Stamina bar
-    const sBarX = x + 40;
-    const sW    = Math.max(1, Math.round(40 * stam / 100));
-    const sCol  = stam > 50 ? 0x44cc44 : stam > 25 ? 0xf5a623 : 0xff3333;
-    makeRect(sBarX + 20, cy, 40, 5, 0x111111);
-    makeRect(sBarX, cy, sW, 4, sCol).setOrigin(0, 0.5);
-    makeText(sBarX + 44, cy, String(stam), { color: '#667788' }).setOrigin(0, 0.5);
-
-    // Bike bar
-    const bBarX = x + 110;
-    const bW    = Math.max(1, Math.round(40 * bike / 100));
-    const bCol  = bike > 25 ? 0xef5350 : 0xff3333;
-    makeRect(bBarX + 20, cy, 40, 5, 0x111111);
-    makeRect(bBarX, cy, bW, 4, bCol).setOrigin(0, 0.5);
-    makeText(bBarX + 44, cy, String(bike), { color: '#667788' }).setOrigin(0, 0.5);
-
-    // ── Snack buttons ─────────────────────────────────────────────────────────
-    const snacks = [
-      { key: 'gatorade', label: 'GAT', boost: SNACK_STAMINA.gatorade },
-      { key: 'granola',  label: 'GRN', boost: SNACK_STAMINA.granola  },
-      { key: 'hotdog',   label: 'DOG', boost: SNACK_STAMINA.hotdog   },
-    ];
-    let btnX = x + 180;
-    snacks.forEach(sn => {
-      const avail = this._snackInv[sn.key] > 0;
-      const bg    = makeRect(btnX + 14, cy, 28, rowH - 4, avail ? 0x1a3a1a : 0x111111);
-      makeText(btnX + 14, cy, sn.label, { color: avail ? '#88ff88' : '#333333' }).setOrigin(0.5);
-      if (avail) {
-        bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setFillStyle(0x2a5a2a));
-        bg.on('pointerout',  () => bg.setFillStyle(0x1a3a1a));
-        bg.on('pointerdown', () => {
-          this._snackInv[sn.key]--;
-          this._stamina[id] = Math.min(100, (this._stamina[id] ?? 0) + sn.boost);
-          this._warnedStamina.delete(id);
-          this._fatigueTriggered.delete(id);
-          this._rebuildRestStop();
-        });
-      }
-      btnX += 30;
-    });
-
-    // ── Bike part buttons ─────────────────────────────────────────────────────
-    const parts = [
-      { key: 'patch', label: 'PAT', restore: BIKE_PART_RESTORE.patch },
-      { key: 'tire',  label: 'TIR', restore: BIKE_PART_RESTORE.tire  },
-      { key: 'chain', label: 'CHN', restore: BIKE_PART_RESTORE.chain  },
-    ];
-    btnX += 6;
-    parts.forEach(pt => {
-      const avail = this._bikeInv[pt.key] > 0;
-      const bg    = makeRect(btnX + 14, cy, 28, rowH - 4, avail ? 0x0a1a2a : 0x111111);
-      makeText(btnX + 14, cy, pt.label, { color: avail ? '#88ccff' : '#333333' }).setOrigin(0.5);
-      if (avail) {
-        bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setFillStyle(0x1a2a3a));
-        bg.on('pointerout',  () => bg.setFillStyle(0x0a1a2a));
-        bg.on('pointerdown', () => {
-          this._bikeInv[pt.key]--;
-          this._bikeHP[id] = Math.min(100, (this._bikeHP[id] ?? 0) + pt.restore);
-          this._bikeTriggered.delete(id);
-          this._warnedBike.delete(id);
-          this._syncBikeToHud();
-          this._rebuildRestStop();
-        });
-      }
-      btnX += 30;
-    });
-
-    // ── DROP button (not available for Leo) ───────────────────────────────────
-    if (id !== 'leo') {
-      btnX += 8;
-      const dropBg = makeRect(btnX + 20, cy, 40, rowH - 4, 0x2a0808);
-      makeText(btnX + 20, cy, 'DROP', { color: '#ff5555' }).setOrigin(0.5);
-      dropBg.setInteractive({ useHandCursor: true });
-      dropBg.on('pointerover', () => dropBg.setFillStyle(0x4a0808));
-      dropBg.on('pointerout',  () => dropBg.setFillStyle(0x2a0808));
-      dropBg.on('pointerdown', () => this._confirmDropMember(id));
-    }
-
-    this._restStopCon.add(objs);
-  }
-
-  // Tears down the rest stop UI without resuming — used when showing a sub-dialog.
-  _tearDownRestStop() {
-    if (this._restStopTimerEvt) { this._restStopTimerEvt.remove(); this._restStopTimerEvt = null; }
-    if (this._restStopCon)      { this._restStopCon.destroy(true); this._restStopCon = null; }
-    // _riding stays false — we're still paused
-  }
-
-  _confirmDropMember(id) {
-    const name = MEMBER_NAMES[id] ?? id.toUpperCase();
-    this._tearDownRestStop();
-    const choices = [
-      { text: `YES — leave ${name} behind`, _action: 'confirm' },
-      { text: 'NO — keep them in the group', _action: 'cancel' },
-    ];
-    this._eventCard.show({
-      title:       `DROP ${name}?`,
-      description: `${name} will be left behind and cannot rejoin. Make sure you want to do this.`,
-      choices,
-    }, (idx) => {
-      if (choices[idx]._action === 'confirm') {
-        this._showFloat(`${name} STAYED BEHIND.`, BASE_WIDTH / 2, BASE_HEIGHT * 0.38, '#ff8800');
-        this._dropMember(id);
-      }
-      // Return to rest stop either way — if only Leo remains it'll show just him
-      this._rebuildRestStop();
-    });
+  // AHEAD / ON PACE / BEHIND word + color for the TIME bar.
+  _scheduleWord() {
+    const f = this._distance / TOTAL_DISTANCE;
+    const margin = f * 100 - (100 - this._resources.time);
+    if (f < 0.05)     return ['on pace', '#f5a623'];
+    if (margin > 8)   return ['ahead!',  '#44cc44'];
+    if (margin < -8)  return ['behind!', '#ff3333'];
+    return ['on pace', '#f5a623'];
   }
 
   _showBanner(label, onDone) {
@@ -1231,7 +929,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     all.forEach((m, i) => {
       const x = startX + i * spacing;
       this._bikerMap[m.id] = this._makeBiker(m.id, x, roadY, m.color);
-      this._buildMemberBars(m.id, x, roadY);
     });
   }
 
@@ -1252,67 +949,12 @@ export default class OregonTrailScene extends Phaser.Scene {
     return { body, wheel1, wheel2, tween, baseColor: color, isSprite: false };
   }
 
-  _buildMemberBars(id, x, roadY) {
-    // Two thin bars stacked: stamina (green) above, bike (blue) below
-    const stamY = roadY + 13;
-    const bikeY = roadY + 20;
-
-    const sBg   = this.add.rectangle(x, stamY, 16, 4, 0x111111);
-    const sFill = this.add.rectangle(x - 7, stamY, 14, 3, 0x44cc44).setOrigin(0, 0.5);
-    const bBg   = this.add.rectangle(x, bikeY, 16, 4, 0x111111);
-    const bFill = this.add.rectangle(x - 7, bikeY, 14, 3, 0xef5350).setOrigin(0, 0.5);
-
-    const shortName = (MEMBER_NAMES[id] ?? id).substring(0, 2);
-    txt(this, x, bikeY + 8, shortName, { fontSize: '8px', color: '#555566' }).setOrigin(0.5);
-
-    this._staminaBars[id] = { bg: sBg, fill: sFill };
-    this._bikeBars[id]    = { bg: bBg, fill: bFill };
-  }
-
   _removeBiker(memberId) {
     const biker = this._bikerMap[memberId];
     if (!biker) return;
     biker.tween?.stop();
     this.tweens.add({ targets: [biker.body, biker.wheel1, biker.wheel2].filter(Boolean), y: `+=${BASE_HEIGHT}`, alpha: 0, duration: 800 });
-    const sb = this._staminaBars[memberId];
-    const bb = this._bikeBars[memberId];
-    if (sb) this.tweens.add({ targets: [sb.bg, sb.fill], alpha: 0, duration: 400 });
-    if (bb) this.tweens.add({ targets: [bb.bg, bb.fill], alpha: 0, duration: 400 });
     delete this._bikerMap[memberId];
-  }
-
-  // ── Per-member bar visuals ────────────────────────────────────────────────────
-
-  _updateStaminaBars() {
-    Object.entries(this._staminaBars).forEach(([id, bars]) => {
-      const st = this._stamina[id];
-      if (st === undefined) return;
-      bars.fill.setSize(Math.max(1, 14 * (st / 100)), 3);
-      bars.fill.setFillStyle(st > 50 ? 0x44cc44 : st > 25 ? 0xf5a623 : 0xff3333);
-      const biker = this._bikerMap[id];
-      if (biker) {
-        if (biker.isSprite) {
-          if (st < FATIGUE_CRIT) biker.body.setTint(0xff5555); else biker.body.clearTint();
-        } else {
-          biker.body.setFillStyle(st < FATIGUE_CRIT ? 0xff2222 : biker.baseColor);
-        }
-      }
-    });
-  }
-
-  _updateBikeBars() {
-    Object.entries(this._bikeBars).forEach(([id, bars]) => {
-      const hp = this._bikeHP[id];
-      if (hp === undefined) return;
-      bars.fill.setSize(Math.max(1, 14 * (hp / 100)), 3);
-      bars.fill.setFillStyle(hp > 25 ? 0xef5350 : 0xff3333);
-      // Wheel color per biker reflects their own bike condition
-      const biker = this._bikerMap[id];
-      if (biker) {
-        const wc = hp < 25 ? 0x881111 : hp < 50 ? 0x664422 : 0x333333;
-        if (biker.wheel1) { biker.wheel1.setFillStyle(wc); biker.wheel2.setFillStyle(wc); }
-      }
-    });
   }
 
   // ── Progress bar ─────────────────────────────────────────────────────────────
