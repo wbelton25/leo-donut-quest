@@ -17,6 +17,7 @@ import DonutShopScene from './scenes/DonutShopScene.js';
 import ReturnJourneyScene from './scenes/ReturnJourneyScene.js';
 import BossGauntletScene from './scenes/BossGauntletScene.js';
 import EdieBossScene from './scenes/EdieBossScene.js';
+import ReportCardScene from './scenes/ReportCardScene.js';
 import CreditsScene from './scenes/CreditsScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
 
@@ -80,6 +81,7 @@ const config = {
     ReturnJourneyScene,
     BossGauntletScene,
     EdieBossScene,
+    ReportCardScene,
     CreditsScene,
     GameOverScene,
     HudScene,      // renders above gameplay scenes

@@ -200,6 +200,15 @@ export default class NeighborhoodScene extends Phaser.Scene {
         });
         FX.shake(scene, 240, 0.011);
       }
+
+      // Bank the run stats for the end-of-run report card (survives boss fights
+      // and save/continue via the persistent gameState object).
+      if (knocked > 0) {
+        const gs = scene.game.registry.get('gameState') ?? {};
+        gs.deerToppled = (gs.deerToppled ?? 0) + knocked;
+        gs.bestCombo   = Math.max(gs.bestCombo ?? 0, knocked);
+        scene.game.registry.set('gameState', gs);
+      }
     });
 
     // ── Ground ────────────────────────────────────────────────────────────────

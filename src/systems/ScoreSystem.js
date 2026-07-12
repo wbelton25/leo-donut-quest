@@ -1,28 +1,54 @@
-// ScoreSystem: calculates final run score and manages the localStorage leaderboard.
+// ScoreSystem: calculates final run score + grade and manages the leaderboard.
 //
-// Score formula: (party_size × 100) + (donuts × 20)   — only if donuts >= 1
-//   party_size = members who reached Donut House (not counting Leo).
-//   0 points if you finish with 0 donuts.
-//   Max possible: 4 members × 100 + 12 donuts × 20 = 640 pts.
+// Score = donuts×20 + crew×80 + timeLeft×2 + deer×5 + bestCombo×15  (0 if no donuts)
+//   crew = members who reached the Donut House (not counting Leo).
+//   timeLeft = the time resource remaining at delivery (0-100ish).
+// Grade S/A/B/C/D is bucketed off the total — see grade().
 //
-// Leaderboard entry: { score, donuts, partySize, date }
+// Leaderboard entry: { score, grade, donuts, partySize, initials, date }
 // Top 5 entries stored in localStorage under key 'leo-donut-scores'.
 
 const STORAGE_KEY = 'leo-donut-scores';
 const MAX_ENTRIES = 5;
 
 export default class ScoreSystem {
-  // Calculate score from run result
-  static calculate({ donuts = 0, party = [] }) {
+  // Total score from a full run result.
+  static calculate({ donuts = 0, party = [], time = 0, deer = 0, combo = 0 }) {
     if (donuts < 1) return 0;
-    return (party.length * 100) + (donuts * 20);
+    return (donuts * 20)
+         + (party.length * 80)
+         + Math.max(0, Math.round(time * 2))
+         + (deer * 5)
+         + (combo * 15);
   }
 
-  // Save a completed run to the leaderboard
-  static saveScore({ donuts, party, initials = '???' }) {
-    const score = ScoreSystem.calculate({ donuts, party });
+  // Labeled point breakdown for the report card.
+  static breakdown({ donuts = 0, party = [], time = 0, deer = 0, combo = 0 }) {
+    return [
+      { label: 'DONUTS DELIVERED', detail: `${donuts} x 20`,             pts: donuts * 20 },
+      { label: 'CREW WHO MADE IT', detail: `${party.length} x 80`,       pts: party.length * 80 },
+      { label: 'TIME TO SPARE',    detail: `${Math.round(time)}%`,       pts: Math.max(0, Math.round(time * 2)) },
+      { label: 'DEER TOPPLED',     detail: `${deer} x 5`,                pts: deer * 5 },
+      { label: 'BEST FART COMBO',  detail: `${combo}x`,                  pts: combo * 15 },
+    ];
+  }
+
+  // Letter grade bucketed off the total score.
+  static grade(total) {
+    if (total >= 680) return 'S';
+    if (total >= 520) return 'A';
+    if (total >= 380) return 'B';
+    if (total >= 220) return 'C';
+    return 'D';
+  }
+
+  // Save a completed run to the leaderboard. Pass `score` to reuse an already-
+  // computed total (keeps the board consistent with the report card).
+  static saveScore({ donuts, party, time = 0, deer = 0, combo = 0, initials = '???', score }) {
+    const finalScore = score ?? ScoreSystem.calculate({ donuts, party, time, deer, combo });
     const entry = {
-      score,
+      score:     finalScore,
+      grade:     ScoreSystem.grade(finalScore),
       donuts,
       partySize: party.length,
       initials:  initials.toUpperCase().substring(0, 3).padEnd(3, '?'),
@@ -40,7 +66,7 @@ export default class ScoreSystem {
       console.warn('[ScoreSystem] Could not save score:', e);
     }
 
-    return score;
+    return finalScore;
   }
 
   // Return sorted leaderboard array (best first)

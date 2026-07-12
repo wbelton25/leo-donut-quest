@@ -1,5 +1,5 @@
 import {
-  SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_CREDITS,
+  SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_CREDITS, SCENE_REPORT_CARD,
   SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_EDIE_BOSS,
   BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
@@ -154,9 +154,10 @@ export default class BossGauntletScene extends Phaser.Scene {
   _winGame() {
     this.cameras.main.fade(400, 0, 0, 0);
     this.time.delayedCall(420, () => {
-      this.scene.start(SCENE_CREDITS, {
-        party:  this._data.party ?? [],
-        donuts: this._data.donuts ?? 0,
+      this.scene.start(SCENE_REPORT_CARD, {
+        party:     this._data.party ?? [],
+        donuts:    this._data.donuts ?? 0,
+        resources: this._data.resources ?? {},
       });
     });
   }

@@ -94,6 +94,7 @@ export const SCENE_JUSTIN_MAX_BOSS = 'JustinMaxBossScene';
 export const SCENE_RETURN_JOURNEY  = 'ReturnJourneyScene';
 export const SCENE_BOSS_GAUNTLET   = 'BossGauntletScene';
 export const SCENE_EDIE_BOSS       = 'EdieBossScene';
+export const SCENE_REPORT_CARD     = 'ReportCardScene';
 export const SCENE_CREDITS = 'CreditsScene';
 
 // ─── Event Bus Keys ───────────────────────────────────────────────────────────
@@ -126,4 +127,6 @@ export const DEFAULT_GAME_STATE = {
     money: 10,         // dollars (Leo's $10; each recruited friend adds $10, max $50)
   },
   donuts: 0,           // donuts collected at the shop
+  deerToppled: 0,      // running count of deer/bike-kids farted over (for the report card)
+  bestCombo: 0,        // most knocked over by a single fart
 };

@@ -11,6 +11,10 @@ export default class CreditsScene extends Phaser.Scene {
   init(data) {
     this._party  = data?.party  ?? [];
     this._donuts = data?.donuts ?? 0;
+    this._time   = data?.time   ?? 0;
+    this._deer   = data?.deer   ?? 0;
+    this._combo  = data?.combo  ?? 0;
+    this._passedScore = data?.score;   // the report card already totalled it
     this._initialsConfirmed = false;
   }
 
@@ -33,18 +37,15 @@ export default class CreditsScene extends Phaser.Scene {
     txt(this, cx, 40, 'YOU GOT THE DONUTS!', { fontSize: '12px', color: '#f5a623' }).setOrigin(0.5);
     txt(this, cx, 58, 'MISSION ACCOMPLISHED', { fontSize: '8px',  color: '#88ff88' }).setOrigin(0.5);
 
-    // ── Score breakdown (calculated now, saved after initials) ───────────────
-    this._score = ScoreSystem.calculate({ donuts: this._donuts, party: this._party });
-
-    if (this._donuts < 1) {
-      txt(this, cx, 72, 'NO DONUTS — NO SCORE', { fontSize: '8px', color: '#ff4444' }).setOrigin(0.5);
-    } else {
-      const crewPts  = this._party.length * 100;
-      const donPts   = this._donuts * 20;
-      txt(this, cx, 72, `CREW: ${this._party.length} × 100 = ${crewPts}`, { fontSize: '8px', color: '#aaaaaa' }).setOrigin(0.5);
-      txt(this, cx, 84, `DONUTS: ${this._donuts} × 20 = ${donPts}`, { fontSize: '8px', color: '#aaaaaa' }).setOrigin(0.5);
-      txt(this, cx, 96, `TOTAL: ${this._score} PTS`, { fontSize: '8px', color: '#f5e642' }).setOrigin(0.5);
-    }
+    // ── Score + grade (detailed breakdown lives on the report card) ──────────
+    this._score = this._passedScore ?? ScoreSystem.calculate({
+      donuts: this._donuts, party: this._party, time: this._time, deer: this._deer, combo: this._combo,
+    });
+    const grade = ScoreSystem.grade(this._score);
+    txt(this, cx, 80, this._donuts < 1
+      ? 'NO DONUTS — NO SCORE'
+      : `FINAL SCORE  ${this._score}  —  GRADE ${grade}`,
+      { fontSize: '8px', color: this._donuts < 1 ? '#ff4444' : '#f5e642' }).setOrigin(0.5);
 
     // ── Party members ────────────────────────────────────────────────────────
     const NAMES = { warren: 'Warren', mj: 'MJ', carson: 'Carson', justin: 'Justin' };
@@ -161,7 +162,10 @@ export default class CreditsScene extends Phaser.Scene {
     this._initialsConfirmed = true;
 
     const initials = this._initials.join('');
-    ScoreSystem.saveScore({ donuts: this._donuts, party: this._party, initials });
+    ScoreSystem.saveScore({
+      donuts: this._donuts, party: this._party, time: this._time,
+      deer: this._deer, combo: this._combo, initials, score: this._score,
+    });
     const rank = ScoreSystem.getRank(this._score);
 
     // Flash boxes green
