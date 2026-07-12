@@ -1,5 +1,4 @@
 import { BASE_WIDTH, BASE_HEIGHT, txt } from '../constants.js';
-import { describeChoice } from '../utils/choiceRisk.js';
 
 // EventCard: an event overlay drawn directly into OregonTrailScene.
 // Shows an Oregon Trail-style event card with title, description, and choice
@@ -109,11 +108,28 @@ export default class EventCard {
 
   // ── Internal ────────────────────────────────────────────────────────────────
 
-  // Risk tier + potential impact shown under each choice — a comparable ladder
-  // (SAFE < SKILLED < RISKY < GAMBLE) with how big the swing could be. No exact
-  // numbers; the real result is rolled and revealed only after they commit.
+  // A short PLAIN hint under each choice — what it does, in kid-readable words.
+  // No numbers, no risk tiers; a little luck still decides how it actually turns out.
   _effectPreview(choice) {
-    return describeChoice(choice);
+    const e = choice.effects ?? {};
+    if (e.partyLossRisk) return { text: 'risky — could cost a friend', color: '#ff7766' };
+
+    const parts = [];
+    if (e.time < 0)                   parts.push('costs time');
+    if (e.time > 0)                   parts.push('saves time');
+    if (e.distance > 0)               parts.push('a shortcut');
+    if (e.energy > 0 || e.snacks > 0) parts.push('helps the crew');
+    if (e.energy < 0)                 parts.push('tires the crew');
+    if (e.bikeCondition > 0)          parts.push('fixes bikes');
+    if (e.bikeCondition < 0)          parts.push('rough on bikes');
+    if (e.money > 0)                  parts.push('find cash');
+
+    if (parts.length === 0) return { text: 'safe', color: '#88bb99' };
+
+    const bad  = (e.energy < 0) || (e.bikeCondition < 0);
+    const good = (e.energy > 0) || (e.bikeCondition > 0) || (e.distance > 0) || (e.snacks > 0);
+    const color = choice.requiresPartyMember ? '#7fd6c0' : bad && !good ? '#ffa077' : good ? '#88cc88' : '#99aabb';
+    return { text: parts.join(', '), color };
   }
 
   _buildStatic() {
