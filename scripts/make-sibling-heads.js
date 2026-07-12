@@ -17,7 +17,7 @@ const DIR = join(__dirname, '..', 'public', 'assets', 'sprites');
 // Optional explicit crop {left,top,side} for sprites the auto-detector trips on
 // (Grace holds a pool noodle + water gun that skew her content box).
 const MAP = [
-  ['grace',      'grace', { left: 455, top: 450, side: 215 }],
+  ['grace',      'grace', { left: 430, top: 415, side: 265 }],
   ['nora',       'nora'],
   ['max',        'max'],
   ['justin_max', 'justin_max'],  // dialogue speaker "JustinMax" → head-justinmax
