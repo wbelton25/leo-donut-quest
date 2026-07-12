@@ -737,17 +737,16 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._buildRestStopUI();
   }
 
-  // Word + color for a group bar's level.
-  _crewWord()  { return this._crew  > 66 ? ['fresh', '#8fd694'] : this._crew  > 33 ? ['getting tired', '#ffcc66'] : ['worn out!', '#ff6666']; }
-  _bikesWord() { return this._bikes > 66 ? ['holding up', '#8fd694'] : this._bikes > 33 ? ['getting rough', '#ffcc66'] : ['barely rolling!', '#ff6666']; }
+  // Word + color for a group bar's level (kept short so it never runs off the card).
+  _crewWord()  { return this._crew  > 66 ? ['fresh', '#8fd694'] : this._crew  > 33 ? ['tiring', '#ffcc66'] : ['worn out!', '#ff6666']; }
+  _bikesWord() { return this._bikes > 66 ? ['good', '#8fd694'] : this._bikes > 33 ? ['rough', '#ffcc66'] : ['failing!', '#ff6666']; }
 
   // The whole camp UI: 3 bars, a heads-up, the pace lever, and two stash buttons.
   _buildRestStopUI() {
     const hasOutcome = !!this._lastEventOutcome;
     const terr  = this._terrain;
-    const lineH = 11;
     const cardW = 300, cardX = (BASE_WIDTH - cardW) / 2;
-    const cardH = 200 + (hasOutcome ? lineH : 0);
+    const cardH = 210 + (hasOutcome ? 12 : 0);
     const cardY = (BASE_HEIGHT - cardH) / 2;
 
     this._restStopCon = this.add.container(0, 0).setDepth(31);
@@ -767,25 +766,25 @@ export default class OregonTrailScene extends Phaser.Scene {
       if (word) line(y, word, wordColor, cardX + 188, 0);
     };
 
-    let y = cardY + 12;
+    let y = cardY + 13;
     const landmark = this._campCp ? this._campCp.label : 'REST STOP';
-    line(y, landmark, '#f5a623'); y += lineH + 2;
+    line(y, landmark, '#f5a623'); y += 15;
 
-    if (this._lastLegSummary) { line(y, this._lastLegSummary.recap, '#99aabb'); y += lineH; }
-    if (hasOutcome)           { line(y, this._lastEventOutcome.text, this._lastEventOutcome.color); y += lineH; }
-    y += 4;
+    if (this._lastLegSummary) { line(y, this._lastLegSummary.recap, '#99aabb'); y += 12; }
+    if (hasOutcome)           { line(y, this._lastEventOutcome.text, this._lastEventOutcome.color); y += 12; }
+    y += 5;
 
     // Three bars.
     const timeWord = this._scheduleWord();
-    bar(y, 'TIME',  this._resources.time, 0xf5e642, timeToDisplay(this._resources.time), timeWord[1]); y += 14;
-    const cw = this._crewWord();  bar(y, 'CREW',  this._crew,  0x66cc66, cw[0], cw[1]); y += 14;
-    const bw = this._bikesWord(); bar(y, 'BIKES', this._bikes, 0xef5350, bw[0], bw[1]); y += 16;
+    bar(y, 'TIME',  this._resources.time, 0xf5e642, timeToDisplay(this._resources.time), timeWord[1]); y += 15;
+    const cw = this._crewWord();  bar(y, 'CREW',  this._crew,  0x66cc66, cw[0], cw[1]); y += 15;
+    const bw = this._bikesWord(); bar(y, 'BIKES', this._bikes, 0xef5350, bw[0], bw[1]); y += 18;
 
     // Terrain heads-up.
-    line(y, `NEXT: ${terr.name} (${terr.hint})`, terr.color); y += lineH + 3;
+    line(y, `NEXT: ${terr.name} (${terr.hint})`, terr.color); y += 16;
 
     // Pace lever.
-    line(y, 'SET YOUR PACE:', '#8899aa'); y += lineH + 2;
+    line(y, 'SET YOUR PACE:', '#8899aa'); y += 16;
     const pw = 88, gap = 6;
     let bx = BASE_WIDTH / 2 - (PACE_ORDER.length * pw + (PACE_ORDER.length - 1) * gap) / 2 + pw / 2;
     PACE_ORDER.forEach(pid => {
@@ -798,12 +797,12 @@ export default class OregonTrailScene extends Phaser.Scene {
       btn.on('pointerdown', () => { this._pace = pid; this._rebuildRestStop(); });
       bx += pw + gap;
     });
-    y += 12;
-    line(y, PACES[this._pace].blurb, '#8899aa'); y += lineH + 4;
+    y += 21;
+    line(y, PACES[this._pace].blurb, '#8899aa'); y += 16;
 
     // Stash buttons — one snack (+CREW), one repair (+BIKES).
     const snacks = this._snackTotal(), kits = this._repairTotal();
-    const stashBtn = (cx2, label, count, enabled, handler) => {
+    const stashBtn = (cx2, label, enabled, handler) => {
       const btn = add(this.add.rectangle(cx2, y, 132, 16, enabled ? 0x1a3a2a : 0x1a1a22)
         .setStrokeStyle(1, enabled ? 0x4a8a5a : 0x2a2a33));
       add(txt(this, cx2, y, label, { fontSize: '8px', color: enabled ? '#aaf0c0' : '#556' }).setOrigin(0.5));
@@ -814,15 +813,15 @@ export default class OregonTrailScene extends Phaser.Scene {
         btn.on('pointerdown', handler);
       }
     };
-    stashBtn(BASE_WIDTH / 2 - 70, `Snack +CREW (x${snacks})`, snacks, snacks > 0 && this._crew < 100,
+    stashBtn(BASE_WIDTH / 2 - 70, `Snack +CREW (x${snacks})`, snacks > 0 && this._crew < 100,
       () => { this._useSnack(); this._rebuildRestStop(); });
-    stashBtn(BASE_WIDTH / 2 + 70, `Fix bikes +BIKES (x${kits})`, kits, kits > 0 && this._bikes < 100,
+    stashBtn(BASE_WIDTH / 2 + 70, `Fix bikes (x${kits})`, kits > 0 && this._bikes < 100,
       () => { this._useRepair(); this._rebuildRestStop(); });
-    y += 18;
+    y += 23;
 
     // Continue.
-    const contBg = add(this.add.rectangle(BASE_WIDTH / 2, y + 4, 200, 18, 0x1a3a1a).setInteractive({ useHandCursor: true }));
-    add(txt(this, BASE_WIDTH / 2, y + 4, 'CONTINUE  →   [ENTER]', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5));
+    const contBg = add(this.add.rectangle(BASE_WIDTH / 2, y, 200, 18, 0x1a3a1a).setInteractive({ useHandCursor: true }));
+    add(txt(this, BASE_WIDTH / 2, y, 'CONTINUE  →   [ENTER]', { fontSize: '8px', color: '#88ff88' }).setOrigin(0.5));
     contBg.on('pointerover', () => contBg.setFillStyle(0x2a6a2a));
     contBg.on('pointerout',  () => contBg.setFillStyle(0x1a3a1a));
     contBg.on('pointerdown', () => this._continueFromCamp());
