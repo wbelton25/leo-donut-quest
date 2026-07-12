@@ -155,6 +155,30 @@ const LEG_TRAVEL_MS    = 3000;  // base ride duration per leg (scaled by pace)
 const LEG_EVENT_CHANCE = 0.7;   // chance a plain camp leg draws a road event
 const CHECKPOINT_BY_ID = Object.fromEntries(CHECKPOINTS.map(c => [c.id, c]));
 
+// ── Pace + terrain (the per-leg strategy layer) ─────────────────────────────────
+// PACE is set at each camp for the UPCOMING leg — the classic Oregon Trail trade:
+// go EASY to spare the crew but burn the clock, or PUSH to save time and grind
+// everyone down. `time` scales the leg's time cost; `drain` scales stamina+bike
+// wear; `speed` scales how fast the ride animation plays.
+const PACES = {
+  easy:   { label: 'EASY',   time: 1.35, drain: 0.55, speed: 0.82, blurb: 'slow, but spares the crew' },
+  steady: { label: 'STEADY', time: 1.0,  drain: 1.0,  speed: 1.0,  blurb: 'balanced' },
+  push:   { label: 'PUSH',   time: 0.68, drain: 1.7,  speed: 1.35, blurb: 'fast, but grinds everyone down' },
+};
+const PACE_ORDER = ['easy', 'steady', 'push'];
+
+// TERRAIN is rolled for each leg and PREVIEWED at the camp before it, so pace +
+// snack decisions become planning. `stam`/`bike` scale that leg's respective wear;
+// `time` scales its time cost. `color` tints the preview by how nasty it is.
+const TERRAINS = [
+  { id: 'smooth',   name: 'Smooth road',    hint: 'easy going',         time: 0.95, stam: 0.8, bike: 0.8, weight: 3, color: '#8fd694' },
+  { id: 'downhill', name: 'Long downhill',  hint: 'a real breather',    time: 0.8,  stam: 0.3, bike: 1.1, weight: 2, color: '#8fd694' },
+  { id: 'hill',     name: 'Big hill',       hint: 'brutal on the legs', time: 1.15, stam: 1.9, bike: 0.9, weight: 2, color: '#ffb060' },
+  { id: 'headwind', name: 'Headwind',       hint: 'slow and tiring',    time: 1.25, stam: 1.4, bike: 1.0, weight: 2, color: '#ffb060' },
+  { id: 'gravel',   name: 'Gravel stretch', hint: 'rough on the bikes', time: 1.1,  stam: 1.0, bike: 2.0, weight: 2, color: '#ff8866' },
+  { id: 'rain',     name: 'Rain',           hint: 'slick and grueling', time: 1.15, stam: 1.3, bike: 1.5, weight: 1, color: '#ff8866' },
+];
+
 export default class OregonTrailScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_OREGON_TRAIL });
@@ -203,6 +227,8 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._lastLegSummary    = null;   // { timeCost, incidents } shown on the camp board
     this._lastEventOutcome  = null;   // { text, color } outcome of this leg's choice
     this._campCp            = null;   // checkpoint being camped at (null for a plain camp)
+    this._pace              = 'steady';           // pace chosen for the upcoming leg
+    this._terrain           = this._rollTerrain(); // terrain of the upcoming leg (previewed at camps)
 
     // Stamina tracking
     this._stamina        = { leo: 100 };
@@ -315,24 +341,34 @@ export default class OregonTrailScene extends Phaser.Scene {
 
   // ── Leg lifecycle ──────────────────────────────────────────────────────────────
 
+  _rollTerrain() {
+    const total = TERRAINS.reduce((s, t) => s + t.weight, 0);
+    let r = Math.random() * total;
+    for (const t of TERRAINS) { r -= t.weight; if (r <= 0) return t; }
+    return TERRAINS[0];
+  }
+
   _startLeg() {
     const leg = LEGS[this._legIndex];
     if (!leg) { this._triggerArrival(); return; }
-    const pace = this._calcSpeedMult();          // healthy group rides faster
+    const health   = this._calcSpeedMult();      // healthy group rides faster
+    const pace     = PACES[this._pace];
+    const terr     = this._terrain;
+    const baseTime = 4 / Math.max(0.35, health) + Math.random() * 2;
     this._travel = {
       startDist:   this._distance,
       endDist:     leg.end,
       elapsed:     0,
-      duration:    LEG_TRAVEL_MS / Math.max(0.35, pace),
+      duration:    LEG_TRAVEL_MS / Math.max(0.35, health * pace.speed),
       scrollSpeed: SCROLL_SPEED,
       // Time cost accrues gradually WHILE the bikes roll (see update()), then
-      // freezes at the stop — the clock never ticks while you're deciding.
-      timeCost:    Math.round(4 / Math.max(0.35, pace) + Math.random() * 2),
+      // freezes at the stop. Scaled by your pace choice and the leg's terrain.
+      timeCost:    Math.max(1, Math.round(baseTime * pace.time * terr.time)),
       timeApplied: 0,
     };
     this._phase  = 'travel';
     this._riding = true;
-    this._updatePaceEta(pace);
+    this._updatePaceEta();
   }
 
   _arriveAtStop() {
@@ -370,12 +406,14 @@ export default class OregonTrailScene extends Phaser.Scene {
   // Arrival cost: one round of per-member stamina/bike drain (the leg's TIME cost
   // was already spent gradually during travel). Returns a summary for the board.
   _applyLegCost(leg) {
+    const pace = PACES[this._pace];
+    const terr = this._terrain;
     const incidents = [];
-    incidents.push(...this._drainStaminaOnce());
-    incidents.push(...this._drainBikesOnce());
+    incidents.push(...this._drainStaminaOnce(pace.drain * terr.stam));
+    incidents.push(...this._drainBikesOnce(pace.drain * terr.bike));
     this._syncBikeToHud();
 
-    return { timeCost: this._travel?.timeCost ?? 0, incidents };
+    return { timeCost: this._travel?.timeCost ?? 0, incidents, terrain: terr, pace: this._pace };
   }
 
   // Draws one Act-2 road event as an untimed card. Picking a choice rolls a
@@ -525,11 +563,13 @@ export default class OregonTrailScene extends Phaser.Scene {
   }
 
   _openCamp(cp) {
-    this._campCp = cp;
-    this._phase  = 'camp';
-    this._riding = false;
+    this._campCp  = cp;
+    this._phase   = 'camp';
+    this._riding  = false;
+    this._terrain = this._rollTerrain();   // roll the UPCOMING leg's terrain (previewed on board)
+    this._pace    = 'steady';              // pace resets to steady each camp
     this._updateInvStrip();
-    this._updatePaceEta(this._calcSpeedMult());
+    this._updatePaceEta();
     this._buildRestStopUI();  // the status board
   }
 
@@ -588,12 +628,14 @@ export default class OregonTrailScene extends Phaser.Scene {
 
   // One leg's worth of stamina drain. Returns short incident strings (rare
   // tumbles/cramps) for the camp board to display — no transient floats.
-  _drainStaminaOnce() {
+  // `mult` folds in the leg's pace + terrain (e.g. PUSH up a hill drains hard).
+  _drainStaminaOnce(mult = 1) {
     const incidents = [];
+    const chance = 0.06 * Math.min(2, Math.max(0.6, mult));   // rough legs = more mishaps
     Object.keys(this._stamina).forEach(id => {
-      const base = STAMINA_BASE * (this._staminaMult[id] ?? 1);
+      const base = STAMINA_BASE * (this._staminaMult[id] ?? 1) * mult;
       let drain;
-      if (Math.random() < 0.06) {
+      if (Math.random() < chance) {
         drain = 15 + Math.random() * 13;  // flat 15-28 mishap (not base-scaled)
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
         const what = this._pick([`${name} took a tumble`, `${name} hit a cramp`, `${name} nearly wiped out`]);
@@ -607,12 +649,13 @@ export default class OregonTrailScene extends Phaser.Scene {
   }
 
   // One leg's worth of bike wear. Returns incident strings for the board.
-  _drainBikesOnce() {
+  _drainBikesOnce(mult = 1) {
     const incidents = [];
+    const chance = 0.06 * Math.min(2, Math.max(0.6, mult));
     Object.keys(this._bikeHP).forEach(id => {
-      const base = BIKE_BASE * (this._bikeMult[id] ?? 1);
+      const base = BIKE_BASE * (this._bikeMult[id] ?? 1) * mult;
       let drain;
-      if (Math.random() < 0.06) {
+      if (Math.random() < chance) {
         drain = 14 + Math.random() * 12;  // flat 14-26 mishap (not base-scaled)
         const name = MEMBER_NAMES[id] ?? id.toUpperCase();
         const what = this._pick([`${name} hit a pothole`, `${name}'s chain slipped`, `${name} clipped a curb`]);
@@ -853,35 +896,43 @@ export default class OregonTrailScene extends Phaser.Scene {
 
   _buildRestStopUI() {
     const members    = ['leo', ...this._party.getParty()];
-    const rowH       = 26;
     const allInc     = this._lastLegSummary?.incidents ?? [];
-    const incidents  = allInc.slice(0, 4);           // cap lines so the card fits 270px
+    const incidents  = allInc.slice(0, 2);           // cap lines so the card fits 270px
     const extraInc   = allInc.length - incidents.length;
     const hasOutcome = !!this._lastEventOutcome;
     const atRisk     = members.filter(
       id => id !== 'leo' && ((this._stamina[id] ?? 1) <= 0 || (this._bikeHP[id] ?? 1) <= 0),
     );
+    const terr = this._terrain;
+    const lineH = 11;
 
-    // Header = title + leg-cost line + ONE line per incident (so nothing runs off
-    // screen when several riders take a hit) + the color-coded choice outcome.
-    const lineH     = 11;
-    const headLines = 2 + incidents.length + (extraInc > 0 ? 1 : 0) + (hasOutcome ? 1 : 0);
+    // Header: title + leg-cost + incidents (+more) + choice outcome + NEXT terrain.
+    const headLines = 2 + incidents.length + (extraInc > 0 ? 1 : 0) + (hasOutcome ? 1 : 0) + 1;
     const headH     = headLines * lineH + 12;
+    const paceH     = 16 + 4 + lineH + 8;   // pace buttons + blurb + gaps
 
-    const cardH = headH + members.length * rowH + 10 + (atRisk.length ? lineH : 0) + 22 + 8;
     const cardW = 462;
     const cardX = (BASE_WIDTH - cardW) / 2;
+
+    // Fit: shrink member rows only if a big party + lots of content would run off
+    // the 270px screen; otherwise keep them comfortable.
+    const MAXH  = 264;
+    const fixed = headH + 10 + (atRisk.length ? lineH : 0) + paceH + 22 + 8;
+    let rowH = 26;
+    if (fixed + members.length * rowH > MAXH) {
+      rowH = Math.max(20, Math.floor((MAXH - fixed) / members.length));
+    }
+    const cardH = fixed + members.length * rowH;
     const cardY = (BASE_HEIGHT - cardH) / 2;
 
     this._restStopCon = this.add.container(0, 0).setDepth(31);
-
     const overlay = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.78);
     const bg      = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0x06080f, 0.98);
     const border  = this.add.rectangle(BASE_WIDTH / 2, cardY + cardH / 2, cardW, cardH, 0, 0).setStrokeStyle(2, 0xf5a623);
     this._restStopCon.add([overlay, bg, border]);
 
-    const line = (y, s, color) => {
-      this._restStopCon.add(txt(this, BASE_WIDTH / 2, y, s, { fontSize: '8px', color }).setOrigin(0.5, 0));
+    const line = (y, s, color, x = BASE_WIDTH / 2, ox = 0.5) => {
+      this._restStopCon.add(txt(this, x, y, s, { fontSize: '8px', color }).setOrigin(ox, 0));
     };
 
     let ly = cardY + 5;
@@ -891,28 +942,50 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     const s = this._lastLegSummary;
     const costText = s
-      ? `On the ride here: ~${Math.round(s.timeCost * 1.2)} min` + (incidents.length === 0 ? ', no trouble' : ':')
+      ? `The ${s.terrain?.name ?? 'ride'} cost ~${Math.round(s.timeCost * 1.2)} min` + (incidents.length === 0 ? ', no trouble' : ':')
       : 'Ready to ride.';
     line(ly, costText, '#99aabb'); ly += lineH;
     incidents.forEach(inc => { line(ly, inc, '#ff9966'); ly += lineH; });
     if (extraInc > 0) { line(ly, `(+${extraInc} more mishap${extraInc > 1 ? 's' : ''})`, '#ff9966'); ly += lineH; }
     if (hasOutcome) { line(ly, this._lastEventOutcome.text, this._lastEventOutcome.color); ly += lineH; }
+    line(ly, `NEXT LEG:  ${terr.name}  -  ${terr.hint}`, terr.color); ly += lineH;
 
+    // Member rows
     let rowY = cardY + headH;
     members.forEach(id => {
       this._buildRestStopRow(id, cardX + 6, rowY, rowH);
       rowY += rowH;
     });
-
-    rowY += 8;
+    rowY += 6;
 
     // Red alert: riders at 0 will leave (and take their cash) if you continue now.
     if (atRisk.length) {
       const names = atRisk.map(id => MEMBER_NAMES[id] ?? id.toUpperCase()).join(' & ');
-      line(rowY + 2, `${names} head home unless you feed/fix them here!`, '#ff4444');
+      line(rowY, `${names} head home unless you feed/fix them here!`, '#ff4444');
       rowY += lineH;
     }
 
+    // ── Pace selector for the upcoming leg ──────────────────────────────────────
+    const btnY = rowY + 8;
+    line(btnY, 'PACE', '#8899aa', cardX + 14, 0);
+    const bw = 74, gap = 10;
+    const groupW = PACE_ORDER.length * bw + (PACE_ORDER.length - 1) * gap;
+    let bx = BASE_WIDTH / 2 - groupW / 2 + bw / 2;
+    PACE_ORDER.forEach(pid => {
+      const sel = this._pace === pid;
+      const btn = this.add.rectangle(bx, btnY + 4, bw, 16, sel ? 0x2a5a2a : 0x141420)
+        .setStrokeStyle(1, sel ? 0x66cc66 : 0x333344).setInteractive({ useHandCursor: true });
+      const lbl = txt(this, bx, btnY + 4, PACES[pid].label, { fontSize: '8px', color: sel ? '#ccffcc' : '#8899aa' }).setOrigin(0.5);
+      btn.on('pointerover', () => { if (this._pace !== pid) btn.setFillStyle(0x22223a); });
+      btn.on('pointerout',  () => { if (this._pace !== pid) btn.setFillStyle(0x141420); });
+      btn.on('pointerdown', () => { this._pace = pid; this._rebuildRestStop(); });
+      this._restStopCon.add([btn, lbl]);
+      bx += bw + gap;
+    });
+    rowY += 20;
+    line(rowY, `${PACES[this._pace].label}: ${PACES[this._pace].blurb}`, '#8899aa'); rowY += lineH + 4;
+
+    // ── Continue ────────────────────────────────────────────────────────────────
     const contLabel = atRisk.length ? 'CONTINUE (lose riders)  →   [ENTER]' : 'CONTINUE  →   [ENTER]';
     const contBg  = this.add.rectangle(BASE_WIDTH / 2, rowY + 10, 260, 20, atRisk.length ? 0x3a1a1a : 0x1a3a1a).setInteractive({ useHandCursor: true });
     const contLbl = txt(this, BASE_WIDTH / 2, rowY + 10, contLabel, { fontSize: '8px', color: atRisk.length ? '#ffaaaa' : '#88ff88' }).setOrigin(0.5);
