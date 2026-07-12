@@ -977,21 +977,40 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const objs = [];
 
     objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setScrollFactor(0).setDepth(50));
-    objs.push(txt(this, cx, cy - 38, 'READY TO DEPART?', { fontSize: '12px', color: '#f5e642' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+    objs.push(txt(this, cx, cy - 52, 'READY TO DEPART?', { fontSize: '12px', color: '#f5e642' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
 
     const partyNames = this._party.getParty();
     const crewLine = partyNames.length > 0
       ? `CREW: Leo + ${partyNames.map(id => id.charAt(0).toUpperCase() + id.slice(1)).join(', ')}`
       : 'CREW: Leo (solo)';
-    objs.push(txt(this, cx, cy - 20, crewLine, { fontSize: '8px', color: '#aaccee' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+    objs.push(txt(this, cx, cy - 36, crewLine, { fontSize: '8px', color: '#aaccee' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
 
-    const btn1 = this.add.rectangle(cx, cy + 2, 160, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    // ── The early-departure gamble ──────────────────────────────────────────
+    // Leaving with fewer friends banks more time for the ride, but each friend
+    // is $10 of supplies, a skill in road events, AND one fewer sibling to fight
+    // on the way home. Make that trade-off explicit.
+    const missing = 4 - partyNames.length;
+    if (missing > 0) {
+      objs.push(txt(this, cx, cy - 20, `${missing} friend${missing > 1 ? 's' : ''} still out there.  Each one brings:`,
+        { fontSize: '8px', color: '#ffcc66' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+      objs.push(txt(this, cx, cy - 10, '+$10 supplies  ·  a road-event move  ·  one more boss home',
+        { fontSize: '8px', color: '#889' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+      objs.push(txt(this, cx, cy, 'Leave now and you keep the extra time.',
+        { fontSize: '8px', color: '#7fd67f' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+    } else {
+      objs.push(txt(this, cx, cy - 14, 'FULL CREW!  Everyone is with you.',
+        { fontSize: '8px', color: '#7fd67f' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+    }
+
+    const goLabel = missing > 0 ? 'RIDE NOW (more time, fewer friends)' : 'RIDE TO THE DONUTS!';
+    const btn1 = this.add.rectangle(cx, cy + 16, 260, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btn1);
-    objs.push(txt(this, cx, cy + 2, 'GO TO ACT 2 (RIDE TO DONUTS)', { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+    objs.push(txt(this, cx, cy + 16, goLabel, { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
 
-    const btn2 = this.add.rectangle(cx, cy + 24, 160, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    const btn2 = this.add.rectangle(cx, cy + 38, 260, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btn2);
-    objs.push(txt(this, cx, cy + 24, 'KEEP EXPLORING ACT 1', { fontSize: '8px', color: '#4fc3f7' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+    objs.push(txt(this, cx, cy + 38, missing > 0 ? `KEEP LOOKING (find the other ${missing})` : 'KEEP EXPLORING ACT 1',
+      { fontSize: '8px', color: '#4fc3f7' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
 
     const dismiss = () => {
       objs.forEach(o => o.destroy());
