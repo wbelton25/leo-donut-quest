@@ -1,6 +1,13 @@
 # Act 2 Simplification — "The Ride" (full rework)
 
-**Status:** IN PROGRESS. User approved the full rework (2026-07-12) to fix Act 2
+**Status:** CORE DONE (2026-07-12). Group bars + clean camp board (commit
+"Act 2 rework 1/2") and plain event hints/reveals (commit "2/2") shipped +
+screenshot-verified. Remaining polish (optional): slim the Walmart shop UI to 2
+items (it still sells 6 types that just stack into SNACKS/KITS totals — works
+fine), a first-camp tutorial tip, and playtest balance of CREW_DRAIN/BIKE_DRAIN
++ pace/terrain multipliers. Original plan below.
+
+User approved the full rework (2026-07-12) to fix Act 2
 being too busy/confusing — especially for kids. Goal: Oregon-Trail-simple +
 popular kid-game readability. File: `src/scenes/OregonTrailScene.js` (+ EventCard,
 choiceRisk, WalmartShopCard).
