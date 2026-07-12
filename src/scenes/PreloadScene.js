@@ -29,6 +29,11 @@ export default class PreloadScene extends Phaser.Scene {
       this.load.image(`head-${id}`, `assets/sprites/${id}_head.png`);
     });
 
+    // Sibling/boss dialogue headshots (cropped from their full-body sprites).
+    // Keyed to the dialogue speaker id; JustinMax keeps a distinct face but shows "Max".
+    [['grace', 'grace'], ['nora', 'nora'], ['max', 'max'], ['justinmax', 'justin_max'], ['edie', 'edie']]
+      .forEach(([key, file]) => this.load.image(`head-${key}`, `assets/sprites/${file}_head.png`));
+
     // World sprites — tree and house (extracted from tileset reference)
     this.load.image('sprite-tree',  'assets/sprites/tree.png');
     this.load.image('sprite-house', 'assets/sprites/house.png');

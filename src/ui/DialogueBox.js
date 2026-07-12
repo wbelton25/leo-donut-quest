@@ -21,13 +21,15 @@ export default class DialogueBox {
     this._clearChoices();
     this._container.setVisible(true);
 
-    this._speakerText.setText(line.speaker?.toUpperCase() ?? '');
+    const speaker = line.speaker?.toLowerCase();
+    // Display-name overrides: "JustinMax" is only a code id — the player just sees "Max".
+    const DISPLAY = { justinmax: 'Max' };
+    this._speakerText.setText((DISPLAY[speaker] ?? line.speaker ?? '').toUpperCase());
 
     const colors = {
       leo: 0x3b82f6, warren: 0xe74c3c, mj: 0x2ecc71,
       carson: 0x9b59b6, justin: 0xf39c12,
     };
-    const speaker = line.speaker?.toLowerCase();
     const headKey = `head-${speaker}`;
     if (speaker && this._scene.textures.exists(headKey)) {
       // Real headshot from the character's sprite, framed by an accent border.

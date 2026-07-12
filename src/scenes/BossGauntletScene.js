@@ -25,7 +25,7 @@ const SIBLING_NAMES = {
   warren: 'GRACE',
   mj:     'MAX',
   carson: 'NORA',
-  justin: 'MAX (BASEBALL)',
+  justin: 'MAX',
 };
 
 // Dialogue scripts to show before each gauntlet fight

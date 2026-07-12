@@ -205,7 +205,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     this._maxHpBg   = this.add.rectangle(ARENA_W / 2, 16, 160, 8, 0x440000).setScrollFactor(0).setDepth(20);
     this._maxHpFill = this.add.rectangle(ARENA_W / 2 - 78, 16, 156, 6, 0xff4400)
       .setScrollFactor(0).setDepth(21).setOrigin(0, 0.5);
-    txt(this, ARENA_W / 2, 6, "JUSTIN'S MAX", { fontSize: '8px', color: '#ffaa44' })
+    txt(this, ARENA_W / 2, 6, "MAX", { fontSize: '8px', color: '#ffaa44' })
       .setOrigin(0.5).setScrollFactor(0).setDepth(21);
 
     this._alertLabel    = txt(this, this._maxX, this._maxY - 32, '!',
@@ -724,7 +724,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
     }
 
     this.time.delayedCall(400, () => {
-      txt(this, ARENA_W / 2, ARENA_H / 2, "JUSTIN'S MAX DEFEATED!", {
+      txt(this, ARENA_W / 2, ARENA_H / 2, "MAX DEFEATED!", {
         fontSize: '8px', color: '#ffff44',
         stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(30);
