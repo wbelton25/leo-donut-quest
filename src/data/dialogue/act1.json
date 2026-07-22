@@ -33,7 +33,7 @@
     { "speaker": "Carson", "text": "Nora's around back by the pool. She's in a mood.", "portrait": "carson", "requiresMember": null }
   ],
   "carson_join": [
-    { "speaker": "Carson", "text": "Didn't even see it coming. That's my whole thing.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "Didn't even see it coming. That's my whole thing, fr.", "portrait": "carson" },
     { "speaker": "Carson", "text": "Stay close and stay quiet. I know the shortcuts.", "portrait": "carson" }
   ],
   "carson_after_nora": [
@@ -46,17 +46,17 @@
     { "speaker": "Justin", "text": "BRO. I've been waiting all week for a donut run.", "portrait": "justin", "requiresMember": null },
     { "speaker": "Justin", "text": "Max is guarding the street with a bat. AND he's somehow electric?", "portrait": "justin", "requiresMember": null },
     { "speaker": "Leo", "text": "That doesn't even make sense.", "portrait": "leo" },
-    { "speaker": "Justin", "text": "I know. Doesn't matter. Let's go.", "portrait": "justin", "requiresMember": null }
+    { "speaker": "Justin", "text": "I know. Doesn't matter. Let's lock in.", "portrait": "justin", "requiresMember": null }
   ],
   "justin_join": [
-    { "speaker": "Justin", "text": "YEAH! Full crew! Nobody's faster than us.", "portrait": "justin" },
+    { "speaker": "Justin", "text": "YEAH! Full crew, no cap! Nobody's faster than us.", "portrait": "justin" },
     { "speaker": "Justin", "text": "I'll get us there in no time. Follow me!", "portrait": "justin" }
   ],
   "justin_after_max": [
     { "speaker": "Justin", "text": "BRO. You just beat my electric brother with a FART.", "portrait": "justin" },
     { "speaker": "Leo", "text": "Did NOT see that coming.", "portrait": "leo" },
     { "speaker": "Justin", "text": "He's been doing that zap thing since he found those batteries.", "portrait": "justin" },
-    { "speaker": "Justin", "text": "OK. Full squad. Let's GO. Donuts won't wait forever.", "portrait": "justin" }
+    { "speaker": "Justin", "text": "OK. Full squad, locked in. Let's GO. Donuts won't wait.", "portrait": "justin" }
   ],
   "departure": [
     { "speaker": "Leo", "text": "Full squad. Donut House is 3 miles east. Let's move.", "portrait": "leo" },
@@ -68,7 +68,7 @@
   "arrival": [
     { "speaker": "Justin", "text": "I CAN SEE IT. I CAN SEE DONUT HOUSE!", "portrait": "justin" },
     { "speaker": "Leo", "text": "We made it. Nobody eat until we're inside.", "portrait": "leo" },
-    { "speaker": "Warren", "text": "That was rougher than I expected. Worth it.", "portrait": "warren" }
+    { "speaker": "Warren", "text": "That was rougher than I expected. Worth it, no cap.", "portrait": "warren" }
   ],
   "checkpoint_school": [
     { "speaker": "Leo", "text": "Tega Cay Elementary. Almost forgot I went here.", "portrait": "leo" },
@@ -84,8 +84,9 @@
   ],
   "gauntlet_grace": [
     { "speaker": "Grace", "text": "You made it back?! Hand over those donuts RIGHT NOW.", "portrait": "grace" },
-    { "speaker": "Leo", "text": "We rode 3 miles for these. We fought for these. You're not getting them.", "portrait": "leo" },
-    { "speaker": "Grace", "text": "Then I'm taking them. Pool noodle round TWO.", "portrait": "grace" }
+    { "speaker": "Leo", "text": "We fought for these, Grace. You're not getting them.", "portrait": "leo" },
+    { "speaker": "Grace", "text": "Then I'm taking them. My pool-noodle rizz is UNDEFEATED.", "portrait": "grace" },
+    { "speaker": "Leo", "text": "...nobody says rizz anymore, Grace. Bring it.", "portrait": "leo" }
   ],
   "gauntlet_max_football": [
     { "speaker": "Max", "text": "Ooh. Donuts. Hand them over and nobody gets a stiff arm.", "portrait": "max" },
@@ -98,7 +99,7 @@
     { "speaker": "Nora", "text": "Not a chance. Drop the donuts and I'll let the rest of you pass.", "portrait": "nora" }
   ],
   "gauntlet_max_baseball": [
-    { "speaker": "JustinMax", "text": "BRO. You brought DONUTS past my block without offering me ONE?!", "portrait": "justinmax" },
+    { "speaker": "JustinMax", "text": "You brought DONUTS past my block?! That's CRAZY work. Six... SEVEN!", "portrait": "justinmax" },
     { "speaker": "Leo", "text": "Justin, keep your brother away from us!", "portrait": "leo" },
     { "speaker": "Justin", "text": "Sorry Leo — he goes electric when he smells sugar.", "portrait": "justin" }
   ],
@@ -116,13 +117,13 @@
   ],
   "gauntlet_max_baseball_win": [
     { "speaker": "Leo", "text": "Somebody get Justin's brother some actual batteries.", "portrait": "leo" },
-    { "speaker": "Justin", "text": "THIS WAS SO WORTH IT. LET'S GO.", "portrait": "justin" }
+    { "speaker": "Justin", "text": "THAT WAS A CLEAN W. LET'S GO.", "portrait": "justin" }
   ],
   "gauntlet_edie": [
     { "speaker": "Edie", "text": "Donuts? From DONUT HOUSE? And you didn't bring me any?!", "portrait": "edie" },
     { "speaker": "Leo", "text": "Edie... step aside.", "portrait": "leo" },
-    { "speaker": "Edie", "text": "Nope. You get past me, you can keep them. But you won't.", "portrait": "edie" },
-    { "speaker": "Leo", "text": "I've fought everyone on this block today. You're next.", "portrait": "leo" }
+    { "speaker": "Edie", "text": "Nope. My final-boss aura is straight SKIBIDI. You won't get past.", "portrait": "edie" },
+    { "speaker": "Leo", "text": "I've fought everyone on this block today. Move, Edie.", "portrait": "leo" }
   ],
   "edie_defeated": [
     { "speaker": "Leo", "text": "Edie... it's over. We earned these donuts.", "portrait": "leo" },
