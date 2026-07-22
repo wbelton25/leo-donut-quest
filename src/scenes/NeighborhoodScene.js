@@ -16,6 +16,7 @@ import GolfBallSpawner  from '../entities/GolfBallSpawner.js';
 import BeanPickup       from '../entities/BeanPickup.js';
 import BikeRepairPickup from '../entities/BikeRepairPickup.js';
 import DonutHolePickup  from '../entities/DonutHolePickup.js';
+import GoldenDonutPickup from '../entities/GoldenDonutPickup.js';
 // GraceBoss is now handled in GraceBossScene; import removed
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
@@ -538,6 +539,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Donut-hole trails ($1 each; breadcrumb the routes to each friend) ─────────
     this._spawnDonutHoles();
 
+    // ── Golden donuts (3 hidden secrets, +$5 each) ───────────────────────────────
+    this._spawnGoldenDonuts();
+
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
       fontSize: '8px', color: '#f5e642',
@@ -646,6 +650,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._updatePowerFart();
     this._checkBikeRepairs();
     this._checkDonutHoles();
+    this._checkGoldenDonuts();
     this._checkCloseCalls();
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
@@ -1003,6 +1008,45 @@ export default class NeighborhoodScene extends Phaser.Scene {
         const gs = this.game.registry.get('gameState') ?? {};
         gs.donutHolesCollected = (gs.donutHolesCollected ?? 0) + 1;
         this.game.registry.set('gameState', gs);
+      }
+    }
+  }
+
+  // ── Golden donuts (R3) ─────────────────────────────────────────────────────────
+  // Three hidden secrets in rarely-visited spots (deep golf course, marina stub, far
+  // SE corner). +$5 + big fanfare each; all 3 in a run → GOLDEN GLAZE badge. NOT on
+  // the minimap — the badge hint is the only clue.
+  _spawnGoldenDonuts() {
+    const SPOTS = [
+      [258, 12],   // deep in the golf course, behind the ball-fire line (needs drivable golf)
+      [11, 146],   // marina road stub, SW of Leo's house
+      [313, 153],  // far SE corner, south road by Justin's street
+    ];
+    const collected = this._collectedSet('collectedGoldenDonuts');
+    this._goldenDonuts = [];
+    SPOTS.forEach(([c, r], i) => {
+      if (collected.has(i)) return;
+      const g = new GoldenDonutPickup(this, c * T + 8, r * T + 8);
+      g._spotIndex = i;
+      this._goldenDonuts.push(g);
+    });
+  }
+
+  _checkGoldenDonuts() {
+    if (!this._goldenDonuts || this._goldenDonuts.length === 0) return;
+    const px = this._player.x, py = this._player.y;
+    for (const g of this._goldenDonuts) {
+      if (g.collected) continue;
+      const dx = g.x - px, dy = g.y - py;
+      if (dx * dx + dy * dy < 18 * 18) {
+        g.collect();
+        this._markCollected('collectedGoldenDonuts', g._spotIndex);
+        this._resources.applyChanges({ money: 5 });
+        FX.popText(this, g.x, g.y - 24, 'GOLDEN DONUT! +$5', { color: '#ffd23f', fontSize: '12px', rise: 30, duration: 1100 });
+        const gs = this.game.registry.get('gameState') ?? {};
+        gs.goldenDonuts = (gs.goldenDonuts ?? 0) + 1;
+        this.game.registry.set('gameState', gs);
+        if (gs.goldenDonuts >= 3) BadgeSystem.awardAndToast(this, 'golden_glaze');
       }
     }
   }
