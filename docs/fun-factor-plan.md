@@ -69,6 +69,14 @@ Cheap fanfare (confetti, stingers, screen shake) multiplies perceived fun.
 doesn't dare the player to beat their best grade, and scores save with `???` initials —
 kids love typing their initials arcade-style.
 
+**Nothing persists between runs, so there is no reason for run #3.** Score chasing alone
+doesn't hold a kid. The game already owns two perfect (and free) replay assets it isn't
+using: a **20-sound fart library** that's fully available from minute one (a reward
+economy wasted as ambient noise), and a big Act-1 map that's fully seen in one run.
+Phase R below converts these into a persistent collect-a-thon: badges that unlock named
+fart sounds, hidden golden donuts, and post-win remix modes. This is the replayability
+core of the whole plan.
+
 ---
 
 ## 4. THE PLAN — ranked by fun-per-effort
@@ -243,11 +251,138 @@ is encouraging, kid-toned, and gives one concrete tip chosen from the run state 
 
 ---
 
+### Phase R — THE REPLAY ENGINE  ★ the "one more run" core — do right after Phase 1
+
+Everything above makes one run more fun. Phase R is what makes a kid start run #2, #3,
+and #6. Design: **badges you earn by playing in different ways → each badge unlocks a
+named fart sound → a visible shelf of empty slots on the title screen dares you to fill
+it.** Plus secrets that only a repeat explorer finds, and remix modes that make later runs
+*feel* different, not just re-rolled.
+
+All persistence is `localStorage` (same pattern as `ScoreSystem`, key per system).
+Never store it on the per-run gameState — badges must survive "START GAME".
+
+#### R1. Badge system + award toasts
+**New file:** `src/systems/BadgeSystem.js` (static class, localStorage key
+`'leo-donut-badges'`, shape `{ earned: { badgeId: 'Jul 22' }, seenToasts: [...] }`).
+API: `award(id)` (idempotent, returns true if newly earned), `has(id)`, `all()` (defs +
+earned state), `unlockedFarts()` (see R2).
+
+Badge definitions (id / name / hint / where the check lives). Deliberately mixed
+difficulty — a first run should earn 2–3 so the shelf hook lands immediately:
+
+| id | name | earn condition | check location |
+|---|---|---|---|
+| `first_delivery` | FIRST DELIVERY | finish the game once | `ReportCardScene` |
+| `full_crew` | FULL CREW | all 4 friends reach the Donut House | `DonutShopScene.create` (party.length===4) |
+| `solo_rider` | LONE WOLF | reach the Donut House with zero friends | `DonutShopScene.create` |
+| `fart_storm` | FART STORM | 3x deer combo | fart handler, `NeighborhoodScene` (`knocked>=3`) |
+| `tootnado` | TOOTNADO | 5x deer combo | same (`knocked>=5`) |
+| `deer_whisperer` | DEER WHISPERER | 15 deer toppled in one run | same (`gs.deerToppled>=15`) |
+| `early_bird` | EARLY BIRD | arrive at Donut House with TIME still "ahead" | `OregonTrailScene._triggerArrival` (reuse `_scheduleWord()`) |
+| `survivor` | SURVIVOR | win the run after CREW hit "worn out!" (<34) | set `gs.crewWasWornOut` flag in `_applyLegCost`, check at `ReportCardScene` |
+| `big_spender` | DOZEN DOWN | buy 12+ donuts in one order | `DonutShopScene._startReturn` |
+| `close_call_king` | CLOSE CALL KING | 5 near-misses in one run (needs 2C) | near-miss handler (`gs.nearMisses>=5`) |
+| `golden_glaze` | GOLDEN GLAZE | find all 3 golden donuts (needs R3) | golden-donut collect |
+| `s_rank` | S-RANK RIDER | earn grade S | `ReportCardScene` |
+
+Award moment matters: call a shared toast the instant it's earned —
+`BadgeSystem.toast(scene, name)` → slide-in banner top-center, `BADGE EARNED: FART STORM!`
+gold on dark, ~2s, plus an `FX.burst` if the scene imports FX. Never queue-block gameplay.
+
+#### R2. Unlockable fart sounds (the reward economy)
+**Files:** `src/systems/AudioManager.js` (`playFart` currently auto-discovers all
+`sfx-fart-N` keys and picks randomly), `BadgeSystem`, `TitleScene`.
+
+- Give every fart sound an arbitrary fun display name in a table in BadgeSystem
+  (names are free to invent; the user can rename later): THE CLASSIC, THE SQUEAKER,
+  THE TROMBONE, THE FOGHORN, THE BUBBLER, THE ZIPPER, THE WHOOPEE, THE RASPBERRY,
+  THE THUNDERCLAP, THE DUCK, THE MOTORBIKE, THE BALLOON, THE KAZOO, THE DRUM SOLO,
+  THE GURGLER, THE AIR HORN, THE SNEAKER, THE TUBA, THE ESPRESSO, THE GRAND FINALE.
+- **Starting pool: farts 1–6.** Each badge unlocks 1–2 more (map badge→fart indices in
+  the same table; 12 badges comfortably unlock the remaining 14).
+- `AudioManager.playFart` filters `_fartKeys` to the unlocked set
+  (`BadgeSystem.unlockedFarts()`); if BadgeSystem is missing/empty, fall back to all
+  (never let a bug silence farts).
+- On badge award, the toast gets a second line when it unlocks a sound:
+  `NEW FART UNLOCKED: THE TROMBONE!` — and **immediately play that fart once**. This is
+  the single funniest reward moment available to this codebase; do not skip it.
+- Title screen badge shelf (R4) lists unlocked fart names so the collection is browsable.
+
+#### R3. Golden donuts (secrets for repeat explorers)
+**Files:** `NeighborhoodScene` (clone the `BeanPickup` spawn/check/persist pattern,
+~line 769), new `src/entities/GoldenDonutPickup.js` (gold circle + darker ring + slow
+sparkle tween — make it obviously special), `ScoreSystem`, `ReportCardScene`.
+
+Three hidden spots chosen to be *found by wandering, not by following roads* — off-road
+placement is the point (verify each sits on reachable, non-wall terrain in
+`public/maps/neighborhood_map.json`; the collision builder blocks off-road driving in
+some areas, so test by riding there):
+1. deep in the golf course between fairways (guarded by golf-ball fire),
+2. the far end of a lake dock (SW water edge),
+3. the map's far SE corner past Justin's street.
+
+Each: +$5, big fanfare (`GOLDEN DONUT!` + sparkle burst), `gs.goldenDonuts++`, persists
+per-run via `_markCollected('collectedGoldenDonuts', i)`. Score: `golden × 50` row on the
+report card ("GOLDEN DONUTS"). All 3 in one run → `golden_glaze` badge. Do NOT mark them
+on the minimap — secret means secret; the badge hint ("hidden around the neighborhood...")
+is the only clue.
+
+#### R4. Title-screen badge shelf
+**File:** `src/scenes/TitleScene.js`. The right panel (~line 56) is the leaderboard;
+add a toggle at its top: `[SCORES] [BADGES]` (two small tabs, same panel area).
+Badges view: 12 slots in a 3×4 grid — earned = gold square + name below on selection;
+unearned = dark slot with `?`. Clicking a slot prints name+hint (or `???` + hint for
+unearned) at the panel bottom. Below the grid: `FARTS: 8/20 UNLOCKED`. The
+partially-empty shelf IS the replay pitch — make sure a fresh browser shows 0/12 and
+6/20, not an empty panel.
+
+#### R5. Remix modes (post-win challenge runs)
+**Files:** `TitleScene`, `src/constants.js` (or a tiny `src/systems/ChallengeSystem.js`),
+touched scenes read a `challenge` id from `this.game.registry.get('challenge')`.
+
+After `first_delivery` is earned, the title screen shows a `CHALLENGES` button →
+pick one modifier for the whole run (plain-words description, one per run):
+
+- **RUSH HOUR** — "The streets are packed!" Act 1: double car/golf-cart `count` at spawn
+  time (multiply in `_spawnObstaclesFromMap`, no map edits); near-miss pays +2s.
+- **DEER STAMPEDE** — "Deer. Deer everywhere." Triple deer counts; fart cooldown scale
+  0.5 (via `AbilitySystem.setCooldownScale`); combos are the run's whole economy.
+- **STORM RIDE** — "Worst weather all year." Act 2 terrain table reweighted (smooth/
+  downhill weight 1, rain weight 4, headwind 3); travel grab-ems (1B) spawn twice as
+  often as compensation.
+
+Each remix has its own win badge if you want 3 more badges (`rush_hour_win` etc.) —
+optional, only if the badge grid is expanded to fit. Implementation rule: a challenge may
+ONLY tweak existing constants/spawn counts at scene start — no new mechanics, no new UI
+beyond a small `CHALLENGE: RUSH HOUR` label under the Act 1 HUD.
+
+#### R6 (stretch, optional). Act 2 route fork
+The strongest *structural* replay lever if there's appetite for more content: at the
+Walmart camp (leg 4), a one-time choice — **HIGHWAY** (remaining legs bias
+gravel/headwind, time costs ×0.85, checkpoint stays DISCOUNT TIRE) vs **PARK TRAIL**
+(time costs ×1.15, terrain biases smooth/downhill, and the leg-6 checkpoint becomes an
+**ICE CREAM STAND** with 2–3 new location events written in the existing
+`LOCATION_EVENTS` format — snack-flavored, e.g. brain-freeze dares and a free-cone
+sample rush). Routes converge at leg 8. Two runs now have genuinely different middles.
+Implement by swapping the `LEGS`/checkpoint entries for indices 5–7 at choice time.
+Skip this item if effort is constrained — R1–R5 stand alone.
+
+**Accept Phase R when:** a fresh browser profile earns 2+ badges and hears a new fart
+unlock during one normal run; badges/farts survive `START GAME` (new run) AND a full page
+reload; the shelf shows correct counts; a remix run visibly differs in its first 30
+seconds; no badge can be earned twice.
+
+---
+
 ## 5. Suggested commit sequence
 
 One commit per lettered item, message style `Act 2: terrain-reactive ride visuals (1A)`.
-Phases are independent; items within a phase are ordered. If a session is short, Phase 1
-alone is the biggest win.
+Phases are independent; items within a phase are ordered. **Recommended order:
+Phase 1 → Phase R (R1–R4) → Phase 2 → 3 → 4 → 5 → R5 → R6.** If a session is short,
+Phase 1 makes one run fun; Phase R makes the next run happen. Dependencies to respect:
+R1 before R2/R3/R4/R5 (they all hang off BadgeSystem); 2C before the `close_call_king`
+badge check; 1B before STORM RIDE's grab-em compensation.
 
 ## 6. Don't-do list
 
