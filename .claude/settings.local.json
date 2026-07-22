@@ -30,10 +30,13 @@
       "Read(//mnt/c/Users/wbelt/**)",
       "PowerShell($files = Get-ChildItem \"C:\\\\Users\\\\wbelt\\\\Downloads\" | Sort-Object LastWriteTime -Descending; foreach \\($f in $files[0..14]\\) { \"$\\($f.LastWriteTime\\) $\\($f.Name\\)\" })",
       "Bash(npx vite *)",
-      "Bash(git commit -m 'Add fun-factor review + handoff-ready improvement plan \\(docs/fun-factor-plan.md\\) *)",
-      "Bash(git commit -m 'Fun plan: add Phase R replay engine \\(badges -> fart unlocks, golden donuts, remix modes\\) *)",
-      "Bash(git commit -m 'Fun plan: lock '\\\\''static places, random moments'\\\\'' placement policy + spawn jitter \\(2D vi/vii\\) *)",
-      "Bash(git commit -m 'Fun plan: add review gates \\(pause points for user playtests between phases\\) *)"
+      "Bash(git commit:*)",
+      "Bash(git add:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(node scripts/*)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" *)"
     ]
   }
 }
