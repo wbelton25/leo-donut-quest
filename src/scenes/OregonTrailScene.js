@@ -8,6 +8,7 @@ import PartySystem from '../systems/PartySystem.js';
 import EventSystem from '../systems/EventSystem.js';
 import EventCard from '../ui/EventCard.js';
 import WalmartShopCard from '../ui/WalmartShopCard.js';
+import FX from '../systems/FX.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 
 // ── Ride constants ─────────────────────────────────────────────────────────────
@@ -468,6 +469,21 @@ export default class OregonTrailScene extends Phaser.Scene {
       this._dropMember(lost);
       this._announceMemberLost(lost, done);
       return;
+    }
+
+    // Reveal fanfare (3A): good luck → confetti; bad luck → shake + red flash; a friend's
+    // skill move → a cool sparkle. Neutral gets nothing — the contrast is the point.
+    const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2 - 44;
+    if (luck === 'good') {
+      FX.burst(this, cx, cy, { count: 26, colors: [0x66dd66, 0xf5e642, 0x8fd694, 0xffffff],
+        minSpeed: 60, maxSpeed: 190, minSize: 2, maxSize: 4, duration: 900, depth: 33, gravity: 45 });
+    } else if (luck === 'bad') {
+      this.cameras.main.shake(220, 0.008);
+      this.cameras.main.flash(180, 120, 0, 0);
+    }
+    if (choice.requiresPartyMember) {
+      FX.burst(this, cx, cy, { count: 14, colors: [0x7fd6c0, 0x8ac6ff, 0xffffff],
+        minSpeed: 40, maxSpeed: 130, minSize: 1, maxSize: 3, duration: 700, depth: 33 });
     }
 
     const title = luck === 'good' ? 'THAT WENT WELL!' : luck === 'bad' ? 'BAD LUCK!' : 'OKAY THEN...';

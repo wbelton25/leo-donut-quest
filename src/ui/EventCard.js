@@ -91,6 +91,14 @@ export default class EventCard {
     }).setOrigin(0.5);
     card.add([cardBg, border, titleBar, ...content, descText, titleTxt]);
 
+    // Icon chip (top-left) — a glance-read of what KIND of trouble this is, for
+    // pre-readers. Only on real events (>1 choice), not the single-button reveal card.
+    if (choices.length > 1) {
+      const chip = this._chipFor(`${event.title} ${event.id ?? ''}`);
+      card.add(this._scene.add.rectangle(-CARD_W / 2 + 13, TITLE_H / 2, 16, 16, chip.bg).setStrokeStyle(1, chip.line));
+      card.add(txt(this._scene, -CARD_W / 2 + 13, TITLE_H / 2, chip.glyph, { fontSize: '8px', color: chip.hex }).setOrigin(0.5));
+    }
+
     // 4. Scale down if too tall, and center vertically.
     const scale   = Math.min(1, MAX_H / cardH);
     const scaledH = cardH * scale;
@@ -130,6 +138,23 @@ export default class EventCard {
     const good = (e.energy > 0) || (e.bikeCondition > 0) || (e.distance > 0) || (e.snacks > 0);
     const color = choice.requiresPartyMember ? '#7fd6c0' : bad && !good ? '#ffa077' : good ? '#88cc88' : '#99aabb';
     return { text: parts.join(', '), color };
+  }
+
+  // Categorize an event by keyword → a colored ASCII chip. Purely visual shorthand.
+  _chipFor(text) {
+    const t = text.toLowerCase();
+    const has = (...w) => w.some(x => t.includes(x));
+    if (has('bike', 'chain', 'tire', 'rim', 'part', 'wheel', 'handlebar', 'brake', 'flat'))
+      return { glyph: '%', bg: 0x25252a, line: 0x888899, hex: '#aab0bb' };   // mechanical
+    if (has('dog', 'deer', 'squirrel', 'ferret', 'parrot', 'cat', 'animal'))
+      return { glyph: '!', bg: 0x3a2410, line: 0xff8844, hex: '#ffaa66' };   // animal
+    if (has('rain', 'heat', 'wind', 'storm', 'sun'))
+      return { glyph: '~', bg: 0x102a3a, line: 0x4488cc, hex: '#66aadd' };   // weather
+    if (has('teacher', 'officer', 'police', 'parent', 'neighbor', 'crossing', 'adult', 'mom'))
+      return { glyph: '?', bg: 0x2a1a3a, line: 0x9966cc, hex: '#bb88dd' };   // people
+    if (has('shortcut', 'money', 'downhill', 'fountain', 'lucky', 'found', 'coast', 'water'))
+      return { glyph: '$', bg: 0x1a3a1a, line: 0x66aa66, hex: '#88cc88' };   // opportunity
+    return { glyph: '*', bg: 0x3a3a10, line: 0xccaa33, hex: '#f5e642' };     // misc
   }
 
   _buildStatic() {
