@@ -63,6 +63,14 @@ let PARK_C = 19, PARK_R = 65, PARK_W = 24, PARK_H = 26;
 let HOUSE_GROUPS = [];
 let FRIEND_ZONES = [];
 
+// Drivable off-road pockets (2D) — [col, row, w, h] in tiles. Leo can ride here even
+// though they aren't roads: Runde Park (widened east to Windward) + the golf course
+// (extended south to Tega Cay Dr). Shared by collision, tree-gen, and the minimap.
+const DRIVABLE_POCKETS = [
+  [19,  65, 26, 26],   // Runde Park
+  [220,  0, 70, 46],   // Tega Cay golf course
+];
+
 export default class NeighborhoodScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_NEIGHBORHOOD });
@@ -781,7 +789,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
       [30, 148],  // Leo's house loop (SW)
       [110, 76],  // Suwarrow Ct cul-de-sac
       [300, 154], // south road near Justin's
-      [240, 120], // long central N-S spur
+      [240, 120], // long central N-S spur — pairs with the 10-deer combo shrine nearby
+      // Combo-setup beans (2D): grab, then blast the herd just past it.
+      [46, 114],  // ride north on Windward → starter pod at r104
+      [43, 78],   // park entrance → park herd
+      [224, 47],  // golf entrance → golf rough herd
     ];
 
     this._powerFartUntil = 0;
@@ -936,12 +948,21 @@ export default class NeighborhoodScene extends Phaser.Scene {
       const cy    = (d.row + dh / 2) * T;
       const count = d.count ?? 1;
 
+      // Jitter each spawn within ±30% of its slice so no two runs open identically
+      // (2D vi — "static places, random moments": the patrol range/road is fixed,
+      // only the starting position inside it varies). Golf balls stay deterministic.
+      const slice = count > 0 ? (maxB - minB) / count : 0;
       for (let i = 0; i < count; i++) {
         let spawnX = cx, spawnY = cy;
         if (count > 1) {
           const t = (i + 0.5) / count;
           if (isH) spawnX = minB + t * (maxB - minB);
           else     spawnY = minB + t * (maxB - minB);
+        }
+        if (d.type !== 'golf_ball' && slice > 0) {
+          const jitter = (Math.random() - 0.5) * 0.6 * slice;   // ±30% of a slice
+          if (isH) spawnX = Phaser.Math.Clamp(spawnX + jitter, minB, maxB);
+          else     spawnY = Phaser.Math.Clamp(spawnY + jitter, minB, maxB);
         }
 
         switch (d.type) {
@@ -1161,6 +1182,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // un-rideable even though they render as asphalt.
     if (c + step <= 110 && r + step > 151) return false;
 
+    // Drivable off-road POCKETS (2D): Runde Park + the golf course. Opening these
+    // turns two dead decorations into playgrounds — the park is a safe deer-combo
+    // pocket, the golf course a treasure zone guarded by golf-ball fire.
+    // [col, row, w, h] in tiles. Park widened east to meet Windward; golf down to Tega Cay Dr.
+    for (const [pc, pr, pw, ph] of DRIVABLE_POCKETS) {
+      if (c < pc + pw && c + step > pc && r < pr + ph && r + step > pr) return true;
+    }
+
     for (const [rc, rr, rw, rh] of ROADS) {
       if (c < rc + rw && c + step > rc && r < rr + rh && r + step > rr) return true;
     }
@@ -1205,6 +1234,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
         if (c >= rc && c < rc + rw && r >= rr && r < rr + rh) return true;
       }
       if (c >= PARK_C && c < PARK_C + PARK_W && r >= PARK_R && r < PARK_R + PARK_H) return true;
+      // Keep the drivable pockets (park + golf fairways) clear of trees so they stay rideable.
+      for (const [pc, pr, pw, ph] of DRIVABLE_POCKETS) {
+        if (c >= pc && c < pc + pw && r >= pr && r < pr + ph) return true;
+      }
       if (c <= 10) return true;              // left water
       if (r >= 151) return true;             // south water
       if (c <= 110 && r >= 148) return true; // south water buffer
@@ -1238,11 +1271,16 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.add.rectangle(MM_X + 5 * T * sx, MM_Y + 105 * T * sy,
       10 * T * sx, 30 * T * sy, 0x1a5f8a).setScrollFactor(0).setDepth(51);
 
-    // Runde Park
+    // Runde Park + golf course (drivable pockets)
     this.add.rectangle(
       MM_X + PARK_C * T * sx + (PARK_W * T * sx) / 2,
       MM_Y + PARK_R * T * sy + (PARK_H * T * sy) / 2,
       PARK_W * T * sx, PARK_H * T * sy, 0x1e7a1e
+    ).setScrollFactor(0).setDepth(51);
+    this.add.rectangle(
+      MM_X + 220 * T * sx + (70 * T * sx) / 2,
+      MM_Y + 0 * T * sy + (46 * T * sy) / 2,
+      70 * T * sx, 46 * T * sy, 0x2f7a3a
     ).setScrollFactor(0).setDepth(51);
 
     // Roads
