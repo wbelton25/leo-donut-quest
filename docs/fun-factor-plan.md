@@ -512,6 +512,35 @@ R1 before R2/R3/R4/R5 (they all hang off BadgeSystem); 2D before 2A/2B placement
 before R3 (golden donut #1 needs the golf course drivable); 2C before the
 `close_call_king` badge check; 1B before STORM RIDE's grab-em compensation.
 
+### Review gates — do NOT implement everything in one pass
+
+The user playtests with the target player (a kid). Feel can't be verified by screenshots,
+so implementation must PAUSE at these gates and wait for the user's verdict before
+continuing. Executing model: stop at each gate, summarize what's ready to test and how
+to reach it (dev-server URL + any `?debug=1` shortcut keys), then end your session.
+
+- **GATE 1 — after Phase 1 (1A+1B).** The riskiest feel-work in the plan: do terrain
+  legs read differently, and are grab-ems fun or fiddly for small hands? A miss here is
+  cheap to fix now and expensive later (STORM RIDE in R5 builds on grab-ems). Test: ride
+  5+ Act 2 legs at mixed paces (`?debug=1` + key `2`, once 4A exists).
+- **GATE 2 — after Phase R (R1–R4). The thesis gate.** One full normal run in a fresh
+  browser profile: did 2–3 badges land with toasts, did a new fart unlock make the kid
+  laugh, does the title-screen shelf create "one more run"? If yes, the plan's core is
+  validated and Phases 2–5 are safe to batch. If no, STOP — rebalance badge difficulty
+  or unlock pacing before building anything else on top.
+- **GATE 3 — after Phase 2 (2D+2A+2B+2C).** Placement is subjective. Test: the opening
+  minute from Leo's house (bean → starter pod → dodging the Windward car), ride into the
+  park and golf course, hunt one golden donut. Density too crowded or still too empty is
+  a JSON-tweak fix — get the verdict while it's fresh.
+- **Phases 3, 4, 5 may then be implemented in one batch** — they're lower-risk polish
+  with objective acceptance criteria. R5/R6 last, only if Gate 2 validated the loop.
+- **FINAL REVIEW:** after everything, hand back to the planning model for a full
+  diff-vs-plan review, headless screenshot verification, and the 5C balance audit.
+
+One more standing rule for the executing model: if an item's acceptance criteria can't
+be met without violating a §2 principle or the §6 don't-do list, STOP and surface the
+conflict to the user instead of improvising a resolution.
+
 ## 6. Don't-do list
 
 - No new resource bars, numbers, percentages, or risk labels anywhere in Act 2.
