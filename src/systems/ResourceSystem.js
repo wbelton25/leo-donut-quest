@@ -1,5 +1,9 @@
 import { DEFAULT_GAME_STATE, EVT_RESOURCE_UPDATE } from '../constants.js';
 
+// The day starts at 12:30 PM (time = 270 minutes until the 5:00 PM deadline). Time can
+// never exceed this — you can't earn your way to before the day began.
+const TIME_START = DEFAULT_GAME_STATE.resources.time;
+
 // ResourceSystem: the single source of truth for all five resources.
 // Any code that changes a resource calls a method here.
 // After every change it emits EVT_RESOURCE_UPDATE so HudScene can react.
@@ -41,7 +45,10 @@ export default class ResourceSystem {
     // delta is an object like: { time: -10, bikeCondition: 5, snacks: -1 }
     // Only keys present in delta are changed.
     const r = this._resources;
-    if (delta.time !== undefined)          r.time = Math.max(0, r.time + delta.time); // no upper cap; starts at 270
+    // Time is minutes-until-5PM. It's capped at the day's starting value (12:30 PM = 270)
+    // so banking deer/dodge bonuses can offset the clock but never push it EARLIER than
+    // when the day began.
+    if (delta.time !== undefined)          r.time = Math.min(TIME_START, Math.max(0, r.time + delta.time));
     if (delta.bikeCondition !== undefined) r.bikeCondition = this._clamp(r.bikeCondition + delta.bikeCondition);
     if (delta.energy !== undefined)        r.energy = this._clamp(r.energy + delta.energy);
     if (delta.snacks !== undefined)        r.snacks = Math.max(0, r.snacks + delta.snacks);
