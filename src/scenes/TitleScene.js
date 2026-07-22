@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import SaveSystem from '../systems/SaveSystem.js';
 import ScoreSystem from '../systems/ScoreSystem.js';
+import BadgeSystem from '../systems/BadgeSystem.js';
 import AudioManager from '../systems/AudioManager.js';
 
 export default class TitleScene extends Phaser.Scene {
@@ -49,73 +50,115 @@ export default class TitleScene extends Phaser.Scene {
       fontSize: '6px', color: '#334455',
     }).setOrigin(1, 1);
 
-    // ── Leaderboard panel (right side) ────────────────────────────────────────
-    this._buildLeaderboard();
+    // ── Side panel (right): SCORES / BADGES tabs ──────────────────────────────
+    this._buildSidePanel();
   }
 
-  _buildLeaderboard() {
-    const board = ScoreSystem.getLeaderboard();
-    const panelX = BASE_WIDTH - 156;
-    const panelY = 14;
-    const panelW = 148;
-    const panelH = BASE_HEIGHT - 28;
+  _buildSidePanel() {
+    const panelX = BASE_WIDTH - 156, panelY = 14, panelW = 148, panelH = BASE_HEIGHT - 28;
+    this._panel = { x: panelX, y: panelY, w: panelW, h: panelH };
 
     // Panel background
     this.add.rectangle(panelX + panelW / 2, panelY + panelH / 2, panelW, panelH, 0x080810, 0.92)
       .setStrokeStyle(1, 0x2a3a4a);
 
-    txt(this, panelX + panelW / 2, panelY + 9, 'HIGH SCORES', {
-      fontSize: '8px', color: '#f5a623',
-    }).setOrigin(0.5);
+    // Tabs
+    this._tab = 'scores';
+    const tabY = panelY + 10;
+    const mkTab = (cx, key, label) => {
+      const bg = this.add.rectangle(cx, tabY, 68, 14, 0x14141c).setInteractive({ useHandCursor: true });
+      const lb = txt(this, cx, tabY, label, { fontSize: '8px', color: '#8899aa' }).setOrigin(0.5);
+      bg.on('pointerdown', () => { this._tab = key; this._renderPanel(); });
+      return { bg, lb, key };
+    };
+    this._tabs = [
+      mkTab(panelX + 40,  'scores', 'SCORES'),
+      mkTab(panelX + 110, 'badges', 'BADGES'),
+    ];
+    this.add.rectangle(panelX + panelW / 2, panelY + 20, panelW - 8, 1, 0x2a3a4a);
 
-    this.add.rectangle(panelX + panelW / 2, panelY + 22, panelW - 8, 1, 0x2a3a4a);
+    this._panelContent = this.add.container(0, 0);
+    this._renderPanel();
+  }
+
+  _renderPanel() {
+    this._tabs.forEach(t => {
+      const active = t.key === this._tab;
+      t.bg.setFillStyle(active ? 0x2a2a4a : 0x14141c);
+      t.lb.setColor(active ? '#f5a623' : '#8899aa');
+    });
+    this._panelContent.removeAll(true);
+    if (this._tab === 'scores') this._renderScores();
+    else                        this._renderBadges();
+  }
+
+  _renderScores() {
+    const { x: panelX, y: panelY, w: panelW, h: panelH } = this._panel;
+    const C = o => { this._panelContent.add(o); return o; };
+    const board = ScoreSystem.getLeaderboard();
 
     if (board.length === 0) {
-      txt(this, panelX + panelW / 2, panelY + panelH / 2, 'NO SCORES YET', {
-        fontSize: '8px', color: '#445566', align: 'center',
-      }).setOrigin(0.5);
-      txt(this, panelX + panelW / 2, panelY + panelH / 2 + 14, 'Play to get on\nthe board!', {
-        fontSize: '8px', color: '#334455', align: 'center',
-      }).setOrigin(0.5);
-    } else {
-      const rankColors = ['#ffdd00', '#bbbbbb', '#cc8844', '#888888', '#667788'];
-
-      board.forEach((entry, i) => {
-        const rowY = panelY + 30 + i * 38;
-        const rc   = rankColors[i] ?? '#667788';
-        const ini  = entry.initials ?? '???';
-
-        // Row divider (except first)
-        if (i > 0) this.add.rectangle(panelX + panelW / 2, rowY - 4, panelW - 12, 1, 0x1a2a3a);
-
-        // #N  INITIALS  SCORE
-        txt(this, panelX + 10, rowY,     `#${i + 1}`, { fontSize: '8px', color: rc });
-        txt(this, panelX + 30, rowY,     ini,          { fontSize: '8px', color: '#ffffff' });
-        txt(this, panelX + panelW - 8, rowY, `${entry.score} PTS`, {
-          fontSize: '8px', color: '#f5e642',
-        }).setOrigin(1, 0);
-
-        // DON:N CRW:N  date  (two separate aligned items)
-        txt(this, panelX + 10, rowY + 14,
-          `D:${entry.donuts} C:${entry.partySize}`,
-          { fontSize: '8px', color: '#556677' });
-        txt(this, panelX + panelW - 8, rowY + 14, entry.date, {
-          fontSize: '8px', color: '#445566',
-        }).setOrigin(1, 0);
-      });
-
-      // Clear scores button
-      const clearY = panelY + panelH - 14;
-      const clearBg = this.add.rectangle(panelX + panelW / 2, clearY, 100, 14, 0x1a1a2a)
-        .setInteractive({ useHandCursor: true });
-      const clearLbl = txt(this, panelX + panelW / 2, clearY, 'CLEAR SCORES', {
-        fontSize: '8px', color: '#445566',
-      }).setOrigin(0.5);
-
-      clearBg.on('pointerover', () => { clearBg.setFillStyle(0x2a1a1a); clearLbl.setColor('#ff4444'); });
-      clearBg.on('pointerout',  () => { clearBg.setFillStyle(0x1a1a2a); clearLbl.setColor('#445566'); });
-      clearBg.on('pointerdown', () => { ScoreSystem.clearBoard(); this.scene.restart(); });
+      C(txt(this, panelX + panelW / 2, panelY + panelH / 2 - 6, 'NO SCORES YET',
+        { fontSize: '8px', color: '#445566' }).setOrigin(0.5));
+      C(txt(this, panelX + panelW / 2, panelY + panelH / 2 + 12, 'Play to get on\nthe board!',
+        { fontSize: '8px', color: '#334455', align: 'center' }).setOrigin(0.5));
+      return;
     }
+
+    const rankColors = ['#ffdd00', '#bbbbbb', '#cc8844', '#888888', '#667788'];
+    board.forEach((entry, i) => {
+      const rowY = panelY + 32 + i * 34;
+      const rc   = rankColors[i] ?? '#667788';
+      const ini  = entry.initials ?? '???';
+      if (i > 0) C(this.add.rectangle(panelX + panelW / 2, rowY - 3, panelW - 12, 1, 0x1a2a3a));
+      C(txt(this, panelX + 10, rowY, `#${i + 1}`, { fontSize: '8px', color: rc }));
+      C(txt(this, panelX + 30, rowY, ini, { fontSize: '8px', color: '#ffffff' }));
+      C(txt(this, panelX + panelW - 8, rowY, `${entry.score}`, { fontSize: '8px', color: '#f5e642' }).setOrigin(1, 0));
+      C(txt(this, panelX + 10, rowY + 12, `D:${entry.donuts} C:${entry.partySize}`, { fontSize: '8px', color: '#556677' }));
+      C(txt(this, panelX + panelW - 8, rowY + 12, entry.date, { fontSize: '8px', color: '#445566' }).setOrigin(1, 0));
+    });
+
+    const clearY = panelY + panelH - 12;
+    const clearBg = C(this.add.rectangle(panelX + panelW / 2, clearY, 100, 14, 0x1a1a2a).setInteractive({ useHandCursor: true }));
+    const clearLbl = C(txt(this, panelX + panelW / 2, clearY, 'CLEAR SCORES', { fontSize: '8px', color: '#445566' }).setOrigin(0.5));
+    clearBg.on('pointerover', () => { clearBg.setFillStyle(0x2a1a1a); clearLbl.setColor('#ff4444'); });
+    clearBg.on('pointerout',  () => { clearBg.setFillStyle(0x1a1a2a); clearLbl.setColor('#445566'); });
+    clearBg.on('pointerdown', () => { ScoreSystem.clearBoard(); this._renderPanel(); });
+  }
+
+  _renderBadges() {
+    const { x: panelX, y: panelY, w: panelW, h: panelH } = this._panel;
+    const C = o => { this._panelContent.add(o); return o; };
+    const badges = BadgeSystem.all();
+    const cols = 3, size = 26, gap = 8;
+    const gridW = cols * size + (cols - 1) * gap;
+    const startX = panelX + (panelW - gridW) / 2 + size / 2;
+    const startY = panelY + 34;
+    let selName, selHint;
+
+    badges.forEach((b, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const bx = startX + col * (size + gap);
+      const by = startY + row * (size + gap);
+      const slot = C(this.add.rectangle(bx, by, size, size, b.earned ? 0x3a2f0a : 0x14141c)
+        .setStrokeStyle(1, b.earned ? 0xf5c542 : 0x2a2a3a).setInteractive({ useHandCursor: true }));
+      if (b.earned) C(this.add.star(bx, by, 5, 4, 9, 0xf5c542));
+      else          C(txt(this, bx, by, '?', { fontSize: '8px', color: '#556' }).setOrigin(0.5));
+      slot.on('pointerdown', () => {
+        selName.setText(b.earned ? b.name : '???').setColor(b.earned ? '#f5c542' : '#667788');
+        selHint.setText(b.hint);
+      });
+    });
+
+    const infoY = startY + 4 * (size + gap) + 2;
+    selName = C(txt(this, panelX + panelW / 2, infoY, 'TAP A BADGE', { fontSize: '8px', color: '#8899aa' }).setOrigin(0.5));
+    selHint = C(txt(this, panelX + panelW / 2, infoY + 13, 'to see how to earn it',
+      { fontSize: '8px', color: '#556677', align: 'center', wordWrap: { width: panelW - 16 } }).setOrigin(0.5, 0));
+
+    C(txt(this, panelX + panelW / 2, panelY + panelH - 20, `BADGES: ${BadgeSystem.earnedCount()}/${badges.length}`,
+      { fontSize: '8px', color: '#f5c542' }).setOrigin(0.5));
+    C(txt(this, panelX + panelW / 2, panelY + panelH - 8, `FARTS: ${BadgeSystem.unlockedFarts().length}/${BadgeSystem.TOTAL_FARTS} UNLOCKED`,
+      { fontSize: '8px', color: '#c6e37b' }).setOrigin(0.5));
   }
 
   _addButton(x, y, label, callback) {
