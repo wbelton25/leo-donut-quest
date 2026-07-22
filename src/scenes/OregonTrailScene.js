@@ -221,11 +221,10 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._crew  = 100;   // crew energy/morale
     this._bikes = 100;   // fleet bike condition
 
-    // Terrain-reactive ride FX (1A) + roadside grab-ems (1B) — built per leg, torn down at stops.
+    // Terrain-reactive ride FX (1A) — built per leg, torn down at stops.
     this._terrainFX       = [];
     this._terrainFXTweens = [];
     this._terrainFXTimer  = null;
-    this._grabbers        = [];
 
     // ── Background ────────────────────────────────────────────────────────────
     this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT * 0.3,  BASE_WIDTH, BASE_HEIGHT * 0.6, 0x87ceeb);
@@ -280,10 +279,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     const advance = () => { if (this._phase === 'camp' && this._restStopCon) this._continueFromCamp(); };
     this.input.keyboard.addKey('ENTER').on('down', advance);
     this.input.keyboard.addKey('SPACE').on('down', advance);
-    // 1B — during a ride, SPACE grabs a pickup overlapping any biker.
-    this.input.keyboard.addKey('SPACE').on('down', () => {
-      if (this._phase === 'travel') this._grabNearBiker();
-    });
 
     this._restStopCon      = null;  // reused as the camp status-board container
     this._restStopTimerEvt = null;
@@ -321,7 +316,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     }
 
     this._scrollLayers(dt, t.scrollSpeed);
-    this._updateGrabbers(dt, t.scrollSpeed);
     this._updateProgressBar();
     this._updateGroupHud();
 
@@ -362,12 +356,10 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._riding = true;
     this._updatePaceEta();
     this._buildTerrainFX();   // 1A — visual weather/terrain for this leg
-    this._spawnGrabbers();    // 1B — roadside pickups to grab while riding
   }
 
   _arriveAtStop() {
     this._clearTerrainFX();   // 1A — tear down this leg's ride FX
-    this._clearGrabbers();    // 1B — remove any un-grabbed pickups
     const leg = LEGS[this._legIndex];
     this._distance = leg.end;
     this._updateProgressBar();
@@ -992,90 +984,6 @@ export default class OregonTrailScene extends Phaser.Scene {
     if (this._terrainFXTimer) { this._terrainFXTimer.remove(); this._terrainFXTimer = null; }
     this._setBikerBobScale(1);
     this._roadStripes?.forEach(s => s.setAlpha(0.35));
-  }
-
-  // ── Roadside grab-ems (1B) ──────────────────────────────────────────────────────
-  // Pickups that scroll by with the road during a ride. Grab by clicking OR pressing
-  // SPACE while one overlaps a biker. Missed ones just scroll off — no penalty.
-  _spawnGrabbers() {
-    this._clearGrabbers();
-    this._grabbers = [];
-    const bikerY = BASE_HEIGHT * 0.62 + 6;
-    let i = 0;
-    const roll = () => {
-      const r = Math.random();
-      const kind = r < 0.45 ? 'donut' : r < 0.80 ? 'wrench' : 'clock';   // 45/35/20
-      const x = BASE_WIDTH + 30 + i * 90 + Math.random() * 40;
-      const y = bikerY + (Math.random() * 40 - 20);
-      this._grabbers.push(this._makeGrabber(kind, x, y));
-      i++;
-    };
-    roll();                              // always at least one
-    if (Math.random() < 0.40) roll();    // sometimes a second
-    if (Math.random() < 0.15) roll();    // rarely a third
-  }
-
-  _makeGrabber(kind, x, y) {
-    const c = this.add.container(x, y).setDepth(10);
-    let label, color;
-    if (kind === 'donut') {
-      c.add(this.add.circle(0, 0, 7, 0xdca444));
-      c.add(this.add.circle(0, 0, 3, 0x3a2a14));
-      label = '+CREW!'; color = '#8fd694';
-    } else if (kind === 'wrench') {
-      c.add(this.add.rectangle(0, 0, 14, 5, 0xaab2bd));
-      c.add(this.add.rectangle(-6, 0, 5, 8, 0xaab2bd));
-      label = '+BIKES!'; color = '#8ac6ff';
-    } else {
-      c.add(this.add.circle(0, 0, 7, 0xf5e642));
-      c.add(this.add.rectangle(0, -2, 1, 4, 0x333300));
-      label = '+2s'; color = '#f5e642';
-    }
-    // gentle bob so it reads as "grab me"
-    this.tweens.add({ targets: c, y: y - 3, yoyo: true, repeat: -1, duration: 500 });
-    c.setSize(28, 28);
-    c.setInteractive(new Phaser.Geom.Rectangle(-14, -14, 28, 28), Phaser.Geom.Rectangle.Contains);
-    const g = { c, kind, label, color };
-    c.on('pointerdown', () => this._grabPickup(g));
-    return g;
-  }
-
-  _updateGrabbers(dt, speed) {
-    if (!this._grabbers || !this._grabbers.length) return;
-    for (let i = this._grabbers.length - 1; i >= 0; i--) {
-      const g = this._grabbers[i];
-      g.c.x -= speed * dt;
-      if (g.c.x < -30) { g.c.destroy(); this._grabbers.splice(i, 1); }
-    }
-  }
-
-  // SPACE while a pickup overlaps any biker → grab the first match.
-  _grabNearBiker() {
-    const bikers = Object.values(this._bikerMap ?? {});
-    for (const g of [...(this._grabbers ?? [])]) {
-      for (const b of bikers) {
-        const bx = b.body?.x ?? -999, by = b.body?.y ?? -999;
-        if (Math.abs(g.c.x - bx) < 26 && Math.abs(g.c.y - by) < 26) { this._grabPickup(g); return; }
-      }
-    }
-  }
-
-  _grabPickup(g) {
-    if (!g || !this._grabbers?.includes(g)) return;
-    const clamp = v => Math.max(0, Math.min(100, v));
-    if (g.kind === 'donut')  { this._crew  = clamp(this._crew  + 6); }
-    if (g.kind === 'wrench') { this._bikes = clamp(this._bikes + 6); }
-    if (g.kind === 'clock')  { this._resources.applyChanges({ time: 2 }); this._updatePaceEta(); }
-    this._updateGroupHud();
-    this._showFloat(g.label, g.c.x, g.c.y - 10, g.color);
-    const idx = this._grabbers.indexOf(g);
-    if (idx >= 0) this._grabbers.splice(idx, 1);
-    g.c.destroy();
-  }
-
-  _clearGrabbers() {
-    (this._grabbers ?? []).forEach(g => g.c?.destroy());
-    this._grabbers = [];
   }
 
   // ── Scrolling ─────────────────────────────────────────────────────────────────
