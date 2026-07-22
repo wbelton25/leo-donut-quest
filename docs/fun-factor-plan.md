@@ -42,7 +42,13 @@ in this repo's history (`git log` shows the format).
 5. **Font is Press Start 2P, 8px grid, ASCII only.** No emoji in game text. Keep strings
    short — long words run off cards.
 6. **The fart is the joy engine.** When in doubt, more fart payoff, not more systems.
-7. **Don't re-add complexity to Act 2.** It was just simplified from per-member bars down
+7. **Static places, random moments.** Act 1 positions (pickups, secrets, herd homes,
+   trails, patrol routes) are FIXED and learnable — mastery-through-knowledge is Act 1's
+   replay value. Per-run variance comes from *moments*, not places: deer wander inside
+   their boxes, traffic phase is randomized, Act 2 rolls terrain/events/luck, and remix
+   modes re-season the rules. Do not "add replayability" by shuffling Act 1 placements —
+   that destroys route knowledge and makes secrets meaningless. See 2D edit (vi).
+8. **Don't re-add complexity to Act 2.** It was just simplified from per-member bars down
    to 3 group bars (see `docs/act2-simplification-plan.md`). Everything below adds *juice*
    and *moment-to-moment play*, not new resources or numbers.
 
@@ -246,6 +252,20 @@ southern approach (c311/r152) — it's already the densest corridor.
 Windward c46, r128→r100 every 4 rows (8) · Tega Cay W r47, c60→c120 every 8 cols (8) ·
 Tara Tea r64, c60→c124 every 8 (8) · Tega Cay E r56, c214→c270 every 8 (7) ·
 c311, r84→r120 every 6 (6) · park interior loop, 6 holes (needs edit i).
+
+**Edit (vi) — randomize the moments, not the places** (see design principle #7).
+In `_spawnObstaclesFromMap()` (~line 912), obstacles currently spawn at deterministic
+evenly-spaced points, so every run opens frame-identical. Add per-spawn jitter: offset
+each spawn position by a random ±30% of its share of the patrol range (clamped inside
+`minB..maxB`), and start each patroller moving in a random direction. Do NOT randomize
+which roads obstacles live on, and do NOT randomize any pickup/secret/trail position —
+those stay fixed forever so route knowledge compounds across runs.
+
+**Edit (vii, optional) — the roaming herd** (a variance valve that respects principle
+#7): one extra 4-deer herd per run spawns in ONE of three fixed candidate homes, chosen
+at random each run: the park (needs edit i), the golf rough, or the Mariana Ln dead-end
+(c60–84, r83–91 area). Kids learn the three spots and check them like fishing holes —
+"where's the herd today?" is a learnable ritual, not noise. Skip if effort-constrained.
 
 **Accept when:** riding north from Leo's house, within ~20 seconds the player passes a
 bean, meets the starter pod, and can dodge the Windward car; Leo can physically ride
