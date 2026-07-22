@@ -578,30 +578,63 @@ export default class OregonTrailScene extends Phaser.Scene {
   _bestSnackId()  { return SNACK_ORDER.find(id => this._snackInv[id] > 0) ?? null; }
   _bestRepairId() { return PART_ORDER.find(id => this._bikeInv[id]  > 0) ?? null; }
 
-  // Use one snack from the stash (best first) → refill CREW.
-  _useSnack() {
-    const order = [['hotdog', SNACK_STAMINA.hotdog], ['granola', SNACK_STAMINA.granola], ['gatorade', SNACK_STAMINA.gatorade]];
-    for (const [k, boost] of order) {
-      if (this._snackInv[k] > 0) {
-        this._snackInv[k]--;
-        this._crew = Math.min(100, this._crew + boost);
-        return true;
-      }
-    }
-    return false;
+  // Use a SPECIFIC snack the player picked → refill CREW by that item's amount.
+  _useSnackType(id) {
+    if (!this._snackInv[id] || this._snackInv[id] <= 0) return false;
+    this._snackInv[id]--;
+    this._crew = Math.min(100, this._crew + (SNACK_STAMINA[id] ?? 0));
+    return true;
   }
 
-  // Use one repair kit → refill BIKES.
-  _useRepair() {
-    const order = [['chain', BIKE_PART_RESTORE.chain], ['tire', BIKE_PART_RESTORE.tire], ['patch', BIKE_PART_RESTORE.patch]];
-    for (const [k, restore] of order) {
-      if (this._bikeInv[k] > 0) {
-        this._bikeInv[k]--;
-        this._bikes = Math.min(100, this._bikes + restore);
-        return true;
-      }
-    }
-    return false;
+  // Use a SPECIFIC bike part the player picked → refill BIKES by that part's amount.
+  _useRepairType(id) {
+    if (!this._bikeInv[id] || this._bikeInv[id] <= 0) return false;
+    this._bikeInv[id]--;
+    this._bikes = Math.min(100, this._bikes + (BIKE_PART_RESTORE[id] ?? 0));
+    return true;
+  }
+
+  // A little overlay that lists the specific items you own so you can CHOOSE which one
+  // to spend (they restore different amounts). Tapping one uses it and rebuilds the camp.
+  _openSupplyPicker(kind) {
+    const isSnack = kind === 'snack';
+    const order   = isSnack ? SNACK_ORDER : PART_ORDER;
+    const inv     = isSnack ? this._snackInv : this._bikeInv;
+    const meta    = isSnack ? SNACK_META : PART_META;
+    const DESC    = { lg: isSnack ? 'fills crew' : 'full fix', md: isSnack ? 'big boost' : 'big fix', sm: isSnack ? 'small boost' : 'small fix' };
+    const owned   = order.filter(id => inv[id] > 0);
+    if (owned.length === 0) return;
+
+    const con = this.add.container(0, 0).setDepth(34);
+    const rowH = 18, gap = 4, w = 250;
+    const h = 30 + owned.length * (rowH + gap) + 22;
+    const px = BASE_WIDTH / 2, py = BASE_HEIGHT / 2;
+    con.add(this.add.rectangle(px, py, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.6).setInteractive());
+    con.add(this.add.rectangle(px, py, w, h, 0x06080f, 0.99).setStrokeStyle(2, isSnack ? 0x66cc66 : 0xef5350));
+    con.add(txt(this, px, py - h / 2 + 12, isSnack ? 'CHOOSE A SNACK' : 'CHOOSE A BIKE PART',
+      { fontSize: '8px', color: isSnack ? '#8fd694' : '#ff9999' }).setOrigin(0.5));
+
+    let ry = py - h / 2 + 28;
+    owned.forEach(id => {
+      const [name, sz] = meta[id];
+      const label = `${name} - ${DESC[sz]}   x${inv[id]}`;
+      const btn = con.add(this.add.rectangle(px, ry + rowH / 2, w - 20, rowH, 0x14261a)
+        .setStrokeStyle(1, 0x2f6a3a).setInteractive({ useHandCursor: true }));
+      con.add(txt(this, px, ry + rowH / 2, label, { fontSize: '8px', color: '#cde3d0' }).setOrigin(0.5));
+      btn.on('pointerover', () => btn.setFillStyle(0x224a2e));
+      btn.on('pointerout',  () => btn.setFillStyle(0x14261a));
+      btn.on('pointerdown', () => {
+        if (isSnack) this._useSnackType(id); else this._useRepairType(id);
+        con.destroy(true);
+        this._rebuildRestStop();
+      });
+      ry += rowH + gap;
+    });
+
+    const cancel = con.add(this.add.rectangle(px, ry + 9, 90, 16, 0x2a1a1a)
+      .setStrokeStyle(1, 0x5a2a2a).setInteractive({ useHandCursor: true }));
+    con.add(txt(this, px, ry + 9, 'CANCEL', { fontSize: '8px', color: '#ff9999' }).setOrigin(0.5));
+    cancel.on('pointerdown', () => con.destroy(true));
   }
 
   // Right-hand strip = SCHEDULE status (are you ahead or behind the clock), so the
@@ -781,7 +814,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     const hasOutcome = !!this._lastEventOutcome;
     const terr  = this._terrain;
     const cardW = 300, cardX = (BASE_WIDTH - cardW) / 2;
-    const cardH = 224 + (hasOutcome ? 12 : 0);   // +14 for the supplies column headers
+    const cardH = 210 + (hasOutcome ? 12 : 0);
     const cardY = (BASE_HEIGHT - cardH) / 2;
 
     this._restStopCon = this.add.container(0, 0).setDepth(31);
@@ -834,16 +867,10 @@ export default class OregonTrailScene extends Phaser.Scene {
       bx += pw + gap;
     });
     y += 21;
-    line(y, PACES[this._pace].blurb, '#8899aa'); y += 15;
+    line(y, PACES[this._pace].blurb, '#8899aa'); y += 16;
 
-    // Supplies column headers, then the two use-buttons on the next row.
-    add(txt(this, BASE_WIDTH / 2 - 70, y, 'EAT (+CREW)',  { fontSize: '8px', color: '#8fd694' }).setOrigin(0.5));
-    add(txt(this, BASE_WIDTH / 2 + 70, y, 'FIX (+BIKES)', { fontSize: '8px', color: '#8ac6ff' }).setOrigin(0.5));
-    y += 13;
-
-    // Stash buttons NAME the exact item they'll use (best-first) + its size (lg/md/sm),
-    // so the tiers you bought at Walmart are visible and you watch the stock drop as you
-    // eat/repair.
+    // Two buttons that open an item PICKER, so you choose exactly which snack / part to
+    // spend (they restore different amounts) — not an auto-pick. Count = total in the pack.
     const stashBtn = (cx2, label, enabled, handler) => {
       const btn = add(this.add.rectangle(cx2, y, 132, 16, enabled ? 0x1a3a2a : 0x1a1a22)
         .setStrokeStyle(1, enabled ? 0x4a8a5a : 0x2a2a33));
@@ -855,13 +882,11 @@ export default class OregonTrailScene extends Phaser.Scene {
         btn.on('pointerdown', handler);
       }
     };
-    const bs = this._bestSnackId(), bp = this._bestRepairId();
-    const snackLabel = bs ? `${SNACK_META[bs][0]} (${SNACK_META[bs][1]}) x${this._snackInv[bs]}` : `NO SNACKS`;
-    const partLabel  = bp ? `${PART_META[bp][0]} (${PART_META[bp][1]}) x${this._bikeInv[bp]}`   : `NO PARTS`;
-    stashBtn(BASE_WIDTH / 2 - 70, snackLabel, !!bs && this._crew < 100,
-      () => { this._useSnack(); this._rebuildRestStop(); });
-    stashBtn(BASE_WIDTH / 2 + 70, partLabel, !!bp && this._bikes < 100,
-      () => { this._useRepair(); this._rebuildRestStop(); });
+    const snacks = this._snackTotal(), kits = this._repairTotal();
+    stashBtn(BASE_WIDTH / 2 - 70, `EAT A SNACK (x${snacks})`, snacks > 0 && this._crew < 100,
+      () => this._openSupplyPicker('snack'));
+    stashBtn(BASE_WIDTH / 2 + 70, `FIX A BIKE (x${kits})`, kits > 0 && this._bikes < 100,
+      () => this._openSupplyPicker('part'));
     y += 23;
 
     // Continue.
