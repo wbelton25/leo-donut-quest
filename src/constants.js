@@ -127,6 +127,7 @@ export const DEFAULT_GAME_STATE = {
     money: 10,         // dollars (Leo's $10; each recruited friend adds $10, max $50)
   },
   donuts: 0,           // donuts collected at the shop
+  bikeLives: 3,        // Act 1 bike lives — break the bike, lose one + respawn; 0 = restart
   deerToppled: 0,      // running count of deer/bike-kids farted over (for the report card)
   bestCombo: 0,        // most knocked over by a single fart
   donutHolesCollected: 0,  // donut-hole coins picked up in Act 1 (2A)

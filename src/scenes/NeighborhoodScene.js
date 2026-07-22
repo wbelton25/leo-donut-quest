@@ -199,14 +199,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
           minSpeed: 20, maxSpeed: 55, minSize: 1, maxSize: 3,
           duration: 420, depth: 5, gravity: 6,
         });
-        FX.popText(scene, o._x, o._y - 12, `+${TIME_PER_DEER}s`, {
+        FX.popText(scene, o._x, o._y - 12, `+${TIME_PER_DEER} MIN`, {
           color: '#7fe07f', fontSize: '8px', rise: 18, duration: 700,
         });
       });
 
       // Combo callout shows the total time banked
       if (knocked >= 2) {
-        FX.popText(scene, player.x, player.y - 40, `${knocked}x COMBO!  +${knocked * TIME_PER_DEER}s`, {
+        FX.popText(scene, player.x, player.y - 40, `${knocked}x COMBO!  +${knocked * TIME_PER_DEER} MIN`, {
           color: '#ffd54f', fontSize: '12px', rise: 30, duration: 900,
         });
         FX.shake(scene, 240, 0.011);
@@ -682,7 +682,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // Bike condition hits 0
     if (this._resources.isBikeBroken() && !this._bikeBrokenTriggered) {
       this._bikeBrokenTriggered = true;
-      this._showBikeBrokenOverlay();
+      this._onBikeBroken();
     }
 
     // 3:00 PM hard stop (time ≤ 120)
@@ -765,7 +765,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   _onObstacleHit(damage = 10) {
     this._resources.applyChanges({ bikeCondition: -damage });
+    // Getting hit also costs TIME (bug 7): dodging a car gives +1 MIN, hitting it costs
+    // you — the symmetric downside. Scales gently with how hard the hit was.
+    const timeLoss = Math.max(2, Math.round(damage / 8));
+    this._resources.applyChanges({ time: -timeLoss });
     this._lastDamageAt = Date.now();   // suppresses a bogus "near-miss" right after a hit (2C)
+    FX.popText(this, this._player.x, this._player.y - 18, `-${timeLoss} MIN`, {
+      color: '#ff7766', fontSize: '8px', rise: 18, duration: 700,
+    });
     this.cameras.main.flash(200, 255, Math.min(damage * 5, 255), 0);
   }
 
@@ -789,7 +796,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
         o._nearMissAt = now;
         this._lastNearMiss = now;
         this._resources.applyChanges({ time: 1 });
-        FX.popText(this, px, py - 20, 'CLOSE ONE! +1s', { color: '#ffd54f', fontSize: '8px', rise: 20, duration: 800 });
+        FX.popText(this, px, py - 20, 'CLOSE ONE! +1 MIN', { color: '#ffd54f', fontSize: '8px', rise: 20, duration: 800 });
         FX.shake(this, 120, 0.004);
         const gs = this.game.registry.get('gameState') ?? {};
         gs.nearMisses = (gs.nearMisses ?? 0) + 1;
@@ -1185,14 +1192,38 @@ export default class NeighborhoodScene extends Phaser.Scene {
     btn2.on('pointerdown', dismiss);
   }
 
-  _showBikeBrokenOverlay() {
+  // Bike broke (condition hit 0). Spend a BIKE LIFE and respawn right where you are with
+  // a repaired bike; out of lives → full restart. (Bugs 1 & 2: was a dead-end restart, and
+  // the flag never reset so a second break did nothing.)
+  _onBikeBroken() {
+    const gs = this.game.registry.get('gameState') ?? {};
+    gs.bikeLives = (gs.bikeLives ?? 3) - 1;
+    this.game.registry.set('gameState', gs);
+
     const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
-    this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50);
-    txt(this, cx, cy - 20, 'BIKE TOO DAMAGED!', { fontSize: '12px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(51);
-    txt(this, cx, cy - 2,  "CAN'T CONTINUE",    { fontSize: '8px',  color: '#aaaaaa' }).setScrollFactor(0).setOrigin(0.5).setDepth(51);
-    const btn = this.add.rectangle(cx, cy + 18, 100, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
-    txt(this, cx, cy + 18, 'RESTART', { fontSize: '8px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(52);
-    btn.on('pointerdown', () => { SaveSystem.deleteSave(); this.scene.start(SCENE_TITLE); });
+    const objs = [];
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50));
+
+    if (gs.bikeLives > 0) {
+      objs.push(txt(this, cx, cy - 24, 'BIKE BROKE!', { fontSize: '12px', color: '#ff8844' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+      objs.push(txt(this, cx, cy - 6, `${gs.bikeLives} SPARE BIKE${gs.bikeLives === 1 ? '' : 'S'} LEFT`, { fontSize: '8px', color: '#ffcc66' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+      const btn = this.add.rectangle(cx, cy + 20, 170, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+      objs.push(btn);
+      objs.push(txt(this, cx, cy + 20, 'HOP ON A SPARE & KEEP GOING', { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+      btn.on('pointerdown', () => {
+        objs.forEach(o => o.destroy());
+        this._resources.applyChanges({ bikeCondition: 100 - this._resources.bikeCondition });  // fresh bike
+        this._bikeBrokenTriggered = false;   // can break again later
+        this._autosave();
+      });
+    } else {
+      objs.push(txt(this, cx, cy - 20, 'OUT OF BIKES!', { fontSize: '12px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+      objs.push(txt(this, cx, cy - 2, 'THE QUEST IS OVER', { fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+      const btn = this.add.rectangle(cx, cy + 20, 100, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+      objs.push(btn);
+      objs.push(txt(this, cx, cy + 20, 'RESTART', { fontSize: '8px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
+      btn.on('pointerdown', () => { SaveSystem.deleteSave(); this.scene.start(SCENE_TITLE); });
+    }
   }
 
   _showDeadlineOverlay() {
