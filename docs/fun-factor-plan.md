@@ -1,8 +1,16 @@
 # Fun-Factor Plan — Leo's Donut Quest
 
-**Status: NOT STARTED.** This is a handoff-ready plan. Any model (or human) should be able
-to execute it top-to-bottom with no other context. Work phase by phase, commit after each
-lettered item, and verify with the recipes in §7 before committing.
+**Status: IN PROGRESS.** Any model (or human) should be able to execute this top-to-bottom
+with no other context. Work phase by phase, commit after each lettered item, and verify
+with the recipes in §7 before committing.
+
+**Done so far:** 1A (terrain FX, kept) · ~~1B grab-ems~~ (built then CUT after playtest) ·
+R1/R2 (badges + fart-sound unlocks — R2 to be redesigned toward fart *abilities*) · R4
+(badge shelf) · 2D (drivable pockets, deer herds, traffic, combo beans, spawn jitter) ·
+2A (donut-hole trails) · 2B (herds, via 2D) · 2C (close-call bonus) · R3 (golden donuts).
+**Awaiting playtest at GATE 1 (Act 2 ride feel) + GATE 2 (replay loop) + GATE 3 (Act 1
+placement).** **Not started:** Phase 3 (event juice + slang), Phase 4 (presentation/meta),
+Phase 5 (Walmart/tip/balance), R5 (remix modes), R6 (route fork), R2-redesign (fart abilities).
 
 ---
 
