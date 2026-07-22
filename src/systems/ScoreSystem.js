@@ -13,32 +13,38 @@ const MAX_ENTRIES = 5;
 
 export default class ScoreSystem {
   // Total score from a full run result.
-  static calculate({ donuts = 0, party = [], time = 0, deer = 0, combo = 0 }) {
+  static calculate({ donuts = 0, party = [], time = 0, deer = 0, combo = 0, holes = 0, golden = 0 }) {
     if (donuts < 1) return 0;
     return (donuts * 20)
          + (party.length * 80)
          + Math.max(0, Math.round(time * 2))
          + (deer * 5)
-         + (combo * 15);
+         + (combo * 15)
+         + (holes * 3)
+         + (golden * 50);
   }
 
   // Labeled point breakdown for the report card.
-  static breakdown({ donuts = 0, party = [], time = 0, deer = 0, combo = 0 }) {
-    return [
+  static breakdown({ donuts = 0, party = [], time = 0, deer = 0, combo = 0, holes = 0, golden = 0 }) {
+    const rows = [
       { label: 'DONUTS DELIVERED', detail: `${donuts} x 20`,             pts: donuts * 20 },
       { label: 'CREW WHO MADE IT', detail: `${party.length} x 80`,       pts: party.length * 80 },
       { label: 'TIME TO SPARE',    detail: `${Math.round(time)}%`,       pts: Math.max(0, Math.round(time * 2)) },
       { label: 'DEER TOPPLED',     detail: `${deer} x 5`,                pts: deer * 5 },
       { label: 'BEST FART COMBO',  detail: `${combo}x`,                  pts: combo * 15 },
+      { label: 'DONUT HOLES',      detail: `${holes} x 3`,               pts: holes * 3 },
     ];
+    if (golden > 0) rows.push({ label: 'GOLDEN DONUTS', detail: `${golden} x 50`, pts: golden * 50 });
+    return rows;
   }
 
-  // Letter grade bucketed off the total score.
+  // Letter grade bucketed off the total score. Thresholds bumped +60 vs the pre-2A
+  // baseline so the new donut-hole/golden points don't inflate grades.
   static grade(total) {
-    if (total >= 680) return 'S';
-    if (total >= 520) return 'A';
-    if (total >= 380) return 'B';
-    if (total >= 220) return 'C';
+    if (total >= 740) return 'S';
+    if (total >= 580) return 'A';
+    if (total >= 430) return 'B';
+    if (total >= 250) return 'C';
     return 'D';
   }
 

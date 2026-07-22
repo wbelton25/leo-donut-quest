@@ -15,6 +15,7 @@ import BikeObstacle     from '../entities/BikeObstacle.js';
 import GolfBallSpawner  from '../entities/GolfBallSpawner.js';
 import BeanPickup       from '../entities/BeanPickup.js';
 import BikeRepairPickup from '../entities/BikeRepairPickup.js';
+import DonutHolePickup  from '../entities/DonutHolePickup.js';
 // GraceBoss is now handled in GraceBossScene; import removed
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
@@ -534,6 +535,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Bike-repair pickups (restore bike condition → speed) ─────────────────────
     this._spawnBikeRepairs();
 
+    // ── Donut-hole trails ($1 each; breadcrumb the routes to each friend) ─────────
+    this._spawnDonutHoles();
+
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
       fontSize: '8px', color: '#f5e642',
@@ -641,6 +645,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._checkBeanPickups();
     this._updatePowerFart();
     this._checkBikeRepairs();
+    this._checkDonutHoles();
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
@@ -917,6 +922,56 @@ export default class NeighborhoodScene extends Phaser.Scene {
       count: 12, colors: [0x8ad4ff, 0xe8eef2, 0xffffff],
       minSpeed: 30, maxSpeed: 90, minSize: 1, maxSize: 3, duration: 450, depth: 7,
     });
+  }
+
+  // ── Donut-hole trails (2A) ─────────────────────────────────────────────────────
+  // Coins on the roads: each pays $1, and the trails double as breadcrumbs pointing
+  // toward each friend's house. Collected indices persist in gameState so they don't
+  // respawn after a boss fight. Positions are FIXED (route knowledge is Act 1's replay
+  // value — see design principle #7).
+  _spawnDonutHoles() {
+    // A straight run of holes from (c0,r0) to (c1,r1); one axis must be constant.
+    const line = (c0, r0, c1, r1, step) => {
+      const pts = [];
+      if (c0 !== c1) { const d = Math.sign(c1 - c0); for (let c = c0; d > 0 ? c <= c1 : c >= c1; c += d * step) pts.push([c, r0]); }
+      else           { const d = Math.sign(r1 - r0); for (let r = r0; d > 0 ? r <= r1 : r >= r1; r += d * step) pts.push([c0, r]); }
+      return pts;
+    };
+    const SPOTS = [
+      ...line(46, 128, 46, 100, 4),   // Windward — the opening climb north
+      ...line(60,  47, 120, 47, 8),   // Tega Cay Dr W — toward MJ
+      ...line(60,  64, 124, 64, 8),   // Tara Tea Dr — toward Warren
+      ...line(214, 56, 270, 56, 8),   // Tega Cay Dr E — toward Carson
+      ...line(311, 84, 311, 120, 6),  // east loop — toward Justin
+      [24, 68], [30, 68], [36, 68], [36, 78], [30, 84], [24, 84],  // park interior loop
+    ];
+
+    const collected = this._collectedSet('collectedDonutHoles');
+    this._donutHoles = [];
+    SPOTS.forEach(([c, r], i) => {
+      if (collected.has(i)) return;
+      const hole = new DonutHolePickup(this, c * T + 8, r * T + 8);
+      hole._spotIndex = i;
+      this._donutHoles.push(hole);
+    });
+  }
+
+  _checkDonutHoles() {
+    if (!this._donutHoles || this._donutHoles.length === 0) return;
+    const px = this._player.x, py = this._player.y;
+    for (const hole of this._donutHoles) {
+      if (hole.collected) continue;
+      const dx = hole.x - px, dy = hole.y - py;
+      if (dx * dx + dy * dy < 16 * 16) {
+        hole.collect();
+        this._markCollected('collectedDonutHoles', hole._spotIndex);
+        this._resources.applyChanges({ money: 1 });
+        FX.popText(this, hole.x, hole.y - 12, '+$1', { color: '#f5d24a', fontSize: '8px', rise: 16, duration: 600 });
+        const gs = this.game.registry.get('gameState') ?? {};
+        gs.donutHolesCollected = (gs.donutHolesCollected ?? 0) + 1;
+        this.game.registry.set('gameState', gs);
+      }
+    }
   }
 
   // ── Obstacle factory ───────────────────────────────────────────────────────────

@@ -27,8 +27,10 @@ export default class ReportCardScene extends Phaser.Scene {
     this._donuts = data?.donuts ?? 0;
     this._time   = data?.resources?.time ?? 0;
     const gs = this.game.registry.get('gameState') ?? {};
-    this._deer  = gs.deerToppled ?? 0;
-    this._combo = gs.bestCombo   ?? 0;
+    this._deer   = gs.deerToppled ?? 0;
+    this._combo  = gs.bestCombo   ?? 0;
+    this._holes  = gs.donutHolesCollected ?? 0;
+    this._golden = gs.goldenDonuts ?? 0;
   }
 
   create() {
@@ -36,7 +38,7 @@ export default class ReportCardScene extends Phaser.Scene {
     const cx = BASE_WIDTH / 2;
     this.add.rectangle(cx, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x0a0a16);
 
-    const stats = { donuts: this._donuts, party: this._party, time: this._time, deer: this._deer, combo: this._combo };
+    const stats = { donuts: this._donuts, party: this._party, time: this._time, deer: this._deer, combo: this._combo, holes: this._holes, golden: this._golden };
     this._stats = stats;
     this._score = ScoreSystem.calculate(stats);
     this._grade = ScoreSystem.grade(this._score);
