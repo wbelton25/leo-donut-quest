@@ -20,6 +20,7 @@ import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
 import SaveSystem from '../systems/SaveSystem.js';
+import BadgeSystem from '../systems/BadgeSystem.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAP v2 — designed in the Level Editor
@@ -208,6 +209,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
         gs.deerToppled = (gs.deerToppled ?? 0) + knocked;
         gs.bestCombo   = Math.max(gs.bestCombo ?? 0, knocked);
         scene.game.registry.set('gameState', gs);
+
+        // ── Replay badges (Phase R) ──────────────────────────────────────────
+        if (knocked >= 3) BadgeSystem.awardAndToast(scene, 'fart_storm');
+        if (knocked >= 5) BadgeSystem.awardAndToast(scene, 'tootnado');
+        if (gs.deerToppled >= 15) BadgeSystem.awardAndToast(scene, 'deer_whisperer');
       }
     });
 

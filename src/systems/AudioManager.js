@@ -6,6 +6,8 @@
 // chain into a separate looping clip — avoiding all Web Audio loopStart/loopEnd
 // complexity that Phaser doesn't expose reliably.
 
+import BadgeSystem from './BadgeSystem.js';
+
 const MUSIC_VOL = 0.6;
 const FADE_MS   = 700;
 
@@ -88,9 +90,10 @@ export default class AudioManager {
     snd.setVolume(enabled ? MUSIC_VOL : 0);
   }
 
-  // Play a random fart sound. Auto-discovers every sfx-fart-N clip that actually
-  // loaded (cached on first use), so adding more files "just works" — no count to
-  // keep in sync here.
+  // Play a random fart sound — but only from the sounds the player has UNLOCKED
+  // via badges (Phase R). Auto-discovers every sfx-fart-N clip that actually loaded
+  // (cached on first use). Falls back to all loaded farts if the unlock list is
+  // empty or unavailable, so a bug can never silence farts.
   static playFart(scene) {
     if (!scene.game.registry.get('audio-sfx')) return;
     if (!AudioManager._fartKeys) {
@@ -100,9 +103,17 @@ export default class AudioManager {
         if (scene.cache.audio.exists(key)) AudioManager._fartKeys.push(key);
       }
     }
-    const keys = AudioManager._fartKeys;
-    if (keys.length === 0) return;
-    scene.sound.play(keys[Math.floor(Math.random() * keys.length)], { volume: 0.85 });
+    const all = AudioManager._fartKeys;
+    if (all.length === 0) return;
+
+    let pool = all;
+    try {
+      const unlocked = BadgeSystem.unlockedFarts();       // fart indices, e.g. [1,2,3,...]
+      const filtered = all.filter(k => unlocked.includes(Number(k.split('-').pop())));
+      if (filtered.length > 0) pool = filtered;
+    } catch (e) { /* fall back to all farts */ }
+
+    scene.sound.play(pool[Math.floor(Math.random() * pool.length)], { volume: 0.85 });
   }
 
   // Play a random deer grunt (sfx-deer-grunt-1 through sfx-deer-grunt-4).

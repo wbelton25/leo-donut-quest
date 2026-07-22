@@ -406,6 +406,12 @@ export default class OregonTrailScene extends Phaser.Scene {
     const bikeHit = Math.round(BIKE_DRAIN * pace.drain * terr.bike * (0.7 + Math.random() * 0.6));
     this._crew  = Math.max(0, this._crew  - crewHit);
     this._bikes = Math.max(0, this._bikes - bikeHit);
+    // Bank a run flag for the SURVIVOR badge (win after the crew was worn out).
+    if (this._crew < 34) {
+      const gs = this.game.registry.get('gameState') ?? {};
+      gs.crewWasWornOut = true;
+      this.game.registry.set('gameState', gs);
+    }
     return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr };
   }
 
@@ -887,6 +893,12 @@ export default class OregonTrailScene extends Phaser.Scene {
   _triggerArrival() {
     this._arrivalTriggered = true;
     this._riding = false;
+    // Bank a run flag for the EARLY BIRD badge (arrived ahead of schedule).
+    if (this._scheduleWord()[0] === 'ahead!') {
+      const gs = this.game.registry.get('gameState') ?? {};
+      gs.arrivedAhead = true;
+      this.game.registry.set('gameState', gs);
+    }
     this.time.delayedCall(600, () => {
       this.scene.get(SCENE_DIALOGUE).showScript('arrival', () => {
         this.cameras.main.fade(500, 0, 0, 0);

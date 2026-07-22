@@ -3,6 +3,7 @@ import {
 } from '../constants.js';
 import ScoreSystem from '../systems/ScoreSystem.js';
 import AudioManager from '../systems/AudioManager.js';
+import BadgeSystem from '../systems/BadgeSystem.js';
 
 // ReportCardScene: the end-of-run payoff. Grades the whole run (donuts, crew kept,
 // time to spare, deer toppled, best fart combo) into a big S/A/B/C/D and shows the
@@ -76,6 +77,14 @@ export default class ReportCardScene extends Phaser.Scene {
     // ── Continue ────────────────────────────────────────────────────────────
     const prompt = txt(this, cx, 252, 'PRESS SPACE', { fontSize: '8px', color: '#f5e642' }).setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.15, yoyo: true, repeat: -1, duration: 600, delay: 700 });
+
+    // ── Replay badges (Phase R) — award after the grade pop so toasts don't clash ──
+    this.time.delayedCall(900, () => {
+      const gs = this.game.registry.get('gameState') ?? {};
+      BadgeSystem.awardAndToast(this, 'first_delivery');
+      if (this._grade === 'S')     BadgeSystem.awardAndToast(this, 's_rank');
+      if (gs.crewWasWornOut)       BadgeSystem.awardAndToast(this, 'survivor');
+    });
 
     // Small delay so a mashed key from the boss fight doesn't skip instantly.
     this.time.delayedCall(700, () => {

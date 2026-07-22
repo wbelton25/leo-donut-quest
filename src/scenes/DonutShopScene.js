@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import PartySystem from '../systems/PartySystem.js';
+import BadgeSystem from '../systems/BadgeSystem.js';
 
 // Donut pricing tiers
 const DONUT_TIERS = [
@@ -79,6 +80,15 @@ export default class DonutShopScene extends Phaser.Scene {
     this._refreshMoney();
     this._resources.applyChanges({});
     this._party._emit();
+
+    // ── Replay badges (Phase R) — reaching the Donut House is the arrival beat ──
+    this.time.delayedCall(600, () => {
+      const crew = this._party.getParty().length;
+      if (crew === 4) BadgeSystem.awardAndToast(this, 'full_crew');
+      if (crew === 0) BadgeSystem.awardAndToast(this, 'solo_rider');
+      const gs = this.game.registry.get('gameState') ?? {};
+      if (gs.arrivedAhead) BadgeSystem.awardAndToast(this, 'early_bird');
+    });
   }
 
   // ── Build helpers ─────────────────────────────────────────────────────────────
@@ -171,6 +181,7 @@ export default class DonutShopScene extends Phaser.Scene {
       const total = this._getTotalDonuts();
       if (total <= 0) return;
       this._donuts = total;
+      if (total >= 12) BadgeSystem.award('big_spender');  // persist; scene is about to fade out
       this._startReturn();
     });
   }
