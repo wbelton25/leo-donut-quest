@@ -25,13 +25,17 @@ const SNACK_STAMINA = { gatorade: 33, granola: 67, hotdog: 100 };
 // Bike part effect on bike condition (0–100 scale)
 const BIKE_PART_RESTORE = { patch: 33, tire: 67, chain: 100 };
 
-// Convert time resource (0–100) → clock string
-// time=100 → 3:00 PM,  time=0 → 5:00 PM (120 minutes window)
+// Convert the time resource → clock string. `time` is minutes remaining until the
+// 5:00 PM deadline (270 = 12:30 PM start, 120 = 3:00 PM, 0 = 5:00 PM). The clock is
+// therefore 5:00 PM minus `time` minutes. (The old formula assumed a 0–100 scale and
+// produced negative minutes like "2:-7 PM" once time went past 100.)
 function timeToDisplay(t) {
-  const minPast = Math.round((100 - t) * 1.2);
-  const hour    = 3 + Math.floor(minPast / 60);
-  const min     = minPast % 60;
-  return `${hour}:${min.toString().padStart(2, '0')} PM`;
+  const totalMin = 17 * 60 - Math.max(0, Math.round(t));   // minutes since midnight
+  const hour24   = Math.floor(totalMin / 60);
+  const min      = ((totalMin % 60) + 60) % 60;
+  const ampm     = hour24 >= 12 ? 'PM' : 'AM';
+  let   h12      = hour24 % 12; if (h12 === 0) h12 = 12;
+  return `${h12}:${min.toString().padStart(2, '0')} ${ampm}`;
 }
 
 const CHECKPOINTS = [
@@ -189,6 +193,11 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._party     = new PartySystem(this.game);
     if (this._initData.resources) this._resources.restoreFromSave(this._initData.resources);
     if (this._initData.party)     this._initData.party.forEach(id => this._party.addMember(id));
+
+    // The ride's time BUDGET = minutes-until-5PM when we set out. The TIME bar and the
+    // ahead/behind check are measured as a fraction of this, so leaving Act 1 earlier
+    // (a bigger budget) genuinely buys a more relaxed ride.
+    this._timeMax = Math.max(1, this._resources.time);
     this.game.registry.set('resources', this._resources);
     this.game.registry.set('party',     this._party);
     this._events = new EventSystem(this._resources, this._party);
@@ -589,13 +598,14 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._legText.setText(`LEG ${Math.min(this._legIndex + 1, LEGS.length)}/${LEGS.length}`);
     this._etaText.setText(`TIME ${timeToDisplay(this._resources.time)}`);
 
-    // margin > 0 → spent less time than your share of the trip so far (ahead).
+    // Ahead when you've covered more of the trip than you've spent of your time budget.
     const f      = this._distance / TOTAL_DISTANCE;
-    const margin = f * 100 - (100 - this._resources.time);
-    if      (f < 0.05)     this._paceText.setText('ON PACE').setColor('#f5a623');
-    else if (margin > 8)   this._paceText.setText('AHEAD').setColor('#44cc44');
-    else if (margin < -8)  this._paceText.setText('BEHIND').setColor('#ff3333');
-    else                   this._paceText.setText('ON PACE').setColor('#f5a623');
+    const used   = (this._timeMax - this._resources.time) / this._timeMax;
+    const margin = f - used;
+    if      (f < 0.05)      this._paceText.setText('ON PACE').setColor('#f5a623');
+    else if (margin > 0.08) this._paceText.setText('AHEAD').setColor('#44cc44');
+    else if (margin < -0.08) this._paceText.setText('BEHIND').setColor('#ff3333');
+    else                    this._paceText.setText('ON PACE').setColor('#f5a623');
   }
 
   // ── Shared drop helper ────────────────────────────────────────────────────────
@@ -787,9 +797,10 @@ export default class OregonTrailScene extends Phaser.Scene {
     if (hasOutcome)           { line(y, this._lastEventOutcome.text, this._lastEventOutcome.color); y += 12; }
     y += 5;
 
-    // Three bars.
+    // Three bars. TIME is shown as a fraction of the ride's starting budget (0-100%).
     const timeWord = this._scheduleWord();
-    bar(y, 'TIME',  this._resources.time, 0xf5e642, timeToDisplay(this._resources.time), timeWord[1]); y += 15;
+    const timePct  = Math.max(0, Math.min(100, this._resources.time / this._timeMax * 100));
+    bar(y, 'TIME',  timePct, 0xf5e642, timeToDisplay(this._resources.time), timeWord[1]); y += 15;
     const cw = this._crewWord();  bar(y, 'CREW',  this._crew,  0x66cc66, cw[0], cw[1]); y += 15;
     const bw = this._bikesWord(); bar(y, 'BIKES', this._bikes, 0xef5350, bw[0], bw[1]); y += 18;
 
@@ -842,11 +853,12 @@ export default class OregonTrailScene extends Phaser.Scene {
 
   // AHEAD / ON PACE / BEHIND word + color for the TIME bar.
   _scheduleWord() {
-    const f = this._distance / TOTAL_DISTANCE;
-    const margin = f * 100 - (100 - this._resources.time);
-    if (f < 0.05)     return ['on pace', '#f5a623'];
-    if (margin > 8)   return ['ahead!',  '#44cc44'];
-    if (margin < -8)  return ['behind!', '#ff3333'];
+    const f      = this._distance / TOTAL_DISTANCE;
+    const used   = (this._timeMax - this._resources.time) / this._timeMax;
+    const margin = f - used;
+    if (f < 0.05)        return ['on pace', '#f5a623'];
+    if (margin > 0.08)   return ['ahead!',  '#44cc44'];
+    if (margin < -0.08)  return ['behind!', '#ff3333'];
     return ['on pace', '#f5a623'];
   }
 

@@ -83,8 +83,10 @@ export default class MaxBossScene extends Phaser.Scene {
       this._abilities = new AbilitySystem(this.game, this._party);
     }
 
-    // Boss fights always start at full energy (5 hearts)
-    this._resources.applyChanges({ energy: 100 - this._resources.energy });
+    // Standalone (Act 1) boss fights start fresh at full energy. In the Act 3 gauntlet,
+    // energy PERSISTS across bosses (set full once when the gauntlet begins) so that
+    // spending a donut to recharge between fights actually matters.
+    if (!this._gauntlet) this._resources.applyChanges({ energy: 100 - this._resources.energy });
 
     // Hide the neighborhood HUD during the fight
     this.scene.sleep(SCENE_HUD);

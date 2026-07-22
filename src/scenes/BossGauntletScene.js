@@ -50,6 +50,13 @@ export default class BossGauntletScene extends Phaser.Scene {
     const defeatedBosses = this._data.defeatedBosses ?? [];
     const edieDefeated   = this._data.edieDefeated ?? false;
 
+    // Act 3 starts fresh at full energy, then PERSISTS across sibling fights so that
+    // spending donuts to recharge matters. Only reset on the very first fight.
+    if (defeatedBosses.length === 0 && !edieDefeated) {
+      const res = this.game.registry.get('resources');
+      if (res) res.applyChanges({ energy: 100 - res.energy });
+    }
+
     // ── If Edie is defeated → game complete ───────────────────────────────────
     if (edieDefeated) {
       this._winGame();
