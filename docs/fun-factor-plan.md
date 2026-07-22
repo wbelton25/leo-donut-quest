@@ -160,10 +160,10 @@ a boss fight, report card shows the new row, and money at Act 2 start reflects p
 #### 2B. Deer combo parks
 **File:** `public/maps/neighborhood_map.json` → `obstacles` array (loaded by
 `_spawnObstaclesFromMap`, NeighborhoodScene ~line 912; format documented ~line 904).
-Add 2–3 tight clusters of 4–6 deer (`count` on a small patrol rect) placed just off the
-main routes — e.g. in Runde Park, on the golf course fairways, near the lake docks. The
-existing fart knockdown already pays +2s per deer and a combo bonus at 2+ — the problem is
-herds dense enough to combo are rare. Keep clusters off roads so they're a *detour choice*.
+The existing fart knockdown already pays +2s per deer and a combo bonus at 2+ — the
+problem is herds dense enough to combo are rare. **Exact herd coordinates, bean pairings,
+and the prerequisite park/golf drivability change are specified in 2D — implement 2B and
+2D together as one placement pass.**
 
 **Accept when:** a power fart in a cluster reliably triggers a "3x COMBO!" popup.
 
@@ -180,6 +180,77 @@ risk-seeking gets rewarded, which is the fun of a bike game.
 
 **Accept when:** skimming past a moving car pops the bonus; sitting next to a stopped or
 distant car doesn't; collisions still damage as before.
+
+#### 2D. Map placement pass — open the pockets, rebalance spawns  ★ do FIRST within Phase 2
+This item is the result of a spatial audit of `public/maps/neighborhood_map.json` +
+the hardcoded spawn arrays. It supersedes the vaguer placement notes in 2A/2B/R3 —
+use THESE coordinates. Background you must know: **Leo can only ride on road rects.**
+`_isRoadChunk()` (NeighborhoodScene ~line 1149) walls everything else, including Runde
+Park and the golf course. Deer patrol boxes and pickups placed off-road are unreachable
+(though deer within ~5 tiles of a road CAN be hit by fart splash from the road).
+
+**Audit findings (why these edits):**
+1. *The opening minute is dead.* Leo starts at (30,142); the ride north up Windward to
+   ~r100 contains one bean, one bike kid, zero deer. The joy engine never fires early.
+2. *Deer are ambient singles, not herds.* Every main-route deer entry is `count` 1–4
+   spread across a huge patrol span. The only combo-able group — obstacle #39, **10 deer
+   on the c238 spur** — is on a road most players never ride, and it accidentally sits
+   next to the bean at (240,120). Promote that accident to a designed "combo shrine."
+3. *The golf course is risk with zero reward.* Golf-ball spawners rake Tega Cay Dr E,
+   but there is no reason to ever enter the course. Pure punishment.
+4. *Traffic is lopsided.* Tega Cay Dr W (c45–213, the longest ride, toward MJ) has ONE
+   car; Justin's southern approach is already the busiest corridor on the map. Near-miss
+   bonuses (2C) need moving cars where players actually ride.
+5. *Bean→herd pairings don't exist* (beans are dead-end detour rewards — fine — but no
+   bean sets up a combo run into a herd, which is the fantasy the power fart deserves).
+
+**Edit (i) — open the park + golf course as drivable pockets** (code, not JSON):
+In `_isRoadChunk()`, also return true when the chunk overlaps:
+- Park rect widened to meet Windward: cols 19–45, rows 65–91 (fences are drawn on the
+  top/left edges only, so entering from the east reads naturally).
+- Golf rect extended to meet Tega Cay Dr: cols 220–290, rows 0–46.
+Also add the golf rect to `_generateTrees()`'s `onClearArea` exclusions (keep fairways
+open) and draw a small green golf rect on the minimap (park is already drawn, ~line 1236).
+This one change turns both dead zones into playgrounds: park = safe combo pocket,
+golf course = guarded treasure zone. **R3's golden donut #1 depends on it.**
+
+**Edit (ii) — deer herds** (append to `obstacles` in `neighborhood_map.json`):
+```json
+{ "type": "deer", "col": 45,  "row": 104, "w": 11, "h": 4,  "count": 3 },
+{ "type": "deer", "col": 24,  "row": 70,  "w": 16, "h": 16, "count": 5 },
+{ "type": "deer", "col": 255, "row": 20,  "w": 20, "h": 10, "count": 4 },
+{ "type": "deer", "col": 150, "row": 50,  "w": 20, "h": 5,  "count": 4 }
+```
+In order: a **starter pod** on lower Windward (first fart target ~15s from Leo's door);
+the **park herd** (needs edit i); the **golf rough herd** (needs edit i — guarded by ball
+fire, near golden donut #1); a **median herd** in the grass strip between Tega Cay Dr's
+two lanes (r50–54 — off-road but within fart range from either lane, which teaches that
+farts work at range). Leave obstacle #39 (the 10-deer c238 spur) exactly as is — it's
+now the combo shrine where TOOTNADO (5x badge) is earned; do not thin it.
+
+**Edit (iii) — beans that set up combos** (add to `SPOTS` in `_spawnBeans`, ~line 771):
+`[46,114]` (grab it riding north → starter pod 6 rows later), `[43,78]` (park entrance →
+park herd), `[224,47]` (golf entrance → golf herd). Keep all 7 existing beans; document
+in a comment that (240,120) intentionally pairs with the c238 shrine.
+
+**Edit (iv) — traffic where the ride is dull** (append to `obstacles`):
+```json
+{ "type": "car", "col": 100, "row": 46, "w": 60, "h": 3 },
+{ "type": "car", "col": 45,  "row": 95, "w": 4,  "h": 25 }
+```
+One patroller on the long dull Tega Cay W stretch, one on lower Windward so the opening
+has something to dodge (and a 2C near-miss to earn). Do NOT add traffic to Justin's
+southern approach (c311/r152) — it's already the densest corridor.
+
+**Edit (v) — donut-hole trail routes for 2A** (exact breadcrumb lines, ~43 holes):
+Windward c46, r128→r100 every 4 rows (8) · Tega Cay W r47, c60→c120 every 8 cols (8) ·
+Tara Tea r64, c60→c124 every 8 (8) · Tega Cay E r56, c214→c270 every 8 (7) ·
+c311, r84→r120 every 6 (6) · park interior loop, 6 holes (needs edit i).
+
+**Accept when:** riding north from Leo's house, within ~20 seconds the player passes a
+bean, meets the starter pod, and can dodge the Windward car; Leo can physically ride
+into the park and the golf course; a fart from Tega Cay Dr topples median deer;
+the golf herd/donut cannot be reached without crossing golf-ball fire.
 
 ### Phase 3 — Act 2 event juice
 
@@ -204,6 +275,41 @@ kind of trouble this is.
 
 **Accept when (3A+3B):** headless screenshot of an event card shows the chip; good-luck
 reveal shows confetti; bad-luck shows shake/flash (verify by eye in dev server).
+
+#### 3C. Dialogue + event copy punch-up (kid-slang pass)
+**Files:** `src/data/dialogue/act1.json` (28 scripts: intros, joins, checkpoints,
+gauntlet taunts + win lines), `src/data/dialogue/act2-events.json` (event descriptions +
+choice text), and the hardcoded `LOCATION_EVENTS` in `src/scenes/OregonTrailScene.js`
+(~lines 45–126). The writing already lands "bro" naturally; this pass leans in further.
+
+**The comedy engine — two slang registers, assigned by role:**
+- **The crew** (Warren, MJ, Carson, Justin) get light, current slang: *cooked, no cap,
+  lock in, fr, bet, ate, lowkey, W / L, mid, crash out, aura.* Season, don't drench.
+- **The sibling bosses** (Grace, Nora, both Maxes, Edie) get **deliberately dead/fading
+  slang played for cringe** — *6-7, skibidi, rizz, sigma.* The joke is that the annoying
+  siblings use expired memes with total confidence and the crew visibly suffers.
+  Example shape (write your own, this is the template): Grace: "You can't beat me.
+  I have SIGMA pool-noodle aura. Six... SEVEN!" / Leo: "That meme died a year ago,
+  Grace." / Warren: "Bro I can't do this." Leo is the straight man — he almost never
+  uses slang, which is what makes everyone else's land.
+
+**Hard budget rules (cringe is a spice, not a sauce):**
+- Max ONE dead-slang gag per script, and only in sibling-boss scripts (gauntlet taunts,
+  boss meets, Edie). Not every boss script needs one — 3–4 total across the game is right.
+- Current slang: at most ~1 word per 2–3 dialogue lines; never two slang words in the
+  same sentence.
+- NEVER slang-ify instructional or UI text: camp boards, buttons, choice hints, tips,
+  and the departure overlay stay in plain words. Event *descriptions* may take light
+  slang; event *choice text* stays clear (a kid deciding needs clarity, not jokes).
+- Keep every existing joke that works; this is a punch-up, not a rewrite. Lines must
+  stay short (dialogue box wraps at ~440px of 8px font), ASCII only.
+- Slang dates fast by design — treat this as a re-runnable seasoning pass. Where a line
+  could age badly, prefer the crew reacting to cringe over the cringe itself (reactions
+  stay funny after the meme is forgotten).
+
+**Accept when:** the user reads the gauntlet scripts and laughs; no slang appears in any
+instructional/UI string; at most 3–4 dead-slang gags exist game-wide; Leo stays the
+straight man throughout.
 
 ### Phase 4 — Presentation & meta-loop
 
@@ -314,13 +420,14 @@ gold on dark, ~2s, plus an `FX.burst` if the scene imports FX. Never queue-block
 ~line 769), new `src/entities/GoldenDonutPickup.js` (gold circle + darker ring + slow
 sparkle tween — make it obviously special), `ScoreSystem`, `ReportCardScene`.
 
-Three hidden spots chosen to be *found by wandering, not by following roads* — off-road
-placement is the point (verify each sits on reachable, non-wall terrain in
-`public/maps/neighborhood_map.json`; the collision builder blocks off-road driving in
-some areas, so test by riding there):
-1. deep in the golf course between fairways (guarded by golf-ball fire),
-2. the far end of a lake dock (SW water edge),
-3. the map's far SE corner past Justin's street.
+Three hidden spots, chosen from the 2D spatial audit (IMPORTANT: Leo can only ride
+where `_isRoadChunk` permits — spot 1 requires 2D edit (i), which makes the golf course
+drivable; the other two sit on existing but rarely-visited roads):
+1. **(258, 12)** — deep in the golf course, behind the golf-ball fire line (requires 2D
+   edit i; pairs with the golf rough herd),
+2. **(11, 146)** — the dead-end marina road stub by Lake Wylie, SW of Leo's house
+   (already drivable, genuinely obscure),
+3. **(313, 153)** — the far SE corner where the south shore road meets Justin's street.
 
 Each: +$5, big fanfare (`GOLDEN DONUT!` + sparkle burst), `gs.goldenDonuts++`, persists
 per-run via `_markCollected('collectedGoldenDonuts', i)`. Score: `golden × 50` row on the
@@ -381,8 +488,9 @@ One commit per lettered item, message style `Act 2: terrain-reactive ride visual
 Phases are independent; items within a phase are ordered. **Recommended order:
 Phase 1 → Phase R (R1–R4) → Phase 2 → 3 → 4 → 5 → R5 → R6.** If a session is short,
 Phase 1 makes one run fun; Phase R makes the next run happen. Dependencies to respect:
-R1 before R2/R3/R4/R5 (they all hang off BadgeSystem); 2C before the `close_call_king`
-badge check; 1B before STORM RIDE's grab-em compensation.
+R1 before R2/R3/R4/R5 (they all hang off BadgeSystem); 2D before 2A/2B placements and
+before R3 (golden donut #1 needs the golf course drivable); 2C before the
+`close_call_king` badge check; 1B before STORM RIDE's grab-em compensation.
 
 ## 6. Don't-do list
 
