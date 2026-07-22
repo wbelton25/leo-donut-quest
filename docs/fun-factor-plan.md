@@ -117,7 +117,13 @@ this is presentation only).
 obviously different at a glance; camp board unaffected; no FX objects leak between legs
 (ride 3+ legs in a row).
 
-#### 1B. Roadside grab-ems (interactive travel)
+#### 1B. Roadside grab-ems (interactive travel) — ❌ CUT (built, then removed after playtest)
+> **Decision (playtest verdict):** implemented and cut. Grabbing pickups during the
+> auto-ride fought Act 2's own "the ride is automatic, decisions happen at camp" model,
+> had no signposting, and the payoff was invisible in the moment. Do not rebuild. The
+> "collect while moving" fantasy lives in Act 1 instead (donut-hole trails, 2A/2D).
+> Terrain ambiance (1A) was kept. Original spec preserved below for the record.
+
 Same file. During each leg's travel, spawn 1–3 pickups that scroll with the road
 (right edge → left) at biker height ±20px: a **donut hole** (tan circle, +6 CREW), a
 **wrench** (gray rect, +6 BIKES), rarely a **clock** (yellow circle, +2 time). The player
@@ -416,24 +422,39 @@ Award moment matters: call a shared toast the instant it's earned —
 `BadgeSystem.toast(scene, name)` → slide-in banner top-center, `BADGE EARNED: FART STORM!`
 gold on dark, ~2s, plus an `FX.burst` if the scene imports FX. Never queue-block gameplay.
 
-#### R2. Unlockable fart sounds (the reward economy)
-**Files:** `src/systems/AudioManager.js` (`playFart` currently auto-discovers all
-`sfx-fart-N` keys and picks randomly), `BadgeSystem`, `TitleScene`.
+#### R2. Fart rewards — ⚠️ REDESIGN (sound-only unlocking shipped; pivot to fart ABILITIES)
+> **Decision (playtest verdict):** the sound-unlock system was built (BadgeSystem +
+> `playFart` filtering to `unlockedFarts()`, starting pool 6 of 20, toast plays the new
+> fart). It works but delivers little fun: the 20 sounds were added at random, so one
+> isn't "better" than another — earning a different *noise* has no impact. The current
+> code can STAY (harmless, still a small collectible), but the real reward should be
+> **mechanical fart TYPES, not sounds.** A specific fart does something another can't.
+>
+> **Design target (future work — not yet built):** a small set of distinct fart abilities,
+> each with its own sound, that the player can trigger/select. Sketch (refine before
+> building):
+> - **BLAST** (default) — the current power fart: knock down deer + rocket-boost forward.
+> - **DIRECTED / STEERING fart** — aim the shove (up/down as well as forward) to line up
+>   a deer herd or dodge — turns the fart into a movement tool.
+> - **LINGERING GAS CLOUD** — a cloud that stays for a few seconds, protecting Leo /
+>   knocking anything that enters it (greater protection for a window of time).
+> - **SILENT-BUT-DEADLY** — no boost, but a huge radius (crowd-clear a whole herd).
+>
+> Open questions for the user before building: are these unlocked by badges (replay hook)
+> or found in Act 1? Does Leo pick ONE loadout or cycle them with a key? Keep it kid-simple
+> — probably 3 types max, cycled with one button, each obviously different on screen.
+> Original sound-only spec preserved below for the record.
 
-- Give every fart sound an arbitrary fun display name in a table in BadgeSystem
-  (names are free to invent; the user can rename later): THE CLASSIC, THE SQUEAKER,
-  THE TROMBONE, THE FOGHORN, THE BUBBLER, THE ZIPPER, THE WHOOPEE, THE RASPBERRY,
-  THE THUNDERCLAP, THE DUCK, THE MOTORBIKE, THE BALLOON, THE KAZOO, THE DRUM SOLO,
-  THE GURGLER, THE AIR HORN, THE SNEAKER, THE TUBA, THE ESPRESSO, THE GRAND FINALE.
-- **Starting pool: farts 1–6.** Each badge unlocks 1–2 more (map badge→fart indices in
-  the same table; 12 badges comfortably unlock the remaining 14).
-- `AudioManager.playFart` filters `_fartKeys` to the unlocked set
-  (`BadgeSystem.unlockedFarts()`); if BadgeSystem is missing/empty, fall back to all
-  (never let a bug silence farts).
-- On badge award, the toast gets a second line when it unlocks a sound:
-  `NEW FART UNLOCKED: THE TROMBONE!` — and **immediately play that fart once**. This is
-  the single funniest reward moment available to this codebase; do not skip it.
-- Title screen badge shelf (R4) lists unlocked fart names so the collection is browsable.
+**Files:** `src/systems/AudioManager.js` (`playFart` filters to `BadgeSystem.unlockedFarts()`),
+`BadgeSystem`, `TitleScene`.
+
+- Fart sounds carry fun display names in `BadgeSystem.FART_NAMES` (THE CLASSIC, THE
+  SQUEAKER, THE TROMBONE, …, THE GRAND FINALE).
+- **Starting pool: farts 1–6.** Each badge unlocks 1–2 more (badge→fart map in `BADGES`).
+- `AudioManager.playFart` filters `_fartKeys` to the unlocked set, falling back to all
+  loaded farts if unavailable (never let a bug silence farts).
+- On badge award, the toast shows `NEW FART: <NAME>!` and immediately plays it once.
+- Title screen badge shelf (R4) shows the `FARTS x/20` count.
 
 #### R3. Golden donuts (secrets for repeat explorers)
 **Files:** `NeighborhoodScene` (clone the `BeanPickup` spawn/check/persist pattern,
