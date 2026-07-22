@@ -25,6 +25,14 @@ const SNACK_STAMINA = { gatorade: 33, granola: 67, hotdog: 100 };
 // Bike part effect on bike condition (0–100 scale)
 const BIKE_PART_RESTORE = { patch: 33, tire: 67, chain: 100 };
 
+// Display metadata + best-first order so the camp stash button can NAME the exact item
+// it will use and its size (lg/md/sm) — making the Walmart tiers visible + showing the
+// finite stock depleting as you consume it (feature 3).
+const SNACK_ORDER = ['hotdog', 'granola', 'gatorade'];
+const PART_ORDER  = ['chain', 'tire', 'patch'];
+const SNACK_META  = { hotdog: ['HOT DOG', 'lg'], granola: ['GRANOLA', 'md'], gatorade: ['GATORADE', 'sm'] };
+const PART_META   = { chain: ['CHAIN', 'lg'], tire: ['TIRE', 'md'], patch: ['PATCH', 'sm'] };
+
 // Convert the time resource → clock string. `time` is minutes remaining until the
 // 5:00 PM deadline (270 = 12:30 PM start, 120 = 3:00 PM, 0 = 5:00 PM). The clock is
 // therefore 5:00 PM minus `time` minutes. (The old formula assumed a 0–100 scale and
@@ -566,6 +574,10 @@ export default class OregonTrailScene extends Phaser.Scene {
   _snackTotal()  { const s = this._snackInv; return s.gatorade + s.granola + s.hotdog; }
   _repairTotal() { const b = this._bikeInv;  return b.patch + b.tire + b.chain; }
 
+  // Best-first item ids currently in the pack (null if empty) — for the camp button labels.
+  _bestSnackId()  { return SNACK_ORDER.find(id => this._snackInv[id] > 0) ?? null; }
+  _bestRepairId() { return PART_ORDER.find(id => this._bikeInv[id]  > 0) ?? null; }
+
   // Use one snack from the stash (best first) → refill CREW.
   _useSnack() {
     const order = [['hotdog', SNACK_STAMINA.hotdog], ['granola', SNACK_STAMINA.granola], ['gatorade', SNACK_STAMINA.gatorade]];
@@ -769,7 +781,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     const hasOutcome = !!this._lastEventOutcome;
     const terr  = this._terrain;
     const cardW = 300, cardX = (BASE_WIDTH - cardW) / 2;
-    const cardH = 210 + (hasOutcome ? 12 : 0);
+    const cardH = 224 + (hasOutcome ? 12 : 0);   // +14 for the supplies column headers
     const cardY = (BASE_HEIGHT - cardH) / 2;
 
     this._restStopCon = this.add.container(0, 0).setDepth(31);
@@ -822,10 +834,16 @@ export default class OregonTrailScene extends Phaser.Scene {
       bx += pw + gap;
     });
     y += 21;
-    line(y, PACES[this._pace].blurb, '#8899aa'); y += 16;
+    line(y, PACES[this._pace].blurb, '#8899aa'); y += 15;
 
-    // Stash buttons — one snack (+CREW), one repair (+BIKES).
-    const snacks = this._snackTotal(), kits = this._repairTotal();
+    // Supplies column headers, then the two use-buttons on the next row.
+    add(txt(this, BASE_WIDTH / 2 - 70, y, 'EAT (+CREW)',  { fontSize: '8px', color: '#8fd694' }).setOrigin(0.5));
+    add(txt(this, BASE_WIDTH / 2 + 70, y, 'FIX (+BIKES)', { fontSize: '8px', color: '#8ac6ff' }).setOrigin(0.5));
+    y += 13;
+
+    // Stash buttons NAME the exact item they'll use (best-first) + its size (lg/md/sm),
+    // so the tiers you bought at Walmart are visible and you watch the stock drop as you
+    // eat/repair.
     const stashBtn = (cx2, label, enabled, handler) => {
       const btn = add(this.add.rectangle(cx2, y, 132, 16, enabled ? 0x1a3a2a : 0x1a1a22)
         .setStrokeStyle(1, enabled ? 0x4a8a5a : 0x2a2a33));
@@ -837,9 +855,12 @@ export default class OregonTrailScene extends Phaser.Scene {
         btn.on('pointerdown', handler);
       }
     };
-    stashBtn(BASE_WIDTH / 2 - 70, `Snack +CREW (x${snacks})`, snacks > 0 && this._crew < 100,
+    const bs = this._bestSnackId(), bp = this._bestRepairId();
+    const snackLabel = bs ? `${SNACK_META[bs][0]} (${SNACK_META[bs][1]}) x${this._snackInv[bs]}` : `NO SNACKS`;
+    const partLabel  = bp ? `${PART_META[bp][0]} (${PART_META[bp][1]}) x${this._bikeInv[bp]}`   : `NO PARTS`;
+    stashBtn(BASE_WIDTH / 2 - 70, snackLabel, !!bs && this._crew < 100,
       () => { this._useSnack(); this._rebuildRestStop(); });
-    stashBtn(BASE_WIDTH / 2 + 70, `Fix bikes (x${kits})`, kits > 0 && this._bikes < 100,
+    stashBtn(BASE_WIDTH / 2 + 70, partLabel, !!bp && this._bikes < 100,
       () => { this._useRepair(); this._rebuildRestStop(); });
     y += 23;
 
