@@ -58,7 +58,12 @@ in this repo's history (`git log` shows the format).
    The old random "could cost a friend" gamble is gone; a bold choice deterministically
    tires the crew. Kids need to reason about choices, not guess. No risk tiers/numbers.
    PACE follows a **sprint/rest rhythm**: EASY rests the crew (recovers), PUSH is locked
-   when the crew is worn out.
+   when the crew is worn out. EVENTS are **"pick your poison"**: every choice spends a
+   DIFFERENT resource (TIME slow/safe · CREW power-through · BIKES send-it), in a
+   consistent order, so no option is ever best — you pick by reading your own bars.
+   No per-choice skill/"friend helps" options (they were a no-brainer that trivialized
+   the decision); choice hints show MAGNITUDE ("a little" / "some" / "a LOT") + a reliable
+   green→orange color.
 4. **Only TIME can end the run** in Act 2. Low CREW/BIKES just slows you down.
 5. **Font is Press Start 2P, 8px grid, ASCII only.** No emoji in game text. Keep strings
    short — long words run off cards.
