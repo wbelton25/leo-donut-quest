@@ -1,5 +1,5 @@
 import {
-  SCENE_OREGON_TRAIL, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_DONUT_SHOP,
+  SCENE_OREGON_TRAIL, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_DONUT_SHOP, SCENE_HUD,
   BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
@@ -197,6 +197,9 @@ export default class OregonTrailScene extends Phaser.Scene {
 
   create() {
     AudioManager.playMusic(this, MUSIC_NEIGHBORHOOD);
+    // Act 2 draws its own CREW/BIKES/clock strips — hide the shared Act-1 HUD so the
+    // two don't stack (it rendered on top of the camp modal otherwise).
+    this.scene.sleep(SCENE_HUD);
     // ── Systems ───────────────────────────────────────────────────────────────
     this._resources = new ResourceSystem(this.game);
     this._party     = new PartySystem(this.game);
