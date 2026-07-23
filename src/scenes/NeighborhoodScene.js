@@ -621,7 +621,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     txt(this, 6, BASE_HEIGHT - 18, 'BOSS TEST  5:GRACE  6:MAX  7:NORA  8:JUSTIN-MAX  9:EDIE', {
       fontSize: '8px', color: '#997788',
     }).setScrollFactor(0).setDepth(10);
-    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   D: TALK   2: ACT 2   3: GAUNTLET', {
+    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   SPACE: HOP OVER STUFF   D: TALK', {
       fontSize: '8px', color: '#778899',
     }).setScrollFactor(0).setDepth(10);
 
@@ -765,6 +765,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   _onObstacleHit(damage = 10) {
+    // HOP over it! If Leo is mid-jump (SPACE), he's airborne and clears the obstacle —
+    // a skill dodge that pairs with the fart (fart = knock down deer, hop = leap anything).
+    if (this._player?.isJumping) {
+      FX.popText(this, this._player.x, this._player.y - 22, 'HOP!', {
+        color: '#8fd6ff', fontSize: '8px', rise: 18, duration: 600,
+      });
+      return;
+    }
     this._resources.applyChanges({ bikeCondition: -damage });
     // Getting hit also costs TIME (bug 7), scaled gently with how hard the hit was.
     const timeLoss = Math.max(2, Math.round(damage / 8));
