@@ -168,11 +168,14 @@ const CHECKPOINT_BY_ID = Object.fromEntries(CHECKPOINTS.map(c => [c.id, c]));
 // everyone down. `time` scales the leg's time cost; `drain` scales stamina+bike
 // wear; `speed` scales how fast the ride animation plays.
 const PACES = {
-  easy:   { label: 'EASY',   time: 1.35, drain: 0.55, speed: 0.82, blurb: 'slow, but spares the crew' },
-  steady: { label: 'STEADY', time: 1.0,  drain: 1.0,  speed: 1.0,  blurb: 'balanced' },
-  push:   { label: 'PUSH',   time: 0.68, drain: 1.7,  speed: 1.35, blurb: 'fast, but grinds everyone down' },
+  easy:   { label: 'EASY',   time: 1.35, drain: 0.55, speed: 0.82, blurb: 'slow, but the crew RESTS (+CREW)' },
+  steady: { label: 'STEADY', time: 1.0,  drain: 1.0,  speed: 1.0,  blurb: 'steady and balanced' },
+  push:   { label: 'PUSH',   time: 0.68, drain: 1.7,  speed: 1.35, blurb: 'fast, but tires the crew out' },
 };
 const PACE_ORDER = ['easy', 'steady', 'push'];
+// PUSH needs a crew with some energy left — you can't sprint an exhausted crew. Below
+// this, PUSH is locked and you have to EASY (rest) first. That's the sprint/rest rhythm.
+const PUSH_MIN_CREW = 34;
 
 // TERRAIN is rolled for each leg and PREVIEWED at the camp before it, so pace +
 // snack decisions become planning. `stam`/`bike` scale that leg's respective wear;
@@ -420,6 +423,17 @@ export default class OregonTrailScene extends Phaser.Scene {
   _applyLegCost(leg) {
     const pace = PACES[this._pace];
     const terr = this._terrain;
+
+    // EASY is a REST leg: the crew and bikes RECOVER (that's the other half of the
+    // sprint/rest rhythm — you PUSH when fresh, then EASY to recover). Costs more time.
+    if (this._pace === 'easy') {
+      const crewGain = 10 + Math.round(Math.random() * 4);   // ~+10-14 CREW
+      const bikeGain = 5  + Math.round(Math.random() * 3);   // ~+5-8 BIKES
+      this._crew  = Math.min(100, this._crew  + crewGain);
+      this._bikes = Math.min(100, this._bikes + bikeGain);
+      return { recap: 'Took it easy — everyone caught their breath.', terrain: terr };
+    }
+
     const crewHit = Math.round(CREW_DRAIN * pace.drain * terr.stam * (0.7 + Math.random() * 0.6));
     const bikeHit = Math.round(BIKE_DRAIN * pace.drain * terr.bike * (0.7 + Math.random() * 0.6));
     this._crew  = Math.max(0, this._crew  - crewHit);
@@ -433,13 +447,19 @@ export default class OregonTrailScene extends Phaser.Scene {
     return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr };
   }
 
-  // One friendly sentence about how the leg went — no numbers.
+  // One friendly sentence about how the leg went — no numbers. Pace-aware so the cause
+  // (you PUSHED) connects to the effect (the crew is worn down).
   _legRecap(terr, crewHit, bikeHit) {
     const t = terr.name.toLowerCase();
+    if (this._pace === 'push') {
+      return (crewHit + bikeHit >= 20)
+        ? 'Pushed HARD — that really wore everyone down.'
+        : 'Pushed the pace to save time.';
+    }
     if (crewHit + bikeHit <= 6)  return 'Smooth going — barely a scratch.';
     if (crewHit >= 14)           return `That ${t} really wore the crew down.`;
     if (bikeHit >= 13)           return `The ${t} was rough on the bikes.`;
-    return `You pushed through the ${t}.`;
+    return `You rode through the ${t}.`;
   }
 
   // Draws one Act-2 road event as an untimed card. Picking a choice rolls a
@@ -452,49 +472,44 @@ export default class OregonTrailScene extends Phaser.Scene {
     });
   }
 
-  // Applies a chosen option to the GROUP bars + clock, then shows a plain, wordy
-  // result card (Oregon-Trail style — no %, no ranges, no risk tiers). A little
-  // luck softens or worsens the cost so it isn't fully solved up front.
+  // Applies a chosen option to the GROUP bars + clock, then confirms what happened.
+  // WHAT YOU SEE IS WHAT YOU GET: the choice's shown effects are applied exactly — no
+  // hidden luck roll — so a kid can actually reason about which choice to make. The old
+  // random "could lose a friend" gamble is gone; a bold move just tires the crew.
   _resolveChoiceAndReveal(choice, done) {
-    const e    = choice.effects ?? {};
-    const roll = Math.random();
-    const luck = roll < 0.25 ? 'good' : roll > 0.80 ? 'bad' : 'normal';
-    const mul  = luck === 'good' ? 0.5 : luck === 'bad' ? 1.6 : 1;   // scales the COSTS only
-
+    const e = choice.effects ?? {};
     const applied = {};
     for (const k of ['time', 'energy', 'bikeCondition', 'distance', 'money', 'snacks']) {
-      if (e[k] === undefined) continue;
-      applied[k] = Math.round(e[k] < 0 ? e[k] * mul : e[k]);
+      if (e[k] !== undefined) applied[k] = e[k];
     }
+    // A bold "risk it" choice deterministically tires the crew (no random friend loss).
+    if (e.partyLossRisk) applied.energy = (applied.energy ?? 0) - Math.round(e.partyLossRisk * 40);
     this._applyEventEffects(applied);
     if (choice.requiresPartyMember) this._crew = Math.max(0, this._crew - 6);  // a helper tires the crew a bit
     this._lastEventOutcome = this._formatEventOutcome(applied);
 
-    // Rare friend loss (only choices flagged risky), on bad luck.
-    if (e.partyLossRisk && this._party.getSize() > 0 && Math.random() < e.partyLossRisk) {
-      const p = this._party.getParty();
-      const lost = p[Math.floor(Math.random() * p.length)];
-      this._dropMember(lost);
-      this._announceMemberLost(lost, done);
-      return;
-    }
+    // Reveal tone is now DETERMINISTIC — based on whether the outcome was net good/bad.
+    const gain = (applied.energy > 0 ? applied.energy : 0) + (applied.bikeCondition > 0 ? applied.bikeCondition : 0)
+               + (applied.distance > 0 ? applied.distance / 20 : 0) + (applied.money > 0 ? applied.money : 0) + (applied.snacks > 0 ? applied.snacks : 0);
+    const loss = (applied.energy < 0 ? -applied.energy : 0) + (applied.bikeCondition < 0 ? -applied.bikeCondition : 0)
+               + (applied.time < 0 ? -applied.time / 2 : 0);
+    const good = gain > loss + 2;
+    const bad  = loss > gain + 2;
 
-    // Reveal fanfare (3A): good luck → confetti; bad luck → shake + red flash; a friend's
-    // skill move → a cool sparkle. Neutral gets nothing — the contrast is the point.
     const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2 - 44;
-    if (luck === 'good') {
-      FX.burst(this, cx, cy, { count: 26, colors: [0x66dd66, 0xf5e642, 0x8fd694, 0xffffff],
+    if (good) {
+      FX.burst(this, cx, cy, { count: 24, colors: [0x66dd66, 0xf5e642, 0x8fd694, 0xffffff],
         minSpeed: 60, maxSpeed: 190, minSize: 2, maxSize: 4, duration: 900, depth: 33, gravity: 45 });
-    } else if (luck === 'bad') {
-      this.cameras.main.shake(220, 0.008);
-      this.cameras.main.flash(180, 120, 0, 0);
+    } else if (bad) {
+      this.cameras.main.shake(200, 0.007);
+      this.cameras.main.flash(160, 120, 0, 0);
     }
     if (choice.requiresPartyMember) {
       FX.burst(this, cx, cy, { count: 14, colors: [0x7fd6c0, 0x8ac6ff, 0xffffff],
         minSpeed: 40, maxSpeed: 130, minSize: 1, maxSize: 3, duration: 700, depth: 33 });
     }
 
-    const title = luck === 'good' ? 'THAT WENT WELL!' : luck === 'bad' ? 'BAD LUCK!' : 'OKAY THEN...';
+    const title = good ? 'NICE!' : bad ? 'OOF.' : 'OKAY.';
     this._eventCard.show({
       title,
       description: this._plainOutcomeLine(applied),
@@ -909,22 +924,31 @@ export default class OregonTrailScene extends Phaser.Scene {
     // Terrain heads-up (wrapped).
     y += wrapLine(y, nextS, terr.color) + 8;
 
-    // Pace lever.
+    // Pace lever. PUSH is LOCKED when the crew is too tired — you must EASY to rest first
+    // (the sprint/rest rhythm). Lock it before drawing so a stale 'push' can't stick.
+    const pushLocked = this._crew < PUSH_MIN_CREW;
+    if (pushLocked && this._pace === 'push') this._pace = 'steady';
     line(y, 'SET YOUR PACE:', '#8899aa'); y += 16;
     const pw = 88, gap = 6;
     let bx = BASE_WIDTH / 2 - (PACE_ORDER.length * pw + (PACE_ORDER.length - 1) * gap) / 2 + pw / 2;
     PACE_ORDER.forEach(pid => {
+      const locked = pid === 'push' && pushLocked;
       const sel = this._pace === pid;
-      const btn = add(this.add.rectangle(bx, y, pw, 16, sel ? 0x2a5a2a : 0x141420)
-        .setStrokeStyle(1, sel ? 0x66cc66 : 0x333344).setInteractive({ useHandCursor: true }));
-      add(txt(this, bx, y, PACES[pid].label, { fontSize: '8px', color: sel ? '#ccffcc' : '#8899aa' }).setOrigin(0.5));
-      btn.on('pointerover', () => { if (this._pace !== pid) btn.setFillStyle(0x22223a); });
-      btn.on('pointerout',  () => { if (this._pace !== pid) btn.setFillStyle(0x141420); });
-      btn.on('pointerdown', () => { this._pace = pid; this._rebuildRestStop(); });
+      const btn = add(this.add.rectangle(bx, y, pw, 16, locked ? 0x201418 : (sel ? 0x2a5a2a : 0x141420))
+        .setStrokeStyle(1, locked ? 0x4a2a2a : (sel ? 0x66cc66 : 0x333344)));
+      add(txt(this, bx, y, locked ? 'PUSH zZ' : PACES[pid].label,
+        { fontSize: '8px', color: locked ? '#8a5a5a' : (sel ? '#ccffcc' : '#8899aa') }).setOrigin(0.5));
+      if (!locked) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => { if (this._pace !== pid) btn.setFillStyle(0x22223a); });
+        btn.on('pointerout',  () => { if (this._pace !== pid) btn.setFillStyle(0x141420); });
+        btn.on('pointerdown', () => { this._pace = pid; this._rebuildRestStop(); });
+      }
       bx += pw + gap;
     });
     y += 21;
-    line(y, PACES[this._pace].blurb, '#8899aa'); y += 16;
+    line(y, pushLocked ? 'Too tired to PUSH! Go EASY to rest.' : PACES[this._pace].blurb,
+      pushLocked ? '#ffaa66' : '#8899aa'); y += 16;
 
     // Two buttons that open an item PICKER, so you choose exactly which snack / part to
     // spend (they restore different amounts) — not an auto-pick. Count = total in the pack.

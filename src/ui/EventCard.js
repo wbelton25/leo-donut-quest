@@ -120,24 +120,24 @@ export default class EventCard {
   // No numbers, no risk tiers; a little luck still decides how it actually turns out.
   _effectPreview(choice) {
     const e = choice.effects ?? {};
-    if (e.partyLossRisk) return { text: 'risky — could cost a friend', color: '#ff7766' };
 
     const parts = [];
     if (e.time < 0)                   parts.push('costs time');
     if (e.time > 0)                   parts.push('saves time');
     if (e.distance > 0)               parts.push('a shortcut');
     if (e.energy > 0 || e.snacks > 0) parts.push('helps the crew');
-    if (e.energy < 0)                 parts.push('tires the crew');
+    if (e.energy < 0 || e.partyLossRisk) parts.push('tires the crew');   // bold move = crew cost
     if (e.bikeCondition > 0)          parts.push('fixes bikes');
     if (e.bikeCondition < 0)          parts.push('rough on bikes');
     if (e.money > 0)                  parts.push('find cash');
 
-    if (parts.length === 0) return { text: 'safe', color: '#88bb99' };
+    const uniq = [...new Set(parts)];
+    if (uniq.length === 0) return { text: 'safe', color: '#88bb99' };
 
-    const bad  = (e.energy < 0) || (e.bikeCondition < 0);
+    const bad  = (e.energy < 0) || (e.bikeCondition < 0) || !!e.partyLossRisk;
     const good = (e.energy > 0) || (e.bikeCondition > 0) || (e.distance > 0) || (e.snacks > 0);
     const color = choice.requiresPartyMember ? '#7fd6c0' : bad && !good ? '#ffa077' : good ? '#88cc88' : '#99aabb';
-    return { text: parts.join(', '), color };
+    return { text: uniq.join(', '), color };
   }
 
   // Categorize an event by keyword → a colored ASCII chip. Purely visual shorthand.
