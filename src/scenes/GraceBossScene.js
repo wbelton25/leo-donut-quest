@@ -8,6 +8,7 @@ import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
 import PartySystem from '../systems/PartySystem.js';
+import FartGauge from '../ui/FartGauge.js';
 
 // ─── Grace Boss Scene ────────────────────────────────────────────────────────
 // Isolated pool-arena battle. Leo faces Grace in her backyard.
@@ -245,9 +246,7 @@ export default class GraceBossScene extends Phaser.Scene {
   // ─── HUD overlay ────────────────────────────────────────────────────────────
 
   _buildHud() {
-    txt(this, 8,  8, 'F: FART',     { fontSize: '8px', color: '#f5e642' }).setScrollFactor(0).setDepth(20);
-    txt(this, 8, 18, 'SPACE: JUMP', { fontSize: '8px', color: '#88eeff' }).setScrollFactor(0).setDepth(20);
-    txt(this, 8, 28, 'WASD: MOVE',  { fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setDepth(20);
+    this._fartGauge = new FartGauge(this);   // fart-ready meter (replaces control text)
 
     // Hearts — 5 hearts × 20 energy each
     txt(this, ARENA_W - 6, 5, 'LEO', { fontSize: '8px', color: '#cccccc' })
@@ -413,8 +412,7 @@ export default class GraceBossScene extends Phaser.Scene {
         alpha: 0, duration: 400, onComplete: () => ring.destroy(),
       });
       this._checkFartHit();
-      // Notify HUD meter
-      this.game.events.emit('ability-used', { abilityId: 'lightning_fart', cooldown: this._fartCooldownMs });
+      this._fartGauge?.trigger(this._fartCooldownMs);
       this.time.delayedCall(this._fartCooldownMs, () => { this._fartReady = true; });
     }
   }

@@ -9,6 +9,7 @@ import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 import ResourceSystem from '../systems/ResourceSystem.js';
 import AbilitySystem from '../systems/AbilitySystem.js';
 import PartySystem from '../systems/PartySystem.js';
+import FartGauge from '../ui/FartGauge.js';
 
 // ─── Justin's Max Boss Scene ─────────────────────────────────────────────────
 // Justin's brother Max faces Leo in the backyard. He plays baseball AND has
@@ -251,8 +252,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
   // ─── HUD ──────────────────────────────────────────────────────────────────
 
   _buildHud() {
-    txt(this, 8, 8,  'F: FART',   { fontSize: '8px', color: '#f5e642' }).setScrollFactor(0).setDepth(20);
-    txt(this, 8, 20, 'WASD: MOVE',{ fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setDepth(20);
+    this._fartGauge = new FartGauge(this);   // fart-ready meter (replaces control text)
 
     // Leo hearts — matches Grace's fight
     this._heartsUpdate = createHearts(this, ARENA_W);
@@ -346,7 +346,7 @@ export default class JustinMaxBossScene extends Phaser.Scene {
         alpha: 0, duration: 400, onComplete: () => ring.destroy(),
       });
       this._checkFartHit();
-      this.game.events.emit('ability-used', { abilityId: 'lightning_fart', cooldown: this._fartCooldownMs });
+      this._fartGauge?.trigger(this._fartCooldownMs);
       this.time.delayedCall(this._fartCooldownMs, () => { this._fartReady = true; });
     }
   }

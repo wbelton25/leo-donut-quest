@@ -5,6 +5,7 @@ import {
 import AudioManager from '../systems/AudioManager.js';
 import FX from '../systems/FX.js';
 import { createHearts, createBossBar } from '../ui/BossHud.js';
+import FartGauge from '../ui/FartGauge.js';
 
 // EdieBossScene: Edie — Leo's older sister (2 years older) — the FINAL boss,
 // deliberately unlike the four sibling chase-fights. She's after Leo's donuts.
@@ -145,9 +146,7 @@ export default class EdieBossScene extends Phaser.Scene {
     this._gameover     = false;
 
     this._heartsUpdate = createHearts(this, ARENA_W);
-
-    txt(this, ARENA_W / 2, ARENA_H - 9, 'WASD: MOVE   F: THROW / FART   SPACE: JUMP',
-      { fontSize: '8px', color: '#778899' }).setOrigin(0.5).setDepth(10);
+    this._fartGauge = new FartGauge(this);   // fart-ready meter
   }
 
   _buildArena() {
@@ -518,6 +517,7 @@ export default class EdieBossScene extends Phaser.Scene {
     if (!this._fartReady) return;
     this._fartReady = false;
     this._fartCd = FART_CD;
+    this._fartGauge?.trigger(FART_CD);
     AudioManager.playFart(this);
     const ring = this.add.circle(this._leoX, this._leoY, 6, 0xf5e642, 0.9).setDepth(6);
     this.tweens.add({ targets: ring, displayWidth: FART_RADIUS * 2, displayHeight: FART_RADIUS * 2,
