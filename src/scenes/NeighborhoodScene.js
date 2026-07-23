@@ -632,6 +632,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    if (this._runPaused) return;   // frozen behind the bike-broken overlay (no drain/autosave)
     this._player.update();
     this._posBuffer.record();
     this._followers.forEach(f => f.update());
@@ -1200,9 +1201,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     gs.bikeLives = (gs.bikeLives ?? 3) - 1;
     this.game.registry.set('gameState', gs);
 
+    // Freeze the scene while the overlay is up so nothing keeps ticking behind it —
+    // no time drain, no re-triggers, and (crucially) no autosave re-persisting the run.
+    this._runPaused = true;
+
     const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
     const objs = [];
-    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50));
+    // Interactive so clicks can't fall through the overlay to the game world.
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50).setInteractive());
 
     if (gs.bikeLives > 0) {
       objs.push(txt(this, cx, cy - 24, 'BIKE BROKE!', { fontSize: '12px', color: '#ff8844' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
@@ -1214,6 +1220,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
         objs.forEach(o => o.destroy());
         this._resources.applyChanges({ bikeCondition: 100 - this._resources.bikeCondition });  // fresh bike
         this._bikeBrokenTriggered = false;   // can break again later
+        this._runPaused = false;             // resume the ride
         this._autosave();
       });
     } else {
@@ -1222,7 +1229,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
       const btn = this.add.rectangle(cx, cy + 20, 100, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
       objs.push(btn);
       objs.push(txt(this, cx, cy + 20, 'RESTART', { fontSize: '8px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
-      btn.on('pointerdown', () => { SaveSystem.deleteSave(); this.scene.start(SCENE_TITLE); });
+      btn.on('pointerdown', () => {
+        // Full wipe → a genuine new game. Clear the saved file AND the in-memory run
+        // state (party, spawn, lives), so the restart can't resurrect a mid-run save.
+        SaveSystem.deleteSave();
+        this.game.registry.set('gameState', SaveSystem.newGame());
+        this.scene.start(SCENE_TITLE);
+      });
     }
   }
 
