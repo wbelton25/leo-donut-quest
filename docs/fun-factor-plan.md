@@ -4,22 +4,31 @@
 with no other context. Work phase by phase, commit after each lettered item, and verify
 with the recipes in §7 before committing.
 
-**Done so far:** 1A (terrain FX, kept) · ~~1B grab-ems~~ (built then CUT after playtest) ·
-R1/R2 (badges + fart-sound unlocks — R2 still to be redesigned toward fart *abilities*) ·
-R3 (golden donuts) · R4 (badge shelf) · 2D (drivable pockets, deer herds, traffic, combo
-beans, spawn jitter) · 2A (donut-hole trails) · 2B (herds) · 2C (close-call bonus) ·
-3A (luck fanfare) · 3B (event chips) · 3C (kid-slang dialogue) · 4B (arrival celebration) ·
-4C (arcade initials existed + title 'BEAT IT!' hook) · 4D (kinder game-over + tips) ·
-5B (first-camp tip).
-**Post-playtest bug fixes also done:** boss energy persists across the gauntlet (donuts
-matter), Act 2 clock scale (was showing negative minutes), tighter deer herds, bike
-LIVES + respawn, hits cost time, time capped at the 12:30 start, Walmart tiers visible +
-a pick-which-item picker.
-**Not started / needs input:** 4A (hide dev cheats — deferred, would disrupt testing) ·
-5A (Walmart slim — SUPERSEDED; user chose more depth) · 5C (balance — needs playtests) ·
-R5 (remix modes — after Gate 2) · R6 (route fork — stretch) · R2-redesign (fart abilities
-— needs design decisions) · the reported "Act 2 dialog overlap" (couldn't reproduce; camp
-board + event card + dialogue all verified clean — need the exact screen).
+**DONE:**
+- **Act 1:** 2D map pass (drivable park/golf pockets, deer herds, traffic, combo beans,
+  spawn jitter) · 2A donut-hole trails · 2B herds · R3 golden-donut secrets · bike LIVES +
+  respawn · hits cost time · HUD cleanup (NRG bar → SPARE-bikes pips).
+- **Act 2:** 1A terrain FX · **pace = sprint/rest rhythm** (EASY rests the crew, PUSH locks
+  when worn out) · **events = "pick your poison"** (every choice spends TIME/CREW/BIKES;
+  no skill no-brainers) · **WYSIWYG choices** (no hidden luck) with magnitude + reliable
+  color hints · 3A luck fanfare · 3B event chips · Walmart tiers visible + pick-which-item
+  picker · 5B first-camp tip · clock scale fixed · time capped at 12:30 start.
+- **Act 3 / meta:** boss energy persists (donuts matter) · **0 donuts = game over** (can't
+  score without ≥1) · boss control-text removed + **fart-ready gauge** on every boss ·
+  4B arrival celebration · 4C arcade initials + title "BEAT IT!" · 4D kinder game-over+tips ·
+  R1/R2 badges + fart-SOUND unlocks · R4 badge shelf.
+- **Dialogue:** 3C kid-slang pass + boss cringe (rizz/6-7/skibidi).
+- **Cut after playtest:** 1B grab-ems · 2C close-call bonus.
+
+**NOT STARTED / OPEN:**
+- **R2-redesign — fart ABILITIES** (directional / lingering / crowd-clear instead of just
+  sounds) — needs design decisions from the user.
+- **5C balance** — drain rates, event magnitudes, grade thresholds — needs kid playtests.
+- **R5 remix modes** · **R6 Act-2 route fork** (stretch).
+- **4A hide dev cheats** behind `?debug=1` — deferred (would disrupt testing).
+- **Open ideas raised in playtests:** friends give a felt Act-2 payoff (e.g. crew drains
+  slower per friend) · a JUMP use in Act 1 (jump exists in bosses only) · possibly rename
+  the S/A/B/C/D grades to be more kid-obvious.
 
 ---
 

@@ -101,7 +101,7 @@
   "gauntlet_max_baseball": [
     { "speaker": "JustinMax", "text": "Hand over the donuts. I'll only take, like... six or seven.", "portrait": "justinmax" },
     { "speaker": "JustinMax", "text": "Six... SEVEN. EH?? Get it?! SIX! SEVEN!", "portrait": "justinmax" },
-    { "speaker": "Leo", "text": "That is not how that works, dude. Justin, leash your brother.", "portrait": "leo" },
+    { "speaker": "Leo", "text": "That is not how that works, dude. Justin, call off your brother!", "portrait": "leo" },
     { "speaker": "Justin", "text": "I am SO sorry. He goes electric when he smells sugar.", "portrait": "justin" }
   ],
   "gauntlet_grace_win": [
