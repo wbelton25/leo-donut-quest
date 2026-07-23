@@ -132,7 +132,6 @@ export const DEFAULT_GAME_STATE = {
   bestCombo: 0,        // most knocked over by a single fart
   donutHolesCollected: 0,  // donut-hole coins picked up in Act 1 (2A)
   goldenDonuts: 0,     // hidden golden donuts found (R3)
-  nearMisses: 0,       // close-call traffic dodges (2C)
   crewWasWornOut: false,   // Act 2 crew hit "worn out" this run (SURVIVOR badge)
   arrivedAhead: false,     // reached the Donut House ahead of schedule (EARLY BIRD badge)
 };

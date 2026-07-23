@@ -32,11 +32,10 @@ const BADGES = [
   { id: 'solo_rider',      name: 'LONE WOLF',      hint: 'Reach the Donut House with no friends.',    farts: [9] },
   { id: 'fart_storm',      name: 'FART STORM',     hint: 'Knock down 3 deer with one fart.',           farts: [10] },
   { id: 'tootnado',        name: 'TOOTNADO',       hint: 'Knock down 5 deer with one fart.',           farts: [11, 12] },
-  { id: 'deer_whisperer',  name: 'DEER WHISPERER', hint: 'Topple 15 deer in a single run.',            farts: [13] },
+  { id: 'deer_whisperer',  name: 'DEER WHISPERER', hint: 'Topple 15 deer in a single run.',            farts: [13, 17] },
   { id: 'early_bird',      name: 'EARLY BIRD',     hint: 'Reach the Donut House ahead of schedule.',   farts: [14] },
   { id: 'survivor',        name: 'SURVIVOR',       hint: 'Win a run after the crew was worn out.',     farts: [15] },
-  { id: 'big_spender',     name: 'DOZEN DOWN',     hint: 'Buy 12 or more donuts in one order.',        farts: [16] },
-  { id: 'close_call_king', name: 'CLOSE CALL KING', hint: 'Get 5 near-misses in a single run.',        farts: [17, 18] },
+  { id: 'big_spender',     name: 'DOZEN DOWN',     hint: 'Buy 12 or more donuts in one order.',        farts: [16, 18] },
   { id: 'golden_glaze',    name: 'GOLDEN GLAZE',   hint: 'Find all 3 hidden golden donuts.',           farts: [19] },
   { id: 's_rank',          name: 'S-RANK RIDER',   hint: 'Earn a grade of S.',                         farts: [20] },
 ];

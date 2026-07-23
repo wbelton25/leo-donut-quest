@@ -652,7 +652,6 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._checkBikeRepairs();
     this._checkDonutHoles();
     this._checkGoldenDonuts();
-    this._checkCloseCalls();
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
@@ -766,46 +765,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   _onObstacleHit(damage = 10) {
     this._resources.applyChanges({ bikeCondition: -damage });
-    // Getting hit also costs TIME (bug 7): dodging a car gives +1 MIN, hitting it costs
-    // you — the symmetric downside. Scales gently with how hard the hit was.
+    // Getting hit also costs TIME (bug 7), scaled gently with how hard the hit was.
     const timeLoss = Math.max(2, Math.round(damage / 8));
     this._resources.applyChanges({ time: -timeLoss });
-    this._lastDamageAt = Date.now();   // suppresses a bogus "near-miss" right after a hit (2C)
     FX.popText(this, this._player.x, this._player.y - 18, `-${timeLoss} MIN`, {
       color: '#ff7766', fontSize: '8px', rise: 18, duration: 700,
     });
     this.cameras.main.flash(200, 255, Math.min(damage * 5, 255), 0);
-  }
-
-  // ── Close-call bonus (2C) ──────────────────────────────────────────────────────
-  // Skim past a moving car/cart WITHOUT hitting it → +1s and a "CLOSE ONE!" pop, so
-  // weaving through traffic becomes thrilling instead of only punishing. The near-miss
-  // ring sits just OUTSIDE each car's real hit box (|dx|<32,|dy|<24). Capped ~1/sec
-  // globally + 4s per obstacle so it can't be farmed by hovering.
-  _checkCloseCalls() {
-    const now = Date.now();
-    if (now - (this._lastNearMiss ?? 0) < 1000) return;   // global cap
-    if (now - (this._lastDamageAt ?? 0) < 300)  return;   // just got hit → not a near-miss
-    const px = this._player.x, py = this._player.y;
-    for (const o of this._obstacles ?? []) {
-      if (!(o instanceof CarObstacle || o instanceof GolfCartObstacle)) continue;
-      if (now - (o._nearMissAt ?? 0) < 4000) continue;
-      const adx = Math.abs((o._x ?? -9999) - px), ady = Math.abs((o._y ?? -9999) - py);
-      const inHit  = adx < 34 && ady < 26;   // a hair beyond the real hit box
-      const inNear = adx < 46 && ady < 36;
-      if (inNear && !inHit) {
-        o._nearMissAt = now;
-        this._lastNearMiss = now;
-        this._resources.applyChanges({ time: 1 });
-        FX.popText(this, px, py - 20, 'CLOSE ONE! +1 MIN', { color: '#ffd54f', fontSize: '8px', rise: 20, duration: 800 });
-        FX.shake(this, 120, 0.004);
-        const gs = this.game.registry.get('gameState') ?? {};
-        gs.nearMisses = (gs.nearMisses ?? 0) + 1;
-        this.game.registry.set('gameState', gs);
-        if (gs.nearMisses >= 5) BadgeSystem.awardAndToast(this, 'close_call_king');
-        break;
-      }
-    }
   }
 
   // Collected-pickup tracking lives on the saved gameState object (same channel
