@@ -9,7 +9,7 @@ import { BASE_WIDTH, BASE_HEIGHT, txt } from '../constants.js';
 //   snackInv:  { gatorade: N, granola: N, hotdog: N }
 //   bikeInv:   { patch: N, tire: N, chain: N }
 
-const CARD_W = 300;
+const CARD_W = 340;   // wide enough that the price doesn't crowd the item description
 const CARD_X = (BASE_WIDTH - CARD_W) / 2;
 const CARD_Y = 34; // sits just below the HUD strip
 
@@ -111,8 +111,8 @@ export default class WalmartShopCard {
 
     const rowBg  = this._scene.add.rectangle(BASE_WIDTH / 2, y + 9, CARD_W - 4, 18, 0x0a0f1a);
     const lbl    = txt(this._scene, CARD_X + 8,   y + 9, item.label, { fontSize: '8px', color: '#cccccc' }).setOrigin(0, 0.5);
-    const desc   = txt(this._scene, CARD_X + 110,  y + 9, item.desc,  { fontSize: '8px', color: '#778899' }).setOrigin(0, 0.5);
-    const cost   = txt(this._scene, CARD_X + 200,  y + 9, `$${item.cost}`, { fontSize: '8px', color: '#f5a623' }).setOrigin(0, 0.5);
+    const desc   = txt(this._scene, CARD_X + 115,  y + 9, item.desc,  { fontSize: '8px', color: '#778899' }).setOrigin(0, 0.5);
+    const cost   = txt(this._scene, CARD_X + 240,  y + 9, `$${item.cost}`, { fontSize: '8px', color: '#f5a623' }).setOrigin(0, 0.5);
 
     // Minus / qty / plus
     const minusBtn = this._scene.add.rectangle(CARD_X + CARD_W - 52, y + 9, 14, 14, 0x1a1a2a).setInteractive({ useHandCursor: true });
