@@ -543,6 +543,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Golden donuts (3 hidden secrets, +$5 each) ───────────────────────────────
     this._spawnGoldenDonuts();
 
+    // ── Potholes — hop over them (SPACE) for a bonus, or eat bike damage ─────────
+    this._spawnPotholes();
+
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
       fontSize: '8px', color: '#f5e642',
@@ -653,6 +656,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._checkBikeRepairs();
     this._checkDonutHoles();
     this._checkGoldenDonuts();
+    this._checkPotholes();
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
@@ -765,14 +769,6 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   _onObstacleHit(damage = 10) {
-    // HOP over it! If Leo is mid-jump (SPACE), he's airborne and clears the obstacle —
-    // a skill dodge that pairs with the fart (fart = knock down deer, hop = leap anything).
-    if (this._player?.isJumping) {
-      FX.popText(this, this._player.x, this._player.y - 22, 'HOP!', {
-        color: '#8fd6ff', fontSize: '8px', rise: 18, duration: 600,
-      });
-      return;
-    }
     this._resources.applyChanges({ bikeCondition: -damage });
     // Getting hit also costs TIME (bug 7), scaled gently with how hard the hit was.
     const timeLoss = Math.max(2, Math.round(damage / 8));
@@ -1030,6 +1026,43 @@ export default class NeighborhoodScene extends Phaser.Scene {
         gs.goldenDonuts = (gs.goldenDonuts ?? 0) + 1;
         this.game.registry.set('gameState', gs);
         if (gs.goldenDonuts >= 3) BadgeSystem.awardAndToast(this, 'golden_glaze');
+      }
+    }
+  }
+
+  // ── Potholes (hop targets) ──────────────────────────────────────────────────
+  // Static road hazards. Ride through one → bike damage + lost time. HOP over it
+  // (SPACE, mid-jump) → a time BONUS. You can also just steer around them — but the
+  // hop is the rewarding play, which finally gives the jump a real job in Act 1.
+  _spawnPotholes() {
+    const SPOTS = [
+      [47, 90], [52, 115], [90, 47], [150, 55], [230, 47], [90, 64], [311, 100], [280, 152],
+    ];
+    this._potholes = SPOTS.map(([c, r]) => {
+      const x = c * T + 8, y = r * T + 8;
+      this.add.ellipse(x, y, 20, 12, 0x080808, 0.92).setStrokeStyle(1, 0x333333).setDepth(2);
+      this.add.rectangle(x - 3, y,     7, 1, 0x2e2e2e).setAngle(20).setDepth(2);
+      this.add.rectangle(x + 4, y - 1, 6, 1, 0x2e2e2e).setAngle(-35).setDepth(2);
+      return { x, y, lastHit: 0 };
+    });
+  }
+
+  _checkPotholes() {
+    if (!this._potholes) return;
+    const now = Date.now();
+    const px = this._player.x, py = this._player.y;
+    for (const p of this._potholes) {
+      if (now - p.lastHit < 1500) continue;           // don't retrigger while lingering
+      const dx = p.x - px, dy = p.y - py;
+      if (dx * dx + dy * dy > 15 * 15) continue;
+      p.lastHit = now;
+      if (this._player.isJumping) {
+        this._resources.applyChanges({ time: 2 });
+        FX.popText(this, px, py - 22, 'NICE HOP! +2 MIN', { color: '#8fd6ff', fontSize: '8px', rise: 20, duration: 800 });
+      } else {
+        this._resources.applyChanges({ bikeCondition: -8, time: -2 });
+        FX.popText(this, px, py - 18, 'POTHOLE! -2 MIN', { color: '#ff7766', fontSize: '8px', rise: 18, duration: 700 });
+        this.cameras.main.shake(120, 0.006);
       }
     }
   }
