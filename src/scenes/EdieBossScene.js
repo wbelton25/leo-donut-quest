@@ -1,5 +1,5 @@
 import {
-  SCENE_EDIE_BOSS, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_CREDITS, SCENE_HUD,
+  SCENE_EDIE_BOSS, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_HUD,
   BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_BOSS,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
@@ -610,7 +610,10 @@ export default class EdieBossScene extends Phaser.Scene {
     this.time.delayedCall(2400, () => {
       [overlay, t1, t2, t3].forEach(o => o.destroy());
       this.cameras.main.fade(400, 0, 0, 0);
-      this.time.delayedCall(420, () => this.scene.start(SCENE_CREDITS, { party: this._gauntletData.party ?? [], donuts: newDonuts }));
+      // Back to the gauntlet (like the sibling fights) — it ends the run at 0 donuts
+      // (game over) or lets you retry Edie with what's left. You only reach the score
+      // screen by actually WINNING with at least one donut.
+      this.time.delayedCall(420, () => this.scene.start(SCENE_BOSS_GAUNTLET, { ...this._gauntletData, donuts: newDonuts }));
     });
   }
 
