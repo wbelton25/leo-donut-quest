@@ -5,12 +5,21 @@ with no other context. Work phase by phase, commit after each lettered item, and
 with the recipes in §7 before committing.
 
 **Done so far:** 1A (terrain FX, kept) · ~~1B grab-ems~~ (built then CUT after playtest) ·
-R1/R2 (badges + fart-sound unlocks — R2 to be redesigned toward fart *abilities*) · R4
-(badge shelf) · 2D (drivable pockets, deer herds, traffic, combo beans, spawn jitter) ·
-2A (donut-hole trails) · 2B (herds, via 2D) · 2C (close-call bonus) · R3 (golden donuts).
-**Awaiting playtest at GATE 1 (Act 2 ride feel) + GATE 2 (replay loop) + GATE 3 (Act 1
-placement).** **Not started:** Phase 3 (event juice + slang), Phase 4 (presentation/meta),
-Phase 5 (Walmart/tip/balance), R5 (remix modes), R6 (route fork), R2-redesign (fart abilities).
+R1/R2 (badges + fart-sound unlocks — R2 still to be redesigned toward fart *abilities*) ·
+R3 (golden donuts) · R4 (badge shelf) · 2D (drivable pockets, deer herds, traffic, combo
+beans, spawn jitter) · 2A (donut-hole trails) · 2B (herds) · 2C (close-call bonus) ·
+3A (luck fanfare) · 3B (event chips) · 3C (kid-slang dialogue) · 4B (arrival celebration) ·
+4C (arcade initials existed + title 'BEAT IT!' hook) · 4D (kinder game-over + tips) ·
+5B (first-camp tip).
+**Post-playtest bug fixes also done:** boss energy persists across the gauntlet (donuts
+matter), Act 2 clock scale (was showing negative minutes), tighter deer herds, bike
+LIVES + respawn, hits cost time, time capped at the 12:30 start, Walmart tiers visible +
+a pick-which-item picker.
+**Not started / needs input:** 4A (hide dev cheats — deferred, would disrupt testing) ·
+5A (Walmart slim — SUPERSEDED; user chose more depth) · 5C (balance — needs playtests) ·
+R5 (remix modes — after Gate 2) · R6 (route fork — stretch) · R2-redesign (fart abilities
+— needs design decisions) · the reported "Act 2 dialog overlap" (couldn't reproduce; camp
+board + event card + dialogue all verified clean — need the exact screen).
 
 ---
 
