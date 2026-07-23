@@ -34,10 +34,15 @@ export default class HudScene extends Phaser.Scene {
     this.add.rectangle(88, y + 10, 56, 6, 0x4a1a1a).setOrigin(0, 0.5);
     this._bikeFill = this.add.rectangle(88, y + 10, 54, 4, 0xef5350).setOrigin(0, 0.5);
 
-    // NRG bar
-    txt(this, 152, y, 'NRG', { fontSize: '8px', color: '#66bb6a' });
-    this.add.rectangle(188, y + 10, 56, 6, 0x1a3a1a).setOrigin(0, 0.5);
-    this._energyFill = this.add.rectangle(188, y + 10, 54, 4, 0x66bb6a).setOrigin(0, 0.5);
+    // SPARE bikes (lives) — replaces the old NRG bar, which never changed in Act 1.
+    // Pips dim as you use up spare bikes; when you're out, breaking the bike ends the run.
+    txt(this, 152, y, 'SPARE', { fontSize: '8px', color: '#8ac6ff' });
+    this._lifePips = [];
+    for (let i = 0; i < 3; i++) {
+      this._lifePips.push(
+        this.add.circle(200 + i * 13, y + 4, 4, 0x8ac6ff).setStrokeStyle(1, 0x33556a)
+      );
+    }
 
     // ── Fart recharge meter ───────────────────────────────────────────────────
     txt(this, 252, y, 'F', { fontSize: '8px', color: '#f5e642' });
@@ -89,7 +94,6 @@ export default class HudScene extends Phaser.Scene {
   _onResourceUpdate(r) {
     const clamp01 = v => Math.max(0, Math.min(1, v / 100));
     this._bikeFill.scaleX   = clamp01(r.bikeCondition);
-    this._energyFill.scaleX = clamp01(r.energy);
     this._moneyText.setText('$' + r.money);
 
     // Clock: time=270 → 12:30 PM, time=120 → 3:00 PM (Act 1 hard stop), time=0 → 5:00 PM
@@ -122,6 +126,12 @@ export default class HudScene extends Phaser.Scene {
   }
 
   update() {
+    // Spare-bike (life) pips — light for available, dark for used.
+    if (this._lifePips) {
+      const lives = this.game.registry.get('gameState')?.bikeLives ?? 3;
+      this._lifePips.forEach((p, i) => p.setFillStyle(i < lives ? 0x8ac6ff : 0x223240));
+    }
+
     if (this._fartDuration > 0) {
       const remaining = this._fartCooldown - Date.now();
       const progress = remaining > 0 ? 1 - remaining / this._fartDuration : 1;
