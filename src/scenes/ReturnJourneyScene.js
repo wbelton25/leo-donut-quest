@@ -1,6 +1,6 @@
 import {
   SCENE_RETURN_JOURNEY, SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE,
-  BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_NEIGHBORHOOD,
+  BASE_WIDTH, BASE_HEIGHT, MUSIC_NEIGHBORHOOD,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
 import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
@@ -49,15 +49,6 @@ export default class ReturnJourneyScene extends Phaser.Scene {
     // ── Bikers ────────────────────────────────────────────────────────────────
     this._buildBikers(party, donuts);
 
-    // ── Progress bar (reversed: DONUT HOUSE → HOME) ───────────────────────────
-    const barY = BASE_HEIGHT - 26;
-    const barW = BASE_WIDTH - 40;
-    txt(this, 20, barY - 4, 'DONUT HOUSE', { fontSize: '8px', color: '#f5a623' });
-    txt(this, 20 + barW, barY - 4, 'HOME', { fontSize: '8px', color: '#888888' }).setOrigin(1, 0);
-    this.add.rectangle(20 + barW / 2, barY, barW, 7, 0x1a1a2a);
-    this._progressFill = this.add.rectangle(20 + barW, barY, 1, 5, 0xe74c3c).setOrigin(1, 0.5);
-    this._barW = barW;
-
     // ── Auto-transition ───────────────────────────────────────────────────────
     this._elapsed = 0;
     this._done    = false;
@@ -77,9 +68,6 @@ export default class ReturnJourneyScene extends Phaser.Scene {
     this._elapsed += delta;
 
     this._scrollLayers(dt);
-
-    const pct = Math.min(1, this._elapsed / RIDE_DURATION);
-    this._progressFill.setSize(Math.max(1, (this._barW - 4) * (1 - pct)), 5);
 
     if (this._elapsed >= RIDE_DURATION) {
       this._done = true;
