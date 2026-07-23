@@ -1,5 +1,5 @@
 import {
-  SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_CREDITS, SCENE_REPORT_CARD,
+  SCENE_BOSS_GAUNTLET, SCENE_DIALOGUE, SCENE_CREDITS, SCENE_REPORT_CARD, SCENE_GAME_OVER,
   SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_EDIE_BOSS,
   BASE_WIDTH, BASE_HEIGHT, txt,
 } from '../constants.js';
@@ -49,6 +49,15 @@ export default class BossGauntletScene extends Phaser.Scene {
     const party          = this._data.party ?? [];
     const defeatedBosses = this._data.defeatedBosses ?? [];
     const edieDefeated   = this._data.edieDefeated ?? false;
+
+    // ── No donuts left → the run is lost ──────────────────────────────────────
+    // The siblings steal donuts on every fight you lose. With none left there's nothing
+    // to bring home, so the quest is over — even if Edie is technically beaten.
+    if ((this._data.donuts ?? 0) <= 0) {
+      this.cameras.main.fade(400, 0, 0, 0);
+      this.time.delayedCall(420, () => this.scene.start(SCENE_GAME_OVER, { reason: 'gauntlet' }));
+      return;
+    }
 
     // Act 3 starts fresh at full energy, then PERSISTS across sibling fights so that
     // spending donuts to recharge matters. Only reset on the very first fight.
