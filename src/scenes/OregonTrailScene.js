@@ -293,8 +293,13 @@ export default class OregonTrailScene extends Phaser.Scene {
     this._paceText = txt(this, BASE_WIDTH - 4, 53, '', { fontSize: '8px', color: '#44cc44' })
       .setOrigin(1, 0.5).setDepth(7);
 
-    // ENTER / SPACE advances from a camp status board to the next leg.
-    const advance = () => { if (this._phase === 'camp' && this._restStopCon) this._continueFromCamp(); };
+    // ENTER / SPACE advances from a camp status board to the next leg — but NOT while
+    // the supply picker is open (else the ride continues with the picker stuck on screen).
+    this._supplyPicker = null;
+    const advance = () => {
+      if (this._supplyPicker) return;
+      if (this._phase === 'camp' && this._restStopCon) this._continueFromCamp();
+    };
     this.input.keyboard.addKey('ENTER').on('down', advance);
     this.input.keyboard.addKey('SPACE').on('down', advance);
 
@@ -561,6 +566,7 @@ export default class OregonTrailScene extends Phaser.Scene {
   }
 
   _advanceLeg() {
+    if (this._supplyPicker) { this._supplyPicker.destroy(true); this._supplyPicker = null; }
     if (this._restStopCon) { this._restStopCon.destroy(true); this._restStopCon = null; }
     this._campCp = null;
     this._lastEventOutcome = null;  // outcome line belongs to the leg just finished
@@ -622,35 +628,43 @@ export default class OregonTrailScene extends Phaser.Scene {
     if (owned.length === 0) return;
 
     const con = this.add.container(0, 0).setDepth(34);
+    // NOTE: Container.add() returns the CONTAINER, not the child — so build each object,
+    // wire it, THEN add via this helper (which returns the object) or handlers land on
+    // the container and the rows stop being clickable.
+    const add = o => { con.add(o); return o; };
+    this._supplyPicker = con;
+
     const rowH = 18, gap = 4, w = 250;
     const h = 30 + owned.length * (rowH + gap) + 22;
     const px = BASE_WIDTH / 2, py = BASE_HEIGHT / 2;
-    con.add(this.add.rectangle(px, py, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.6).setInteractive());
-    con.add(this.add.rectangle(px, py, w, h, 0x06080f, 0.99).setStrokeStyle(2, isSnack ? 0x66cc66 : 0xef5350));
-    con.add(txt(this, px, py - h / 2 + 12, isSnack ? 'CHOOSE A SNACK' : 'CHOOSE A BIKE PART',
+    const close = () => { con.destroy(true); this._supplyPicker = null; };
+
+    add(this.add.rectangle(px, py, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.6).setInteractive());
+    add(this.add.rectangle(px, py, w, h, 0x06080f, 0.99).setStrokeStyle(2, isSnack ? 0x66cc66 : 0xef5350));
+    add(txt(this, px, py - h / 2 + 12, isSnack ? 'CHOOSE A SNACK' : 'CHOOSE A BIKE PART',
       { fontSize: '8px', color: isSnack ? '#8fd694' : '#ff9999' }).setOrigin(0.5));
 
     let ry = py - h / 2 + 28;
     owned.forEach(id => {
       const [name, sz] = meta[id];
       const label = `${name} - ${DESC[sz]}   x${inv[id]}`;
-      const btn = con.add(this.add.rectangle(px, ry + rowH / 2, w - 20, rowH, 0x14261a)
+      const btn = add(this.add.rectangle(px, ry + rowH / 2, w - 20, rowH, 0x14261a)
         .setStrokeStyle(1, 0x2f6a3a).setInteractive({ useHandCursor: true }));
-      con.add(txt(this, px, ry + rowH / 2, label, { fontSize: '8px', color: '#cde3d0' }).setOrigin(0.5));
+      add(txt(this, px, ry + rowH / 2, label, { fontSize: '8px', color: '#cde3d0' }).setOrigin(0.5));
       btn.on('pointerover', () => btn.setFillStyle(0x224a2e));
       btn.on('pointerout',  () => btn.setFillStyle(0x14261a));
       btn.on('pointerdown', () => {
         if (isSnack) this._useSnackType(id); else this._useRepairType(id);
-        con.destroy(true);
+        close();
         this._rebuildRestStop();
       });
       ry += rowH + gap;
     });
 
-    const cancel = con.add(this.add.rectangle(px, ry + 9, 90, 16, 0x2a1a1a)
+    const cancel = add(this.add.rectangle(px, ry + 9, 90, 16, 0x2a1a1a)
       .setStrokeStyle(1, 0x5a2a2a).setInteractive({ useHandCursor: true }));
-    con.add(txt(this, px, ry + 9, 'CANCEL', { fontSize: '8px', color: '#ff9999' }).setOrigin(0.5));
-    cancel.on('pointerdown', () => con.destroy(true));
+    add(txt(this, px, ry + 9, 'CANCEL', { fontSize: '8px', color: '#ff9999' }).setOrigin(0.5));
+    cancel.on('pointerdown', close);
   }
 
   // Right-hand strip = SCHEDULE status (are you ahead or behind the clock), so the
