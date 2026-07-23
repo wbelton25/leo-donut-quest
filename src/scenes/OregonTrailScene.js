@@ -911,6 +911,13 @@ export default class OregonTrailScene extends Phaser.Scene {
     contBg.on('pointerover', () => contBg.setFillStyle(0x2a6a2a));
     contBg.on('pointerout',  () => contBg.setFillStyle(0x1a3a1a));
     contBg.on('pointerdown', () => this._continueFromCamp());
+
+    // First-stop tutorial tip (5B) — one line at the very bottom, only on the first camp.
+    if (this._legIndex === 0) {
+      add(txt(this, BASE_WIDTH / 2, BASE_HEIGHT - 9,
+        'FIRST STOP! Set your pace, eat/fix if low, then CONTINUE.',
+        { fontSize: '8px', color: '#ffcc66' }).setOrigin(0.5));
+    }
   }
 
   // AHEAD / ON PACE / BEHIND word + color for the TIME bar.
