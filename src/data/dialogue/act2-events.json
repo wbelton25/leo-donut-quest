@@ -1,189 +1,189 @@
 {
-  "_comment": "PICK YOUR POISON: most events offer the SAME three choices in the same order — spend TIME (slow, safe), spend CREW (power through), or spend BIKES (send it). No option is ever 'best'; you pick based on which bar you can spare. Opportunity events instead let you skip or grab a reward for a cost. Kept consistent + numberless on purpose so kids learn the pattern.",
+  "_comment": "PICK YOUR POISON: most events offer the SAME three trades in the same order — spend TIME (slow, safe), CREW (power through), or BIKES (send it). No option is ever 'best'; the magnitude/color preview + your bars tell you which to pick. Text is punched up with kid slang for flavor, but the leading VERB still signals the trade (wait/stop = time, power/muscle/sprint = crew, send/gun/bomb = bikes). Effects are balanced — keep them if you rewrite the words.",
   "events": [
     {
       "id": "flat_tire",
       "weight": 9,
       "title": "Flat Tire!",
-      "description": "One of the bikes has a flat. What now?",
+      "description": "PSSSSFT. A tire just went flat. Classic.",
       "choices": [
-        { "text": "Stop and patch it properly", "effects": { "time": -14 } },
-        { "text": "Everyone pitches in for a fast fix", "effects": { "energy": -12 } },
-        { "text": "Just ride on the flat", "effects": { "bikeCondition": -16 } }
+        { "text": "Stop and patch it up right", "effects": { "time": -14 } },
+        { "text": "Everybody lock in for a speed-fix", "effects": { "energy": -12 } },
+        { "text": "Eh, just send it on the flat", "effects": { "bikeCondition": -16 } }
       ]
     },
     {
       "id": "broken_chain",
       "weight": 8,
-      "title": "Broken Chain",
-      "description": "A chain snapped mid-pedal.",
+      "title": "Chain's Cooked",
+      "description": "A chain snapped mid-pedal. It is straight up cooked.",
       "choices": [
-        { "text": "Take your time to fix it right", "effects": { "time": -13 } },
-        { "text": "Force it back together and go", "effects": { "energy": -12 } },
-        { "text": "Grind on with the loose chain", "effects": { "bikeCondition": -15 } }
+        { "text": "Take your time, fix it clean", "effects": { "time": -13 } },
+        { "text": "Muscle it back together, GO", "effects": { "energy": -12 } },
+        { "text": "Grind on with the busted chain", "effects": { "bikeCondition": -15 } }
       ]
     },
     {
       "id": "bent_rim",
       "weight": 8,
       "title": "Bent Wheel!",
-      "description": "Someone clipped a curb and the wheel wobbles badly.",
+      "description": "Somebody ate a curb and now the wheel is all wobbly.",
       "choices": [
-        { "text": "Carefully true the wheel", "effects": { "time": -15 } },
-        { "text": "Bang it straight together", "effects": { "energy": -11 } },
-        { "text": "Ride the wobble and hope", "effects": { "bikeCondition": -18 } }
+        { "text": "Carefully true it back up", "effects": { "time": -15 } },
+        { "text": "Bang it straight, hurry", "effects": { "energy": -11 } },
+        { "text": "Ride the wobble and pray", "effects": { "bikeCondition": -18 } }
       ]
     },
     {
       "id": "deer_chase",
       "weight": 8,
-      "title": "Deer in the Road!",
-      "description": "A deer bolts right across your path.",
+      "title": "Deer!!",
+      "description": "A deer YEETS across the road right in front of you.",
       "choices": [
-        { "text": "Slow way down and wait", "effects": { "time": -12 } },
-        { "text": "Sprint past it", "effects": { "energy": -14 } },
-        { "text": "Swerve hard off the curb", "effects": { "bikeCondition": -14 } }
+        { "text": "Chill and let it pass", "effects": { "time": -12 } },
+        { "text": "Sprint past that thing", "effects": { "energy": -14 } },
+        { "text": "Swerve off the curb hard", "effects": { "bikeCondition": -14 } }
       ]
     },
     {
       "id": "dog_chase",
       "weight": 8,
       "title": "Dog Chase!",
-      "description": "A big dog is chasing the whole crew.",
+      "description": "A big ol' dog is fully chasing the crew. It is locked in.",
       "choices": [
-        { "text": "Circle back the long way", "effects": { "time": -13 } },
-        { "text": "Pedal like crazy to lose it", "effects": { "energy": -15 } },
-        { "text": "Cut through the rocky lot", "effects": { "bikeCondition": -13 } }
+        { "text": "Loop back the safe way", "effects": { "time": -13 } },
+        { "text": "Pedal for your LIVES", "effects": { "energy": -15 } },
+        { "text": "Cut through the gnarly lot", "effects": { "bikeCondition": -13 } }
       ]
     },
     {
       "id": "rainstorm",
       "weight": 8,
       "title": "Rainstorm",
-      "description": "The sky opens up and rain pours down.",
+      "description": "Sky opens up. You are getting absolutely SOAKED.",
       "choices": [
         { "text": "Wait it out under a tree", "effects": { "time": -16 } },
         { "text": "Push on through the downpour", "effects": { "energy": -13 } },
-        { "text": "Splash through the puddles fast", "effects": { "bikeCondition": -14 } }
+        { "text": "Splash the puddles full speed", "effects": { "bikeCondition": -14 } }
       ]
     },
     {
       "id": "heat_wave",
       "weight": 7,
       "title": "Heat Wave",
-      "description": "The afternoon sun is absolutely brutal.",
+      "description": "It is HOT hot. Everyone's melting, no cap.",
       "choices": [
-        { "text": "Rest in the shade a while", "effects": { "time": -14 } },
-        { "text": "Grit it out and hold the pace", "effects": { "energy": -16 } },
-        { "text": "Race hard to the next shade", "effects": { "bikeCondition": -12 } }
+        { "text": "Chill in the shade a sec", "effects": { "time": -14 } },
+        { "text": "Grit it out, hold the pace", "effects": { "energy": -16 } },
+        { "text": "Race to the next shady spot", "effects": { "bikeCondition": -12 } }
       ]
     },
     {
       "id": "headwind",
       "weight": 7,
-      "title": "Fierce Headwind",
-      "description": "A hard wind shoves you backward.",
+      "title": "Brutal Headwind",
+      "description": "A wall of wind is shoving you backward. Rude.",
       "choices": [
-        { "text": "Ease off and wait for a lull", "effects": { "time": -12 } },
+        { "text": "Ease off, wait for a break", "effects": { "time": -12 } },
         { "text": "Power straight into it", "effects": { "energy": -16 } },
-        { "text": "Tuck low and hammer the pedals", "effects": { "bikeCondition": -12 } }
+        { "text": "Tuck low and hammer it", "effects": { "bikeCondition": -12 } }
       ]
     },
     {
       "id": "construction",
       "weight": 8,
       "title": "Construction Zone",
-      "description": "The road ahead is completely torn up.",
+      "description": "Road's completely torn up. Big L for the city.",
       "choices": [
-        { "text": "Take the long detour", "effects": { "time": -16 } },
-        { "text": "Carry the bikes across on foot", "effects": { "energy": -13 } },
-        { "text": "Bump straight over the rubble", "effects": { "bikeCondition": -16 } }
+        { "text": "Take the long way around", "effects": { "time": -16 } },
+        { "text": "Carry the bikes across", "effects": { "energy": -13 } },
+        { "text": "Bump right over the rubble", "effects": { "bikeCondition": -16 } }
       ]
     },
     {
       "id": "big_hill",
       "weight": 8,
       "title": "Big Hill",
-      "description": "A steep hill looms with no way around.",
+      "description": "A monster hill. Everyone groans out loud.",
       "choices": [
-        { "text": "Walk the bikes up slowly", "effects": { "time": -16 } },
-        { "text": "Grind up it in the saddle", "effects": { "energy": -18 } },
-        { "text": "Attack it standing (hard on the bikes)", "effects": { "bikeCondition": -11 } }
+        { "text": "Walk the bikes up slow", "effects": { "time": -16 } },
+        { "text": "Grind up it, no walking", "effects": { "energy": -18 } },
+        { "text": "Attack it standing up", "effects": { "bikeCondition": -11 } }
       ]
     },
     {
       "id": "debris",
       "weight": 8,
-      "title": "Junk in the Road!",
-      "description": "Broken glass and screws cover the road.",
+      "title": "Junk Everywhere",
+      "description": "Glass and screws all over the road. Super sketchy.",
       "choices": [
-        { "text": "Pick a careful path through", "effects": { "time": -14 } },
+        { "text": "Weave through real careful", "effects": { "time": -14 } },
         { "text": "Hop off and walk it through", "effects": { "energy": -12 } },
-        { "text": "Gun it and hope", "effects": { "bikeCondition": -20 } }
+        { "text": "Gun it and hope for the best", "effects": { "bikeCondition": -20 } }
       ]
     },
     {
       "id": "officer",
       "weight": 6,
-      "title": "Officer on Patrol",
-      "description": "A police officer waves you down. No sidewalk riding!",
+      "title": "Cop Alert",
+      "description": "An officer waves you down. \"No sidewalk riding!\"",
       "choices": [
-        { "text": "Stop and explain politely", "effects": { "time": -14 } },
-        { "text": "Talk fast and hustle off", "effects": { "energy": -10 } },
-        { "text": "Duck down the bumpy back alley", "effects": { "bikeCondition": -12 } }
+        { "text": "Stop and explain, stay cool", "effects": { "time": -14 } },
+        { "text": "Talk fast and bounce", "effects": { "energy": -10 } },
+        { "text": "Duck down the bumpy alley", "effects": { "bikeCondition": -12 } }
       ]
     },
     {
       "id": "nosy_neighbor",
       "weight": 6,
       "title": "Nosy Neighbor!",
-      "description": "Mr. Henderson is already reaching for his phone.",
+      "description": "Mr. Henderson is already dialing someone. Snitch behavior.",
       "choices": [
         { "text": "Stop and chat him down", "effects": { "time": -13 } },
-        { "text": "Wave and rush right past", "effects": { "energy": -10 } },
-        { "text": "Cut across his rough yard", "effects": { "bikeCondition": -12 } }
+        { "text": "Wave and zoom right past", "effects": { "energy": -10 } },
+        { "text": "Cut across his junky yard", "effects": { "bikeCondition": -12 } }
       ]
     },
     {
       "id": "shortcut",
       "weight": 7,
       "title": "Shortcut!",
-      "description": "A path through the park could cut off a big chunk.",
+      "description": "A path could cut off a HUGE chunk. Kinda risky though.",
       "choices": [
-        { "text": "Stay on the safe main road", "effects": {} },
-        { "text": "Take it, riding careful", "effects": { "distance": 150, "time": -4 } },
-        { "text": "Bomb down it full speed", "effects": { "distance": 250, "bikeCondition": -12 } }
+        { "text": "Nah, stay on the main road", "effects": {} },
+        { "text": "Take it, ride it careful", "effects": { "distance": 150, "time": -4 } },
+        { "text": "BOMB it full speed", "effects": { "distance": 250, "bikeCondition": -12 } }
       ]
     },
     {
       "id": "downhill",
       "weight": 6,
-      "title": "Big Downhill!",
-      "description": "A long hill you can coast down — or bomb.",
+      "title": "Huge Downhill!",
+      "description": "A giant hill you can just let it ride down.",
       "choices": [
-        { "text": "Coast easy and let everyone rest", "effects": { "energy": 16 } },
+        { "text": "Coast easy, everyone rests", "effects": { "energy": 16 } },
         { "text": "Let it roll for good speed", "effects": { "distance": 150 } },
-        { "text": "Full send for max ground", "effects": { "distance": 260, "bikeCondition": -12 } }
+        { "text": "FULL SEND for max ground", "effects": { "distance": 260, "bikeCondition": -12 } }
       ]
     },
     {
       "id": "water_fountain",
       "weight": 6,
       "title": "Water Fountain!",
-      "description": "A working fountain by the park. Everyone's parched.",
+      "description": "A working fountain. Everyone's parched fr.",
       "choices": [
         { "text": "Skip it — no time", "effects": {} },
-        { "text": "Everyone drinks and cools off", "effects": { "energy": 22, "time": -6 } }
+        { "text": "Everybody drink up and cool off", "effects": { "energy": 22, "time": -6 } }
       ]
     },
     {
       "id": "found_money",
       "weight": 5,
-      "title": "Lucky Find!",
-      "description": "A crumpled bill on the side of the road.",
+      "title": "Free Money!",
+      "description": "A crumpled bill just sitting there. Straight W.",
       "choices": [
         { "text": "Leave it, keep rolling", "effects": {} },
-        { "text": "Grab it quick", "effects": { "money": 5, "time": -3 } }
+        { "text": "Snag it real quick", "effects": { "money": 5, "time": -3 } }
       ]
     }
   ]
