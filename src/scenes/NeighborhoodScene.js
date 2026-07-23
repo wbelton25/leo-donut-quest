@@ -1143,7 +1143,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
     const objs = [];
 
-    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setScrollFactor(0).setDepth(50));
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setScrollFactor(0).setDepth(50).setInteractive());
     objs.push(txt(this, cx, cy - 52, 'READY TO DEPART?', { fontSize: '12px', color: '#f5e642' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
 
     const partyNames = this._party.getParty();
@@ -1242,7 +1242,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
   _showDeadlineOverlay() {
     const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
     const objs = [];
-    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50));
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50).setInteractive());
     objs.push(txt(this, cx, cy - 30, "IT'S 3:00 PM!", { fontSize: '12px', color: '#f5a623' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
     objs.push(txt(this, cx, cy - 10, 'LAST CHANCE TO DEPART', { fontSize: '8px', color: '#cccccc' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
 
@@ -1263,7 +1263,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const name = NAMES[bossLost] ?? 'SIBLING';
     const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
     const objs = [];
-    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setScrollFactor(0).setDepth(50));
+    objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82).setScrollFactor(0).setDepth(50).setInteractive());
     objs.push(txt(this, cx, cy - 28, `LOST TO ${name}!`, { fontSize: '10px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
 
     const dismiss = () => objs.forEach(o => o.destroy());
