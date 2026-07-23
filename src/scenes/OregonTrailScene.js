@@ -847,7 +847,28 @@ export default class OregonTrailScene extends Phaser.Scene {
     const hasOutcome = !!this._lastEventOutcome;
     const terr  = this._terrain;
     const cardW = 300, cardX = (BASE_WIDTH - cardW) / 2;
-    const cardH = 210 + (hasOutcome ? 12 : 0);
+    const wrapW = cardW - 24;
+
+    // The flavor lines (leg recap / event outcome / terrain heads-up) can be longer than
+    // one line — pre-measure them so the card sizes to fit instead of spilling past the
+    // border (bug 4). Uses an off-screen temp text to get the wrapped height.
+    const measure = (s) => {
+      const t = txt(this, 0, -999, s, { fontSize: '8px', align: 'center', wordWrap: { width: wrapW } });
+      const h = t.height; t.destroy(); return h;
+    };
+    const recapS   = this._lastLegSummary ? this._lastLegSummary.recap : null;
+    const outcomeS = hasOutcome ? this._lastEventOutcome.text : null;
+    const nextS    = `NEXT: ${terr.name} (${terr.hint})`;
+    const recapH   = recapS   ? measure(recapS)   : 0;
+    const outcomeH = outcomeS ? measure(outcomeS) : 0;
+    const nextH    = measure(nextS);
+
+    const cardH = 13 + 15
+      + (recapS   ? recapH   + 3 : 0)
+      + (outcomeS ? outcomeH + 3 : 0)
+      + 5 + 15 + 15 + 18
+      + nextH + 8
+      + 16 + 21 + 16 + 23 + 20;
     const cardY = (BASE_HEIGHT - cardH) / 2;
 
     this._restStopCon = this.add.container(0, 0).setDepth(31);
@@ -858,6 +879,9 @@ export default class OregonTrailScene extends Phaser.Scene {
 
     const line = (y, s, color, x = BASE_WIDTH / 2, ox = 0.5) =>
       add(txt(this, x, y, s, { fontSize: '8px', color }).setOrigin(ox, 0.5));
+    // Top-anchored centered line that wraps within the card; returns its rendered height.
+    const wrapLine = (y, s, color) =>
+      add(txt(this, BASE_WIDTH / 2, y, s, { fontSize: '8px', color, align: 'center', wordWrap: { width: wrapW } }).setOrigin(0.5, 0)).height;
 
     // A labeled bar: NAME [====----] word
     const bar = (y, label, value, fillColor, word, wordColor) => {
@@ -871,8 +895,8 @@ export default class OregonTrailScene extends Phaser.Scene {
     const landmark = this._campCp ? this._campCp.label : 'REST STOP';
     line(y, landmark, '#f5a623'); y += 15;
 
-    if (this._lastLegSummary) { line(y, this._lastLegSummary.recap, '#99aabb'); y += 12; }
-    if (hasOutcome)           { line(y, this._lastEventOutcome.text, this._lastEventOutcome.color); y += 12; }
+    if (recapS)   { y += wrapLine(y, recapS, '#99aabb') + 3; }
+    if (outcomeS) { y += wrapLine(y, outcomeS, this._lastEventOutcome.color) + 3; }
     y += 5;
 
     // Three bars. TIME is shown as a fraction of the ride's starting budget (0-100%).
@@ -882,8 +906,8 @@ export default class OregonTrailScene extends Phaser.Scene {
     const cw = this._crewWord();  bar(y, 'CREW',  this._crew,  0x66cc66, cw[0], cw[1]); y += 15;
     const bw = this._bikesWord(); bar(y, 'BIKES', this._bikes, 0xef5350, bw[0], bw[1]); y += 18;
 
-    // Terrain heads-up.
-    line(y, `NEXT: ${terr.name} (${terr.hint})`, terr.color); y += 16;
+    // Terrain heads-up (wrapped).
+    y += wrapLine(y, nextS, terr.color) + 8;
 
     // Pace lever.
     line(y, 'SET YOUR PACE:', '#8899aa'); y += 16;
