@@ -54,85 +54,83 @@ const CHECKPOINTS = [
   { distance: 1600, id: 'petsupply', label: 'PET SUPPLIES PLUS',  tick: 'PET SUPLS', dialogue: 'checkpoint_petsupply', isShop: false, autoEffect: { energy: -5 } },
 ];
 
-// Location-specific events fired when reaching each checkpoint
+// Location-specific events fired when reaching each checkpoint. Same "pick your poison"
+// shape as the road events: spend TIME (safe), CREW (power through), or BIKES (send it).
 const LOCATION_EVENTS = {
   school: [
     {
       title: 'TEACHER ALERT!',
-      description: "Mrs. Peterson spots the crew from the parking lot. \"Aren't you kids supposed to be in class?!\"",
+      description: "Mrs. Peterson spots the crew. \"Aren't you kids supposed to be in class?!\"",
       choices: [
-        { text: "Explain it's a real emergency",        effects: { time: -8 } },
-        { text: 'Pedal away fast!',                    effects: { energy: -10, time: -4 } },
-        { text: 'Carson talks her down  [skill]',      effects: { time: -3 }, requiresPartyMember: 'carson' },
-        { text: 'Warren creates a diversion  [skill]', effects: { time: -5 }, requiresPartyMember: 'warren' },
+        { text: 'Stop and explain the emergency', effects: { time: -12 } },
+        { text: 'Sweet-talk her and slip away',   effects: { energy: -10 } },
+        { text: 'Cut across the muddy field',      effects: { bikeCondition: -12 } },
       ],
     },
     {
       title: 'RECESS RACE!',
-      description: "Kids at recess block the path and dare the crew to a quick race. \"Scared?!\"",
+      description: "Kids at recess block the path and dare the crew to a race. \"Scared?!\"",
       choices: [
-        { text: "Race them — it'll pump everyone up",  effects: { time: -10, energy: 10 } },
-        { text: 'Politely decline and ride on',        effects: { time: -4 } },
-        { text: 'Justin destroys them in 20 sec  [skill]', effects: { time: -3, energy: 8 }, requiresPartyMember: 'justin' },
+        { text: 'Politely decline and ride on', effects: { time: -10 } },
+        { text: "Race them — you can't lose",    effects: { energy: -14 } },
+        { text: 'Bunny-hop the curbs to flex',   effects: { bikeCondition: -12 } },
       ],
     },
     {
       title: 'CROSSING GUARD',
-      description: "The crossing guard holds the stop sign up. \"Slow down! No bikes on school property!\"",
+      description: "The crossing guard holds up the stop sign. \"No bikes on school property!\"",
       choices: [
-        { text: 'Wait it out',                         effects: { time: -6 } },
-        { text: 'Duck through the back path',          effects: { time: -3, bikeCondition: -8 } },
-        { text: 'Warren spots a gap  [skill]',         effects: { time: -2 }, requiresPartyMember: 'warren' },
+        { text: 'Wait it out', effects: { time: -12 } },
+        { text: 'Hustle across on foot', effects: { energy: -9 } },
+        { text: 'Duck through the rough back path', effects: { bikeCondition: -11 } },
       ],
     },
   ],
   tire: [
     {
       title: 'FREE TIRE CHECK!',
-      description: "\"Hey kids, those bikes look rough. I'll inspect them for free — takes five minutes!\"",
+      description: "\"Those bikes look rough — I'll tune them up free, but it takes a bit!\"",
       choices: [
-        { text: 'Accept the free check',               effects: { time: -8, bikeCondition: 20 } },
-        { text: 'Wave him off — no time',              effects: {} },
-        { text: 'Warren evaluates what is critical  [skill]', effects: { time: -4, bikeCondition: 25 }, requiresPartyMember: 'warren' },
+        { text: 'Wave him off — no time', effects: {} },
+        { text: 'Let him tune the bikes up', effects: { time: -12, bikeCondition: 22 } },
       ],
     },
     {
       title: 'DELIVERY TRUCK!',
-      description: "A delivery truck is backed across the exit, completely blocking the road.",
+      description: "A delivery truck is backed clear across the exit, blocking the road.",
       choices: [
-        { text: 'Wait for it to move',                 effects: { time: -8 } },
-        { text: 'Cut through the gravel lot',          effects: { time: -3, bikeCondition: -12 } },
-        { text: 'Justin finds a gap instantly  [skill]', effects: { time: -2 }, requiresPartyMember: 'justin' },
+        { text: 'Wait for it to move', effects: { time: -14 } },
+        { text: 'Squeeze the bikes around it', effects: { energy: -11 } },
+        { text: 'Cut through the gravel lot', effects: { bikeCondition: -14 } },
       ],
     },
   ],
   petsupply: [
     {
       title: 'ESCAPED DOG!',
-      description: "A massive golden retriever bursts through the pet store door and charges after the crew!",
+      description: "A huge golden retriever bursts out the door and charges the crew!",
       choices: [
-        { text: 'RIDE FOR YOUR LIVES!',                effects: { energy: -20, time: -5 } },
-        { text: 'MJ grabs the leash  [skill]',         effects: { time: -3, energy: -8 }, requiresPartyMember: 'mj' },
-        { text: 'Carson lures it away  [skill]',       effects: { time: -2 }, requiresPartyMember: 'carson' },
-        { text: 'Justin outruns it easily  [skill]',   effects: { energy: -5 }, requiresPartyMember: 'justin' },
+        { text: 'Freeze and let it calm down', effects: { time: -12 } },
+        { text: 'Ride for your lives!', effects: { energy: -16 } },
+        { text: 'Bail off the curb to escape', effects: { bikeCondition: -12 } },
       ],
     },
     {
       title: 'LOOSE FERRET!',
-      description: "A ferret escapes and zips between the bikes — MJ nearly swerves into a fence!",
+      description: "A ferret escapes and zips right between the bikes!",
       choices: [
-        { text: 'Swerve hard and keep going',          effects: { bikeCondition: -15, time: -3 } },
-        { text: 'Stop and catch it carefully',         effects: { time: -10 } },
-        { text: 'Carson scoops it up smoothly  [skill]', effects: { time: -2, bikeCondition: -5 }, requiresPartyMember: 'carson' },
+        { text: 'Stop and let it pass', effects: { time: -10 } },
+        { text: 'Swerve and stay in control', effects: { energy: -10 } },
+        { text: 'Jerk the bars hard to dodge', effects: { bikeCondition: -14 } },
       ],
     },
     {
       title: 'SQUAWKING PARROT!',
-      description: "A parrot on a perch outside starts yelling your names, drawing stares from everyone nearby.",
+      description: "A parrot outside starts yelling your names, drawing a crowd.",
       choices: [
-        { text: 'Ignore it and pedal hard',            effects: { time: -3 } },
-        { text: 'Try to shoo it (bad idea)',           effects: { time: -8, energy: -5 } },
-        { text: 'Warren walks past calmly  [skill]',   effects: { time: -1 }, requiresPartyMember: 'warren' },
+        { text: 'Wait for it to quiet down', effects: { time: -10 } },
+        { text: 'Pedal off before a crowd forms', effects: { energy: -10 } },
+        { text: 'Cut across the rough lot', effects: { bikeCondition: -10 } },
       ],
     },
   ],
