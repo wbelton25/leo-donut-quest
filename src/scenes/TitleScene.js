@@ -46,6 +46,14 @@ export default class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
     this.time.addEvent({ delay: 600, loop: true, callback: () => prompt.setVisible(!prompt.visible) });
 
+    // "Beat your grade" hook (4C) — dares the player to top their best run.
+    const best = ScoreSystem.getLeaderboard()[0];
+    if (best) {
+      txt(this, cx - 60, cy + 70, `BEST: ${best.grade} (${best.initials}) - BEAT IT!`, {
+        fontSize: '8px', color: '#f5c542',
+      }).setOrigin(0.5);
+    }
+
     txt(this, BASE_WIDTH - 4, BASE_HEIGHT - 6, 'v0.5', {
       fontSize: '6px', color: '#334455',
     }).setOrigin(1, 1);
