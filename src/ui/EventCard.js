@@ -118,26 +118,46 @@ export default class EventCard {
 
   // A short PLAIN hint under each choice — what it does, in kid-readable words.
   // No numbers, no risk tiers; a little luck still decides how it actually turns out.
+  // A plain, MAGNITUDE-aware hint for each choice, with a reliable good→bad color so the
+  // player can tell options apart: teal = a friend's easy move, green = good/cheap,
+  // yellow = a real cost, orange = big cost / risky. (Choices are deterministic, so the
+  // hint is exactly what happens.)
   _effectPreview(choice) {
     const e = choice.effects ?? {};
+    const timeWord = v => { const a = -v; return a >= 15 ? 'costs a LOT of time' : a >= 7 ? 'costs some time' : 'costs a little time'; };
+    const crewWord = v => { const a = -v; return a >= 15 ? 'wears the crew out'  : a >= 7 ? 'tires the crew'  : 'tires the crew a bit'; };
+    const bikeWord = v => { const a = -v; return a >= 15 ? 'rough on the bikes'  : a >= 7 ? 'wears the bikes'  : 'scuffs the bikes'; };
 
-    const parts = [];
-    if (e.time < 0)                   parts.push('costs time');
-    if (e.time > 0)                   parts.push('saves time');
-    if (e.distance > 0)               parts.push('a shortcut');
-    if (e.energy > 0 || e.snacks > 0) parts.push('helps the crew');
-    if (e.energy < 0 || e.partyLossRisk) parts.push('tires the crew');   // bold move = crew cost
-    if (e.bikeCondition > 0)          parts.push('fixes bikes');
-    if (e.bikeCondition < 0)          parts.push('rough on bikes');
-    if (e.money > 0)                  parts.push('find cash');
+    // A friend's skill move — always the quick, low-cost, smart pick. Flag it clearly.
+    if (choice.requiresPartyMember) {
+      return { text: 'quick + easy (a friend helps)', color: '#6fe0c8' };
+    }
 
-    const uniq = [...new Set(parts)];
-    if (uniq.length === 0) return { text: 'safe', color: '#88bb99' };
+    const perks = [], costs = [];
+    if (e.time > 0)          perks.push('saves time');
+    if (e.bikeCondition > 0) perks.push('fixes bikes');
+    if (e.energy > 0 || e.snacks > 0) perks.push('rests the crew');
+    if (e.distance > 0)      perks.push('a shortcut!');
+    if (e.money > 0)         perks.push('find cash');
+    if (e.time < 0)          costs.push(timeWord(e.time));
+    if (e.energy < 0)        costs.push(crewWord(e.energy));
+    if (e.partyLossRisk)     costs.push('tires the crew');
+    if (e.bikeCondition < 0) costs.push(bikeWord(e.bikeCondition));
 
-    const bad  = (e.energy < 0) || (e.bikeCondition < 0) || !!e.partyLossRisk;
-    const good = (e.energy > 0) || (e.bikeCondition > 0) || (e.distance > 0) || (e.snacks > 0);
-    const color = choice.requiresPartyMember ? '#7fd6c0' : bad && !good ? '#ffa077' : good ? '#88cc88' : '#99aabb';
-    return { text: uniq.join(', '), color };
+    const uniq = [...new Set([...perks, ...costs])];
+    const text = uniq.length ? uniq.join(', ') : 'safe — no cost';
+
+    // Cost/perk score → reliable color (greener = better, oranger = worse).
+    const cost = (e.time < 0 ? -e.time * 0.7 : 0) + (e.energy < 0 ? -e.energy : 0)
+               + (e.partyLossRisk ? e.partyLossRisk * 40 : 0) + (e.bikeCondition < 0 ? -e.bikeCondition : 0);
+    const perk = (e.bikeCondition > 0 ? e.bikeCondition : 0) + (e.energy > 0 ? e.energy : 0)
+               + (e.distance > 0 ? 12 : 0) + (e.money > 0 ? 6 : 0) + (e.time > 0 ? 10 : 0);
+    let color;
+    if (perk >= cost)   color = '#7ee08a';   // net good — bright green
+    else if (cost < 9)  color = '#b6d98a';   // cheap — light green
+    else if (cost < 18) color = '#f0c04a';   // a real cost — yellow
+    else                color = '#ff8866';   // big cost / risky — orange
+    return { text, color };
   }
 
   // Categorize an event by keyword → a colored ASCII chip. Purely visual shorthand.
