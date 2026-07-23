@@ -45,8 +45,18 @@ export default class GameOverScene extends Phaser.Scene {
       fontSize: '8px', color: '#ffaa44',
     }).setOrigin(0.5);
 
-    txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 10, 'NO DONUTS TODAY.', {
-      fontSize: '8px', color: '#888888',
+    // Encouraging kid-toned line + one concrete tip for the specific failure.
+    const TIPS = {
+      energy:   'TIP: eat a snack at camp when the crew looks tired.',
+      bike:     'TIP: fix your bikes at camp before they wear out.',
+      time:     'TIP: knock down deer + dodge cars to bank time,\nand take it EASY on the big hills.',
+      gauntlet: 'TIP: save a few donuts to recharge between fights!',
+    };
+    txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 8, 'SO CLOSE! GIVE IT ANOTHER GO.', {
+      fontSize: '8px', color: '#9fd6a0',
+    }).setOrigin(0.5);
+    txt(this, BASE_WIDTH / 2, BASE_HEIGHT / 2 + 26, TIPS[this._reason] ?? '', {
+      fontSize: '8px', color: '#7a90a8', align: 'center', lineSpacing: 4,
     }).setOrigin(0.5);
 
     // Prompt

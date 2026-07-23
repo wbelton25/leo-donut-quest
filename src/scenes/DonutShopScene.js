@@ -81,6 +81,9 @@ export default class DonutShopScene extends Phaser.Scene {
     this._resources.applyChanges({});
     this._party._emit();
 
+    // ── Arrival celebration (4B) — reaching the shop is the mid-game victory ──
+    this._celebrateArrival();
+
     // ── Replay badges (Phase R) — reaching the Donut House is the arrival beat ──
     this.time.delayedCall(600, () => {
       const crew = this._party.getParty().length;
@@ -88,6 +91,32 @@ export default class DonutShopScene extends Phaser.Scene {
       if (crew === 0) BadgeSystem.awardAndToast(this, 'solo_rider');
       const gs = this.game.registry.get('gameState') ?? {};
       if (gs.arrivedAhead) BadgeSystem.awardAndToast(this, 'early_bird');
+    });
+  }
+
+  // ── Arrival celebration ─────────────────────────────────────────────────────
+  // A quick shower of donuts + a YOU MADE IT! banner when the shop opens. Reaching
+  // the Donut House is the mid-game win — it deserves a beat before the shopping.
+  _celebrateArrival() {
+    for (let i = 0; i < 14; i++) {
+      const x = 20 + Math.random() * (BASE_WIDTH - 40);
+      const d = this.add.container(x, -12 - Math.random() * 70).setDepth(60);
+      d.add(this.add.circle(0, 0, 6, 0xf5a623));
+      d.add(this.add.circle(0, 0, 2.5, 0x2a1a0a));
+      d.add(this.add.rectangle(-2, -2, 3, 1.5, 0xe74c3c).setAngle(30));
+      this.tweens.add({
+        targets: d, y: BASE_HEIGHT + 20, angle: (Math.random() < 0.5 ? 360 : -360),
+        duration: 1500 + Math.random() * 800, delay: Math.random() * 500, ease: 'Cubic.In',
+        onComplete: () => d.destroy(),
+      });
+    }
+    const banner = txt(this, BASE_WIDTH / 2, -20, 'YOU MADE IT!', {
+      fontSize: '16px', color: '#f5e642', stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(61);
+    this.tweens.add({
+      targets: banner, y: BASE_HEIGHT / 2 - 44, duration: 500, ease: 'Back.Out',
+      onComplete: () => this.time.delayedCall(1200, () =>
+        this.tweens.add({ targets: banner, alpha: 0, y: banner.y - 20, duration: 400, onComplete: () => banner.destroy() })),
     });
   }
 
