@@ -52,9 +52,13 @@ in this repo's history (`git log` shows the format).
    ("worn out!", "ahead!"), never percentages, ranges, or point values. The player is a kid.
 2. **Camps are untimed.** The clock only moves while bikes visibly move. Never add time
    pressure to a decision screen.
-3. **No risk tiers / stat previews on choices.** Choices show a short plain-language hint
-   ("risky — could cost a friend"); outcomes are a hidden luck roll revealed afterward.
-   A previous risk-tier system was built and deliberately deleted (`src/utils/choiceRisk.js`).
+3. **Choices are PREDICTABLE (what you see is what you get).** *(Updated after playtest —
+   this reverses the old "hidden gamble" rule.)* Each choice shows a plain trade-off hint
+   ("costs time, tires the crew") and that is EXACTLY what happens — no hidden luck roll.
+   The old random "could cost a friend" gamble is gone; a bold choice deterministically
+   tires the crew. Kids need to reason about choices, not guess. No risk tiers/numbers.
+   PACE follows a **sprint/rest rhythm**: EASY rests the crew (recovers), PUSH is locked
+   when the crew is worn out.
 4. **Only TIME can end the run** in Act 2. Low CREW/BIKES just slows you down.
 5. **Font is Press Start 2P, 8px grid, ASCII only.** No emoji in game text. Keep strings
    short — long words run off cards.
