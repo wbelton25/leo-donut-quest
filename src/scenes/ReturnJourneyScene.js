@@ -8,7 +8,7 @@ import { registerCharacterAnims } from '../utils/AnimationRegistry.js';
 // ReturnJourneyScene: sunset cutscene — the crew rides home with donuts.
 // No events, no input. Pure visual with auto-transition after RIDE_DURATION ms.
 
-const RIDE_DURATION  = 7000;  // ms total ride length
+const RIDE_DURATION  = 4500;  // ms of peaceful riding before the crew spots the siblings
 const SCROLL_SPEED   = 70;    // slightly faster than outbound — urgency
 
 const MEMBER_COLORS = {
@@ -49,37 +49,32 @@ export default class ReturnJourneyScene extends Phaser.Scene {
     // ── Bikers ────────────────────────────────────────────────────────────────
     this._buildBikers(party, donuts);
 
-    // ── Auto-transition ───────────────────────────────────────────────────────
-    this._elapsed = 0;
-    this._done    = false;
-    this._riding  = false;
+    // ── Flow: ride a bit → the crew SPOTS the siblings (dialogue) → into the fights ──
+    this._done   = false;
+    this._riding = true;   // start the peaceful ride right away
 
-    // Show return_journey dialogue, then start the ride
-    this.time.delayedCall(200, () => {
-      this.scene.get(SCENE_DIALOGUE).showScript('return_journey', () => {
-        this._riding = true;
-      });
+    // After a few seconds of riding, the crew notices they're being followed.
+    this.time.delayedCall(RIDE_DURATION, () => {
+      this.scene.get(SCENE_DIALOGUE).showScript('return_journey', () => this._toGauntlet());
     });
   }
 
   update(time, delta) {
     if (this._done || !this._riding) return;
-    const dt = delta / 1000;
-    this._elapsed += delta;
+    this._scrollLayers(delta / 1000);   // keep the scenery rolling (incl. behind the dialogue)
+  }
 
-    this._scrollLayers(dt);
-
-    if (this._elapsed >= RIDE_DURATION) {
-      this._done = true;
-      this.cameras.main.fade(600, 0, 0, 0);
-      this.time.delayedCall(620, () => {
-        this.scene.start(SCENE_BOSS_GAUNTLET, {
-          party:     this._initData.party   ?? [],
-          donuts:    this._initData.donuts  ?? 0,
-          resources: this._initData.resources ?? {},
-        });
+  _toGauntlet() {
+    if (this._done) return;
+    this._done = true;
+    this.cameras.main.fade(600, 0, 0, 0);
+    this.time.delayedCall(620, () => {
+      this.scene.start(SCENE_BOSS_GAUNTLET, {
+        party:     this._initData.party   ?? [],
+        donuts:    this._initData.donuts  ?? 0,
+        resources: this._initData.resources ?? {},
       });
-    }
+    });
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
