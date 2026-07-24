@@ -81,7 +81,7 @@ export default class BadgeSystem {
   // All badge defs with earned state (for the title-screen shelf).
   static all() {
     const earned = BadgeSystem._load().earned;
-    return BADGES.map(b => ({ ...b, earned: !!earned[b], earnedDate: earned[b.id] ?? null }));
+    return BADGES.map(b => ({ ...b, earned: !!earned[b.id], earnedDate: earned[b.id] ?? null }));
   }
 
   static earnedCount() {
