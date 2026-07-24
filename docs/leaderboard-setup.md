@@ -58,23 +58,48 @@ create policy "anyone can add a score"
 
 ## 3. Wire up the game
 
-**Project Settings → API**, then copy two values into `src/config.js`:
+Supabase renamed its API keys in 2025, so what you see depends on how new the
+project is. Either generation works — you want the **browser-safe** one:
 
-| Supabase field | Goes into |
-|---|---|
-| Project URL (`https://xxxx.supabase.co`) | `SUPABASE_URL` |
-| `anon` `public` key | `SUPABASE_ANON_KEY` |
+| Dashboard label | Older name | Looks like | Use it? |
+|---|---|---|---|
+| **Publishable key** | `anon` / `public` | `sb_publishable_...` or `eyJhbGciOi...` | ✅ yes |
+| **Secret key** | `service_role` | `sb_secret_...` | ❌ **never** |
+
+> **The secret key must never reach the browser.** It bypasses Row Level
+> Security completely — anyone who found it could read, rewrite, or drop the
+> whole table. The publishable key is designed to be public and is fully
+> constrained by the policies above. Under the hood it still authenticates as
+> the Postgres `anon` role, which is why the policies in step 2 say `to anon`.
+
+**Finding the Project URL.** In the newer dashboard it lives under
+**Project Settings → Data API**, not on the keys page. Failing that, read it out
+of your browser's address bar — `.../dashboard/project/<REF>` means your URL is
+`https://<REF>.supabase.co`.
+
+**Finding the keys.** **Project Settings → API Keys**.
+
+Then fill in `src/config.js`:
 
 ```js
-export const SUPABASE_URL      = 'https://xxxx.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOi...';
+export const SUPABASE_URL      = 'https://abcdefghijklmnop.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_...';   // publishable, NOT secret
 ```
 
 Commit and push — Actions redeploys, and the WORLD tab goes live.
 
-> **Use the `anon` key, never the `service_role` key.** The `anon` key is meant
-> to be public and is fully constrained by the policies above. The
-> `service_role` key bypasses RLS entirely and must never reach the browser.
+### Check it worked
+
+From a terminal, with your two values substituted:
+
+```bash
+curl -sS "https://<REF>.supabase.co/rest/v1/scores?select=score&limit=1" \
+  -H "apikey: <publishable key>"
+```
+
+`[]` is success — the table is reachable and empty. An error mentioning JWT or
+an API key means the key is wrong; `relation "scores" does not exist` means
+step 2 didn't run.
 
 ---
 

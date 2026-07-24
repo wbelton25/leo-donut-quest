@@ -57,12 +57,18 @@ export default class GlobalScores {
     const ctl   = new AbortController();
     const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
     try {
+      // `apikey` alone authenticates both key generations. The legacy anon key
+      // is a JWT and is additionally accepted as a bearer token; the newer
+      // sb_publishable_* keys are not JWTs, so only send Authorization when the
+      // key actually looks like one.
+      const isJwt = SUPABASE_ANON_KEY.startsWith('eyJ');
+
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
         ...init,
         signal: ctl.signal,
         headers: {
           apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          ...(isJwt ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}` } : {}),
           'Content-Type': 'application/json',
           ...(init.headers ?? {}),
         },
