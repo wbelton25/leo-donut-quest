@@ -2,7 +2,7 @@ import {
   SCENE_NEIGHBORHOOD, SCENE_TITLE, SCENE_DIALOGUE, SCENE_GAME_OVER, SCENE_OREGON_TRAIL, SCENE_BOSS_GAUNTLET, SCENE_HUD,
   SCENE_GRACE_BOSS, SCENE_MAX_BOSS, SCENE_NORA_BOSS, SCENE_JUSTIN_MAX_BOSS, SCENE_EDIE_BOSS, SCENE_DONUT_SHOP,
   BASE_WIDTH, BASE_HEIGHT, TILE_SIZE, PLAYER_SPEED, txt,
-  PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN, MUSIC_NEIGHBORHOOD,
+  PARTY_WARREN, PARTY_MJ, PARTY_CARSON, PARTY_JUSTIN, MUSIC_NEIGHBORHOOD, DEV_MODE,
 } from '../constants.js';
 import AudioManager from '../systems/AudioManager.js';
 import FX from '../systems/FX.js';
@@ -561,9 +561,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this._spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     // R = deliberately swap to a fresh SPARE bike (trade a spare for speed).
     this._spareKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
-    this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
-      .once('down', () => this.scene.get(SCENE_DIALOGUE).showScript('intro', () => {}));
+    // NOTE: there is deliberately no "talk" key. D is WASD-right, so binding it
+    // to the intro script meant the first press of "move right" fired dialogue.
+    // The intro now plays by itself once per new game — see the end of this method.
 
+    // ── Scene-skip / boss-warp shortcuts — DEV ONLY ───────────────────────────
+    // Never bound in a production build, so a player can't press 5 and land in
+    // a boss fight. Add ?debug=1 to the URL to get them back on the live site.
+    if (DEV_MODE) {
     // ── DEV CHEAT: press "2" to skip straight to Act 2 with full party ────────
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO)
       .once('down', () => {
@@ -621,6 +626,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
         this.time.delayedCall(320, () => this.scene.start(scene, {}));
       });
     });
+    }   // end DEV_MODE shortcuts
 
     // ── Camera ────────────────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, 0, worldW, worldH);
@@ -628,10 +634,14 @@ export default class NeighborhoodScene extends Phaser.Scene {
     this.cameras.main.setDeadzone(80, 60);
 
     // ── Controls hint ─────────────────────────────────────────────────────────
-    txt(this, 6, BASE_HEIGHT - 18, 'BOSS TEST  5:GRACE  6:MAX  7:NORA  8:JUSTIN-MAX  9:EDIE', {
-      fontSize: '8px', color: '#997788',
-    }).setScrollFactor(0).setDepth(10);
-    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   SPACE: HOP OVER STUFF   D: TALK', {
+    // The boss-warp list is dev-only; the controls line is for players and stays.
+    // (D: TALK is gone — D is WASD-right, and the intro now plays on its own.)
+    if (DEV_MODE) {
+      txt(this, 6, BASE_HEIGHT - 18, 'BOSS TEST  5:GRACE  6:MAX  7:NORA  8:JUSTIN-MAX  9:EDIE', {
+        fontSize: '8px', color: '#997788',
+      }).setScrollFactor(0).setDepth(10);
+    }
+    txt(this, 6, BASE_HEIGHT - 10, 'WASD: MOVE   F: FART   SPACE: HOP OVER STUFF', {
       fontSize: '8px', color: '#778899',
     }).setScrollFactor(0).setDepth(10);
 
@@ -640,6 +650,18 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     this._resources.applyChanges({});
     this._party._emit();
+
+    // ── Opening lines ─────────────────────────────────────────────────────────
+    // Plays by itself at the start of a new game, then never again — the flag
+    // lives in gameState so coming back here from a boss fight or Act 2 doesn't
+    // replay it. Everything else stays event-driven, as it already was.
+    const gs = this.game.registry.get('gameState');
+    if (gs && !gs.introSeen) {
+      gs.introSeen = true;
+      this.time.delayedCall(400, () => {
+        this.scene.get(SCENE_DIALOGUE)?.showScript('intro', () => {});
+      });
+    }
   }
 
   update(time, delta) {

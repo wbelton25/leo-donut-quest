@@ -113,6 +113,20 @@ export const PARTY_JUSTIN = 'justin';
 
 // ─── Default Game State ───────────────────────────────────────────────────────
 // This is the starting state for a new game. SaveSystem serializes/deserializes this shape.
+// ─── Dev mode ─────────────────────────────────────────────────────────────────
+// True when running `npm run dev`, false in a production build — so the scene-
+// skip and boss-warp shortcuts (and their on-screen list) never ship to players.
+// `?debug=1` re-enables them on the deployed site when you want to test there
+// without running locally.
+export const DEV_MODE = (() => {
+  try {
+    if (import.meta.env?.DEV) return true;
+    return new URLSearchParams(window.location.search).has('debug');
+  } catch (e) {
+    return false;
+  }
+})();
+
 export const DEFAULT_GAME_STATE = {
   act: 1,
   party: [],           // IDs of recruited members currently in the group
@@ -134,4 +148,5 @@ export const DEFAULT_GAME_STATE = {
   goldenDonuts: 0,     // hidden golden donuts found (R3)
   crewWasWornOut: false,   // Act 2 crew hit "worn out" this run (SURVIVOR badge)
   arrivedAhead: false,     // reached the Donut House ahead of schedule (EARLY BIRD badge)
+  introSeen: false,        // Leo's opening lines have played — once per new game
 };
