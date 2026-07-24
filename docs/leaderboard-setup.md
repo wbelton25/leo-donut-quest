@@ -112,10 +112,17 @@ just "a number under 5000".
 Paste into **SQL Editor** and Run. It deletes the test row first, because the
 new constraint validates existing rows and that row predates these columns:
 
-Written as one statement per line rather than a single comma-separated
-`ALTER TABLE`. It's more verbose, but there are no commas to drop when copying,
-and every statement is idempotent — so it's safe to re-run if part of it already
-applied, or if a paste failed halfway through.
+**Copy this from [`leaderboard-hardening.sql`](./leaderboard-hardening.sql), not
+from the block below.** The Supabase SQL editor runs Monaco with autocomplete
+on, and it can fire inside runs of whitespace and swallow part of a pasted line.
+The `.sql` file is formatted defensively against that — no column alignment, no
+tabs, one statement per line, nothing that depends on a comma surviving the trip.
+
+Every statement is also idempotent, so it's safe to run again if an earlier
+attempt failed partway through.
+
+If a paste still comes out mangled, run the statements **one at a time** — they
+are independent by design.
 
 ```sql
 -- Any test rows would fail the arithmetic check below. No-op if none exist.
