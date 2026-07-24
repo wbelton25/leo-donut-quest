@@ -21,12 +21,36 @@ const INTRO_LOOP_TRACKS = {
 };
 
 export default class AudioManager {
+  // A volume tween whose sound gets stopped or destroyed underneath it will
+  // write to a null target on its next step, and that exception is thrown from
+  // inside TweenManager.update — which kills the entire game loop, freezing the
+  // whole game. So the current fade is tracked here and cancelled before any
+  // code stops or destroys the sound it is animating. The tween is kept as an
+  // object (not looked up per-scene) because the scene that created it is often
+  // not the scene that later tears the sound down.
+  static _killFade(reg) {
+    const t = reg.get('bgm-fade');
+    if (t) { try { t.remove(); } catch (e) { /* already gone */ } }
+    reg.set('bgm-fade', null);
+  }
+
+  static _fade(scene, reg, sound, toVol, onDone) {
+    AudioManager._killFade(reg);
+    const t = scene.tweens.add({
+      targets: sound, volume: toVol, duration: FADE_MS,
+      onComplete: () => { reg.set('bgm-fade', null); onDone?.(); },
+    });
+    reg.set('bgm-fade', t);
+    return t;
+  }
+
   // Start a looping music track. No-ops if that key is already playing.
   static playMusic(scene, key, volume = MUSIC_VOL) {
     const reg = scene.game.registry;
     if (reg.get('bgm-key') === key) return;
 
     const old = reg.get('bgm-sound');
+    AudioManager._killFade(reg);       // must precede stop() — see _killFade
     if (old?.isPlaying) old.stop();
 
     reg.set('bgm-key', key);
@@ -41,11 +65,15 @@ export default class AudioManager {
       if (split) {
         // Play intro once, then hand off to the loop clip.
         const intro = scene.sound.add(split.intro, { loop: false, volume: 0 });
-        if (targetVol > 0) scene.tweens.add({ targets: intro, volume: targetVol, duration: FADE_MS });
+        if (targetVol > 0) AudioManager._fade(scene, reg, intro, targetVol);
         intro.play();
         reg.set('bgm-sound', intro);
 
         intro.once('complete', () => {
+          // Cancel the fade-in first: if the scene was paused part-way through
+          // it (dialogue does exactly that) the tween is still live, and
+          // destroying its target below would crash the game loop.
+          AudioManager._killFade(reg);
           if (reg.get('bgm-key') !== key) return;
           intro.destroy();
           const loopVol = reg.get('audio-music') !== false ? volume : 0;
@@ -56,7 +84,7 @@ export default class AudioManager {
       } else {
         const snd = scene.sound.add(key, { loop: true, volume: 0 });
         snd.play();
-        if (targetVol > 0) scene.tweens.add({ targets: snd, volume: targetVol, duration: FADE_MS });
+        if (targetVol > 0) AudioManager._fade(scene, reg, snd, targetVol);
         reg.set('bgm-sound', snd);
       }
     };
@@ -72,14 +100,18 @@ export default class AudioManager {
   static stopMusic(scene) {
     const reg = scene.game.registry;
     const old = reg.get('bgm-sound');
-    if (old?.isPlaying) {
-      scene.tweens.add({
-        targets: old, volume: 0, duration: FADE_MS,
-        onComplete: () => old.stop(),
-      });
-    }
+    AudioManager._killFade(reg);
     reg.set('bgm-key', null);
-    reg.set('bgm-sound', null);
+
+    if (!old?.isPlaying) { reg.set('bgm-sound', null); return; }
+
+    // Deliberately leave 'bgm-sound' pointing at `old` until the fade finishes.
+    // If playMusic runs first it will kill this fade and stop the sound itself;
+    // clearing the reference early would strand it playing forever.
+    AudioManager._fade(scene, reg, old, 0, () => {
+      try { old.stop(); } catch (e) { /* already torn down */ }
+      if (reg.get('bgm-sound') === old) reg.set('bgm-sound', null);
+    });
   }
 
   // Mute or unmute the currently playing BGM.
