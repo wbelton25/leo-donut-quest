@@ -1,0 +1,17 @@
+[
+  {
+    "id": 5,
+    "initials": "TMP",
+    "score": 467,
+    "grade": "B",
+    "donuts": 5,
+    "party_size": 2,
+    "client_id": "verify-client-0001",
+    "created_at": "2026-07-24T18:19:05.214403+00:00",
+    "time_points": 100,
+    "deer": 3,
+    "combo": 2,
+    "holes": 4,
+    "golden": 1
+  }
+]
