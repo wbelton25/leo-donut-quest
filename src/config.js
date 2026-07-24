@@ -9,5 +9,5 @@
 // Leave these empty and the game simply runs local-only: the world board shows
 // an "offline" message and everything else behaves exactly as before.
 
-export const SUPABASE_URL      = '';
-export const SUPABASE_ANON_KEY = '';
+export const SUPABASE_URL      = 'https://oyxdskjivrpzrbkskarz.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_d7AD22kbgAj9F2aA09y27w_xR4h0zuw';
