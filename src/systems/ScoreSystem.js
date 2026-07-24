@@ -12,16 +12,30 @@ const STORAGE_KEY = 'leo-donut-scores';
 const MAX_ENTRIES = 5;
 
 export default class ScoreSystem {
+  // The integer pieces a score is built from. Split out so the world board can
+  // submit them alongside the total and have the database re-check the
+  // arithmetic — if these ever drifted from calculate(), honest runs would be
+  // rejected server-side, so both must read from here.
+  static components({ donuts = 0, party = [], time = 0, deer = 0, combo = 0, holes = 0, golden = 0 }) {
+    return {
+      donuts,
+      partySize:  party.length,
+      timePoints: Math.max(0, Math.round(time * 2)),
+      deer, combo, holes, golden,
+    };
+  }
+
   // Total score from a full run result.
-  static calculate({ donuts = 0, party = [], time = 0, deer = 0, combo = 0, holes = 0, golden = 0 }) {
-    if (donuts < 1) return 0;
-    return (donuts * 20)
-         + (party.length * 80)
-         + Math.max(0, Math.round(time * 2))
-         + (deer * 5)
-         + (combo * 15)
-         + (holes * 3)
-         + (golden * 50);
+  static calculate(stats) {
+    if ((stats?.donuts ?? 0) < 1) return 0;
+    const c = ScoreSystem.components(stats);
+    return (c.donuts * 20)
+         + (c.partySize * 80)
+         + c.timePoints
+         + (c.deer * 5)
+         + (c.combo * 15)
+         + (c.holes * 3)
+         + (c.golden * 50);
   }
 
   // Labeled point breakdown for the report card.

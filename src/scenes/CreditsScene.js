@@ -16,6 +16,10 @@ export default class CreditsScene extends Phaser.Scene {
     this._time   = data?.time   ?? 0;
     this._deer   = data?.deer   ?? 0;
     this._combo  = data?.combo  ?? 0;
+    // Needed so the world board can submit every component of the score; the
+    // report card already totalled these in, they just weren't read here.
+    this._holes  = data?.holes  ?? 0;
+    this._golden = data?.golden ?? 0;
     this._passedScore = data?.score;   // the report card already totalled it
     this._initialsConfirmed = false;
   }
@@ -176,7 +180,11 @@ export default class CreditsScene extends Phaser.Scene {
     GlobalScores.submit({
       initials, score: this._score,
       grade: ScoreSystem.grade(this._score),
-      donuts: this._donuts, partySize: this._party.length,
+      stats: {
+        donuts: this._donuts, party: this._party, time: this._time,
+        deer: this._deer, combo: this._combo,
+        holes: this._holes, golden: this._golden,
+      },
     }).then((ok) => {
       if (!ok || !this.scene?.isActive()) return;
       return GlobalScores.rankFor(this._score).then((wr) => {

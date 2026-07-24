@@ -12,6 +12,7 @@
 // independent of this. A finished run writes to both.
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
+import ScoreSystem from './ScoreSystem.js';
 import cleanInitials from '../utils/cleanInitials.js';
 
 const TABLE      = 'scores';
@@ -88,20 +89,33 @@ export default class GlobalScores {
 
   // Post a finished run. Resolves true on success, false on any failure —
   // callers should not care much either way, since the local board already has it.
-  static async submit({ initials, score, grade, donuts = 0, partySize = 0 }) {
+  //
+  // `stats` is the raw run result; the individual components go up with the
+  // total so the database can verify the arithmetic adds up. That doesn't stop
+  // a determined forger (see docs/leaderboard-setup.md), but it does mean a
+  // fake score has to be internally consistent AND inside every per-component
+  // bound, which caps the damage at "plausible run they didn't play".
+  static async submit({ initials, score, grade, stats = {} }) {
     const s = Math.round(Number(score) || 0);
     if (s <= 0 || s > MAX_SCORE) return false;   // don't bother the server with junk
+
+    const c = ScoreSystem.components(stats);
 
     const res = await GlobalScores._fetch(TABLE, {
       method: 'POST',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({
-        initials:   cleanInitials(initials),
-        score:      s,
-        grade:      String(grade ?? '?').slice(0, 1),
-        donuts:     Math.max(0, Math.round(Number(donuts) || 0)),
-        party_size: Math.max(0, Math.round(Number(partySize) || 0)),
-        client_id:  GlobalScores.clientId(),
+        initials:    cleanInitials(initials),
+        score:       s,
+        grade:       String(grade ?? '?').slice(0, 1),
+        donuts:      c.donuts,
+        party_size:  c.partySize,
+        time_points: c.timePoints,
+        deer:        c.deer,
+        combo:       c.combo,
+        holes:       c.holes,
+        golden:      c.golden,
+        client_id:   GlobalScores.clientId(),
       }),
     });
     return !!res;

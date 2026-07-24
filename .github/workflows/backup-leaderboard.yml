@@ -1,0 +1,82 @@
+name: Backup leaderboard
+
+# Two jobs in one: it keeps a version-controlled copy of the world board in the
+# repo, and the request itself resets Supabase's inactivity timer so the free
+# project doesn't pause.
+#
+# Runs Mon + Thu rather than weekly on purpose: the free tier pauses after
+# roughly a week idle, so a 7-day cadence sits right on the threshold and one
+# skipped run would let it sleep. Twice a week leaves margin.
+
+on:
+  schedule:
+    - cron: '17 8 * * 1,4'   # 08:17 UTC Mondays and Thursdays
+  workflow_dispatch:          # ...and on demand from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: leaderboard-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Read the credentials out of src/config.js rather than duplicating them
+      # as repo secrets — they're the publishable key, already public in the
+      # deployed bundle, and this way they can never drift out of sync.
+      - name: Read Supabase config
+        id: cfg
+        run: |
+          # POSIX sed rather than `grep -P`, which isn't portable.
+          url=$(sed -n "s/.*SUPABASE_URL[[:space:]]*=[[:space:]]*'\([^']*\)'.*/\1/p" src/config.js)
+          key=$(sed -n "s/.*SUPABASE_ANON_KEY[[:space:]]*=[[:space:]]*'\([^']*\)'.*/\1/p" src/config.js)
+          if [ -z "$url" ] || [ -z "$key" ]; then
+            echo "World board isn't configured — nothing to back up."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch scores
+        if: steps.cfg.outputs.skip != 'true'
+        run: |
+          mkdir -p backups
+          # Fixed ordering + pretty-print so the diff reflects real changes
+          # rather than key reshuffling. Written to a temp file first so a
+          # failed request can't truncate the previous good backup.
+          curl -fsS --retry 3 --retry-delay 5 -m 60 \
+            "${{ steps.cfg.outputs.url }}/rest/v1/scores?select=*&order=score.desc,created_at.asc" \
+            -H "apikey: ${{ steps.cfg.outputs.key }}" \
+            -o /tmp/scores.raw.json
+          node -e '
+            const fs = require("fs");
+            const rows = JSON.parse(fs.readFileSync("/tmp/scores.raw.json", "utf8"));
+            // PostgREST reports errors as a JSON object, not an array — refuse
+            // to overwrite a good backup with one.
+            if (!Array.isArray(rows)) throw new Error("unexpected payload: " + JSON.stringify(rows).slice(0, 200));
+            fs.writeFileSync("backups/scores.json", JSON.stringify(rows, null, 2) + "\n");
+            console.log("Rows backed up:", rows.length);
+          '
+
+      - name: Commit if changed
+        if: steps.cfg.outputs.skip != 'true'
+        run: |
+          # --porcelain (not `git diff`) so the very first run, when the file is
+          # still untracked, is correctly seen as a change.
+          if [ -z "$(git status --porcelain backups/scores.json)" ]; then
+            echo "Board unchanged since last backup."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backups/scores.json
+          # [skip ci] keeps a backup commit from kicking off a pointless rebuild
+          # and redeploy of the site.
+          git commit -m "Leaderboard backup $(date -u +%Y-%m-%d) [skip ci]"
+          git push
