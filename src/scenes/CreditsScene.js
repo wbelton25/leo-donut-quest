@@ -1,7 +1,9 @@
 import { SCENE_CREDITS, SCENE_TITLE, BASE_WIDTH, BASE_HEIGHT, txt, MUSIC_CREDITS } from '../constants.js';
 import SaveSystem from '../systems/SaveSystem.js';
 import ScoreSystem from '../systems/ScoreSystem.js';
+import GlobalScores from '../systems/GlobalScores.js';
 import AudioManager from '../systems/AudioManager.js';
+import cleanInitials from '../utils/cleanInitials.js';
 
 export default class CreditsScene extends Phaser.Scene {
   constructor() {
@@ -161,12 +163,29 @@ export default class CreditsScene extends Phaser.Scene {
     if (this._initialsConfirmed) return;
     this._initialsConfirmed = true;
 
-    const initials = this._initials.join('');
+    const initials = cleanInitials(this._initials.join(''));
     ScoreSystem.saveScore({
       donuts: this._donuts, party: this._party, time: this._time,
       deer: this._deer, combo: this._combo, initials, score: this._score,
     });
     const rank = ScoreSystem.getRank(this._score);
+
+    // Fire off to the world board too. Deliberately not awaited — the local
+    // board is already saved, so a slow or dead network must not hold up the
+    // score screen. The world rank just fills itself in later if it arrives.
+    GlobalScores.submit({
+      initials, score: this._score,
+      grade: ScoreSystem.grade(this._score),
+      donuts: this._donuts, partySize: this._party.length,
+    }).then((ok) => {
+      if (!ok || !this.scene?.isActive()) return;
+      return GlobalScores.rankFor(this._score).then((wr) => {
+        if (!wr || !this.scene?.isActive()) return;
+        txt(this, BASE_WIDTH / 2, 241,
+          wr === 1 ? 'BEST IN THE WORLD!' : `#${wr} IN THE WORLD`,
+          { fontSize: '8px', color: wr === 1 ? '#ffdd00' : '#88bbff' }).setOrigin(0.5);
+      });
+    });
 
     // Flash boxes green
     this._ilBoxes.forEach(({ bg }) => bg.setFillStyle(0x1a4a1a).setStrokeStyle(1, 0x44cc44));
@@ -180,7 +199,8 @@ export default class CreditsScene extends Phaser.Scene {
         ? 'NEW HIGH SCORE!'
         : `RANK #${rank} ON YOUR BOARD`;
       const rankColor = rank === 1 ? '#ffdd00' : '#aaaaaa';
-      txt(this, cx, 236, rankTxt, { fontSize: '8px', color: rankColor }).setOrigin(0.5);
+      // 230 / 241 / 252 — local rank, world rank, continue prompt.
+      txt(this, cx, 230, rankTxt, { fontSize: '8px', color: rankColor }).setOrigin(0.5);
     }
 
     // Continue prompt

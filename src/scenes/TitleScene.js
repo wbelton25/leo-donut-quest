@@ -5,6 +5,7 @@ import {
 import SaveSystem from '../systems/SaveSystem.js';
 import ScoreSystem from '../systems/ScoreSystem.js';
 import BadgeSystem from '../systems/BadgeSystem.js';
+import GlobalScores from '../systems/GlobalScores.js';
 import AudioManager from '../systems/AudioManager.js';
 
 export default class TitleScene extends Phaser.Scene {
@@ -70,20 +71,25 @@ export default class TitleScene extends Phaser.Scene {
     this.add.rectangle(panelX + panelW / 2, panelY + panelH / 2, panelW, panelH, 0x080810, 0.92)
       .setStrokeStyle(1, 0x2a3a4a);
 
-    // Tabs
+    // Tabs — three across 148px, so 6px labels (8px 'BADGES' would overflow).
     this._tab = 'scores';
     const tabY = panelY + 10;
     const mkTab = (cx, key, label) => {
-      const bg = this.add.rectangle(cx, tabY, 68, 14, 0x14141c).setInteractive({ useHandCursor: true });
-      const lb = txt(this, cx, tabY, label, { fontSize: '8px', color: '#8899aa' }).setOrigin(0.5);
+      const bg = this.add.rectangle(cx, tabY, 46, 14, 0x14141c).setInteractive({ useHandCursor: true });
+      const lb = txt(this, cx, tabY, label, { fontSize: '6px', color: '#8899aa' }).setOrigin(0.5);
       bg.on('pointerdown', () => { this._tab = key; this._renderPanel(); });
       return { bg, lb, key };
     };
     this._tabs = [
-      mkTab(panelX + 40,  'scores', 'SCORES'),
-      mkTab(panelX + 110, 'badges', 'BADGES'),
+      mkTab(panelX + 26,  'scores', 'YOU'),
+      mkTab(panelX + 74,  'world',  'WORLD'),
+      mkTab(panelX + 122, 'badges', 'BADGES'),
     ];
     this.add.rectangle(panelX + panelW / 2, panelY + 20, panelW - 8, 1, 0x2a3a4a);
+
+    // Bumped on every panel render so a slow world-board fetch that lands after
+    // the player has switched tabs (or left the scene) is discarded.
+    this._worldToken = 0;
 
     this._panelContent = this.add.container(0, 0);
     this._renderPanel();
@@ -96,8 +102,10 @@ export default class TitleScene extends Phaser.Scene {
       t.lb.setColor(active ? '#f5a623' : '#8899aa');
     });
     this._panelContent.removeAll(true);
-    if (this._tab === 'scores') this._renderScores();
-    else                        this._renderBadges();
+    this._worldToken++;
+    if      (this._tab === 'scores') this._renderScores();
+    else if (this._tab === 'world')  this._renderWorld();
+    else                             this._renderBadges();
   }
 
   _renderScores() {
@@ -132,6 +140,65 @@ export default class TitleScene extends Phaser.Scene {
     clearBg.on('pointerover', () => { clearBg.setFillStyle(0x2a1a1a); clearLbl.setColor('#ff4444'); });
     clearBg.on('pointerout',  () => { clearBg.setFillStyle(0x1a1a2a); clearLbl.setColor('#445566'); });
     clearBg.on('pointerdown', () => { ScoreSystem.clearBoard(); this._renderPanel(); });
+  }
+
+  // World board: everyone who has ever played this build, best first.
+  // Fetched async, so every exit path has to tolerate the panel being gone.
+  _renderWorld() {
+    const { x: panelX, y: panelY, w: panelW, h: panelH } = this._panel;
+    const C = o => { this._panelContent.add(o); return o; };
+    const midX = panelX + panelW / 2;
+
+    const message = (title, sub, color = '#445566') => {
+      C(txt(this, midX, panelY + panelH / 2 - 6, title,
+        { fontSize: '8px', color }).setOrigin(0.5));
+      C(txt(this, midX, panelY + panelH / 2 + 12, sub,
+        { fontSize: '8px', color: '#334455', align: 'center',
+          wordWrap: { width: panelW - 16 } }).setOrigin(0.5));
+    };
+
+    if (!GlobalScores.enabled) {
+      message('WORLD BOARD', 'Not switched on\nyet!');
+      return;
+    }
+
+    const loading = C(txt(this, midX, panelY + panelH / 2, 'LOADING...',
+      { fontSize: '8px', color: '#556677' }).setOrigin(0.5));
+
+    const token = this._worldToken;
+    GlobalScores.top(5).then((rows) => {
+      // Stale response, tab switched, or scene torn down — drop it silently.
+      if (token !== this._worldToken || !this.scene?.isActive()) return;
+      loading.destroy();
+
+      if (rows === null)   { message('BOARD OFFLINE', "Can't reach the\nworld board.", '#886644'); return; }
+      if (rows.length === 0) { message('NOBODY YET!', 'Be the first one\non the board!', '#f5c542'); return; }
+
+      const rankColors = ['#ffdd00', '#bbbbbb', '#cc8844', '#888888', '#667788'];
+      rows.forEach((e, i) => {
+        const rowY = panelY + 32 + i * 34;
+        const rc   = rankColors[i] ?? '#667788';
+        // Tint the player's own rows so they can find themselves in the crowd.
+        if (e.isMe) C(this.add.rectangle(midX, rowY + 6, panelW - 12, 26, 0x1a2a1a, 0.9));
+        if (i > 0)  C(this.add.rectangle(midX, rowY - 3, panelW - 12, 1, 0x1a2a3a));
+        C(txt(this, panelX + 10, rowY, `#${i + 1}`, { fontSize: '8px', color: rc }));
+        C(txt(this, panelX + 30, rowY, e.initials,
+          { fontSize: '8px', color: e.isMe ? '#88ff88' : '#ffffff' }));
+        C(txt(this, panelX + panelW - 8, rowY, `${e.score}`,
+          { fontSize: '8px', color: '#f5e642' }).setOrigin(1, 0));
+        C(txt(this, panelX + 10, rowY + 12, e.isMe ? 'YOU!' : `${e.grade} D:${e.donuts}`,
+          { fontSize: '8px', color: e.isMe ? '#88ff88' : '#556677' }));
+        C(txt(this, panelX + panelW - 8, rowY + 12, e.date,
+          { fontSize: '8px', color: '#445566' }).setOrigin(1, 0));
+      });
+
+      const rY = panelY + panelH - 12;
+      const rBg  = C(this.add.rectangle(midX, rY, 100, 14, 0x1a1a2a).setInteractive({ useHandCursor: true }));
+      const rLbl = C(txt(this, midX, rY, 'REFRESH', { fontSize: '8px', color: '#445566' }).setOrigin(0.5));
+      rBg.on('pointerover', () => { rBg.setFillStyle(0x1a2a3a); rLbl.setColor('#88bbff'); });
+      rBg.on('pointerout',  () => { rBg.setFillStyle(0x1a1a2a); rLbl.setColor('#445566'); });
+      rBg.on('pointerdown', () => this._renderPanel());
+    });
   }
 
   _renderBadges() {
