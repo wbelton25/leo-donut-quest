@@ -551,9 +551,16 @@ export default class NeighborhoodScene extends Phaser.Scene {
       fontSize: '8px', color: '#f5e642',
     }).setScrollFactor(0).setDepth(20).setVisible(false);
 
+    // Low-bike hint — appears when the bike is worn and you have a spare to swap to.
+    this._spareHint = txt(this, BASE_WIDTH / 2, 34, '', {
+      fontSize: '8px', color: '#8ac6ff',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(20).setVisible(false);
+
     // ── Input ─────────────────────────────────────────────────────────────────
     this._fartKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
     this._spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    // R = deliberately swap to a fresh SPARE bike (trade a spare for speed).
+    this._spareKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
       .once('down', () => this.scene.get(SCENE_DIALOGUE).showScript('intro', () => {}));
 
@@ -660,6 +667,10 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     // ── Bike condition → Leo's speed (0.3× at 0 bike, 1.0× at full) ─────────────
     this._player.speedMultiplier = 0.3 + 0.7 * (this._resources.bikeCondition / 100);
+
+    // ── Deliberate spare swap (R): trade a spare for a fresh, fast bike ──────────
+    if (Phaser.Input.Keyboard.JustDown(this._spareKey)) this._trySwapSpare();
+    this._updateSpareHint();
 
     // ── Act 1 clock drain (only while Leo is moving) ─────────────────────────────
     // ACT1_TIME_RATE: time-units per second. 0.5 = ~9 min real time to drain Act 1 budget.
@@ -1205,9 +1216,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
   // a repaired bike; out of lives → full restart. (Bugs 1 & 2: was a dead-end restart, and
   // the flag never reset so a second break did nothing.)
   _onBikeBroken() {
-    const gs = this.game.registry.get('gameState') ?? {};
-    gs.bikeLives = (gs.bikeLives ?? 3) - 1;
-    this.game.registry.set('gameState', gs);
+    // Spares are spent WHEN used (below), not upfront — so 3 pips = 3 real swaps and the
+    // deliberate R-swap and the auto-break share one clean model.
+    const spares = this.game.registry.get('gameState')?.bikeLives ?? 3;
 
     // Freeze the scene while the overlay is up so nothing keeps ticking behind it —
     // no time drain, no re-triggers, and (crucially) no autosave re-persisting the run.
@@ -1218,15 +1229,15 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // Interactive so clicks can't fall through the overlay to the game world.
     objs.push(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.88).setScrollFactor(0).setDepth(50).setInteractive());
 
-    if (gs.bikeLives > 0) {
+    if (spares >= 1) {
       objs.push(txt(this, cx, cy - 24, 'BIKE BROKE!', { fontSize: '12px', color: '#ff8844' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
-      objs.push(txt(this, cx, cy - 6, `${gs.bikeLives} SPARE BIKE${gs.bikeLives === 1 ? '' : 'S'} LEFT`, { fontSize: '8px', color: '#ffcc66' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
+      objs.push(txt(this, cx, cy - 6, `${spares} SPARE BIKE${spares === 1 ? '' : 'S'} READY`, { fontSize: '8px', color: '#ffcc66' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
       const btn = this.add.rectangle(cx, cy + 20, 170, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
       objs.push(btn);
       objs.push(txt(this, cx, cy + 20, 'HOP ON A SPARE & KEEP GOING', { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
       btn.on('pointerdown', () => {
         objs.forEach(o => o.destroy());
-        this._resources.applyChanges({ bikeCondition: 100 - this._resources.bikeCondition });  // fresh bike
+        this._useSpareBike();                // spend a spare → fresh bike
         this._bikeBrokenTriggered = false;   // can break again later
         this._runPaused = false;             // resume the ride
         this._autosave();
@@ -1245,6 +1256,49 @@ export default class NeighborhoodScene extends Phaser.Scene {
         this.scene.start(SCENE_TITLE);
       });
     }
+  }
+
+  // Spend one spare bike → jump onto a fresh, full-condition bike. Shared by the auto-break
+  // and the deliberate R-swap. Returns false if there are no spares left.
+  _useSpareBike() {
+    const gs = this.game.registry.get('gameState') ?? {};
+    if ((gs.bikeLives ?? 0) <= 0) return false;
+    gs.bikeLives -= 1;
+    this.game.registry.set('gameState', gs);
+    this._resources.applyChanges({ bikeCondition: 100 - this._resources.bikeCondition });
+    return true;
+  }
+
+  // Deliberate swap (R): trade a spare for a fresh fast bike when yours is worn — so you
+  // can choose speed over limping. Only when the bike is actually worn (<60%), so you can't
+  // waste a spare on a near-full bike.
+  _trySwapSpare() {
+    if (this._runPaused || this._departurePlayed) return;
+    const spares = this.game.registry.get('gameState')?.bikeLives ?? 3;
+    if (this._resources.bikeCondition >= 60) {
+      FX.popText(this, this._player.x, this._player.y - 22, 'BIKE STILL GOOD', { color: '#8899aa', fontSize: '8px', rise: 16, duration: 700 });
+      return;
+    }
+    if (spares <= 0) {
+      FX.popText(this, this._player.x, this._player.y - 22, 'NO SPARES LEFT!', { color: '#ff7766', fontSize: '8px', rise: 16, duration: 700 });
+      return;
+    }
+    this._useSpareBike();
+    AudioManager.playSfx(this, 'sfx-bike-hit', { volume: 0.5 });
+    FX.popText(this, this._player.x, this._player.y - 26, 'FRESH BIKE!', { color: '#8ad4ff', fontSize: '12px', rise: 26, duration: 900 });
+    FX.burst(this, this._player.x, this._player.y, {
+      count: 12, colors: [0x8ad4ff, 0xe8eef2, 0xffffff], minSpeed: 30, maxSpeed: 90, minSize: 1, maxSize: 3, duration: 450, depth: 7,
+    });
+    this._autosave();
+  }
+
+  // Show the "press R for a spare" nudge only when the bike is worn AND you have a spare.
+  _updateSpareHint() {
+    if (!this._spareHint) return;
+    const spares = this.game.registry.get('gameState')?.bikeLives ?? 3;
+    const show = this._resources.bikeCondition < 60 && spares > 0 && !this._departurePlayed;
+    this._spareHint.setVisible(show);
+    if (show) this._spareHint.setText(`BIKE WORN! Press R for a spare (x${spares})`);
   }
 
   _showDeadlineOverlay() {
