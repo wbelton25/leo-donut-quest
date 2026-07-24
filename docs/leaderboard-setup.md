@@ -112,39 +112,56 @@ just "a number under 5000".
 Paste into **SQL Editor** and Run. It deletes the test row first, because the
 new constraint validates existing rows and that row predates these columns:
 
+Written as one statement per line rather than a single comma-separated
+`ALTER TABLE`. It's more verbose, but there are no commas to drop when copying,
+and every statement is idempotent — so it's safe to re-run if part of it already
+applied, or if a paste failed halfway through.
+
 ```sql
--- Test rows from setup would fail the arithmetic check below.
-delete from public.scores where client_id = 'probe-client-0001';
+-- Any test rows would fail the arithmetic check below. No-op if none exist.
+delete from public.scores where client_id like 'probe-%' or client_id like 'ordering-%';
 
-alter table public.scores
-  add column if not exists time_points integer not null default 0,
-  add column if not exists deer        integer not null default 0,
-  add column if not exists combo       integer not null default 0,
-  add column if not exists holes       integer not null default 0,
-  add column if not exists golden      integer not null default 0;
+-- New columns. `if not exists` makes each line safe to re-run.
+alter table public.scores add column if not exists time_points integer not null default 0;
+alter table public.scores add column if not exists deer        integer not null default 0;
+alter table public.scores add column if not exists combo       integer not null default 0;
+alter table public.scores add column if not exists holes       integer not null default 0;
+alter table public.scores add column if not exists golden      integer not null default 0;
 
-alter table public.scores
-  -- Per-component ceilings: each is comfortably above a great run, but far
-  -- below what someone inventing numbers would reach for.
-  add constraint scores_time_range   check (time_points between 0 and 540),
-  add constraint scores_deer_range   check (deer        between 0 and 80),
-  add constraint scores_combo_range  check (combo       between 0 and 12),
-  add constraint scores_holes_range  check (holes       between 0 and 60),
-  add constraint scores_golden_range check (golden      between 0 and 3),
-  add constraint scores_donuts_min   check (donuts      between 1 and 30),
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS, so each is dropped first.
+-- Per-component ceilings: comfortably above a great run, far below what
+-- someone inventing numbers would reach for.
+alter table public.scores drop constraint if exists scores_time_range;
+alter table public.scores add  constraint scores_time_range check (time_points between 0 and 540);
 
-  -- The important one: the total must actually equal its parts. Mirrors
-  -- ScoreSystem.calculate() exactly — if you change the scoring formula in
-  -- the game, change it here too or every honest score gets rejected.
-  add constraint scores_math check (
-    score = donuts * 20
-          + party_size * 80
-          + time_points
-          + deer * 5
-          + combo * 15
-          + holes * 3
-          + golden * 50
-  );
+alter table public.scores drop constraint if exists scores_deer_range;
+alter table public.scores add  constraint scores_deer_range check (deer between 0 and 80);
+
+alter table public.scores drop constraint if exists scores_combo_range;
+alter table public.scores add  constraint scores_combo_range check (combo between 0 and 12);
+
+alter table public.scores drop constraint if exists scores_holes_range;
+alter table public.scores add  constraint scores_holes_range check (holes between 0 and 60);
+
+alter table public.scores drop constraint if exists scores_golden_range;
+alter table public.scores add  constraint scores_golden_range check (golden between 0 and 3);
+
+alter table public.scores drop constraint if exists scores_donuts_min;
+alter table public.scores add  constraint scores_donuts_min check (donuts between 1 and 30);
+
+-- The important one: the total must actually equal its parts. Mirrors
+-- ScoreSystem.calculate() exactly — if you change the scoring formula in the
+-- game, change it here too or every honest score gets rejected.
+alter table public.scores drop constraint if exists scores_math;
+alter table public.scores add  constraint scores_math check (
+  score = donuts * 20
+        + party_size * 80
+        + time_points
+        + deer * 5
+        + combo * 15
+        + holes * 3
+        + golden * 50
+);
 ```
 
 With these in place the highest *possible* score is about 2,370, and reaching
