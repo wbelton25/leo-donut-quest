@@ -42,9 +42,11 @@ const YARD_LEFT = 12, YARD_RIGHT = 468, YARD_TOP = 135, YARD_BOTTOM = 252;
 // Max stays in the UPPER yard so Leo always keeps a dodge lane below him.
 const MAX_Y_BOTTOM = YARD_TOP + 46; // 181
 // Yard trees — oval trunk obstacles Leo rides around (matched to the art).
+// Positions verified against the green-shutter Priebe house art: the two front-
+// yard trees sit slightly lower and more central than the previous background.
 const TREES = [
-  { x: 79,  y: 188, rx: 13, ry: 30 },
-  { x: 406, y: 198, rx: 12, ry: 26 },
+  { x: 86,  y: 207, rx: 13, ry: 28 },
+  { x: 414, y: 207, rx: 13, ry: 28 },
 ];
 
 // Max constants
