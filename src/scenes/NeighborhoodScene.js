@@ -1623,8 +1623,8 @@ export default class NeighborhoodScene extends Phaser.Scene {
       g.fillCircle(a.x, a.y, width / 2);
       g.fillCircle(b.x, b.y, width / 2);
     };
-    stroke(30, 0x8f7f52);   // darker edge
-    stroke(22, 0xd8c890);   // tan paved surface
+    stroke(30, 0x141416);   // near-black edge/shadow
+    stroke(22, 0x2c2c31);   // dark asphalt surface
   }
 
   _ts(x, y, w, h, key, depth = 0) {
