@@ -10,9 +10,15 @@ export default class DonutHolePickup {
     this.y         = y;
     this.collected = false;
 
+    // A donut HOLE is a solid ball of fried dough (no center hole) with a light
+    // glaze — a "munchkin". Drawn as a filled ball plus a top-left sheen and a
+    // couple of sugar specks so it reads as round, not as a ring.
     const c = scene.add.container(x, y).setDepth(5);
-    c.add(scene.add.circle(0, 0, 5, 0xdca444).setStrokeStyle(1, 0x9a6a24));  // dough ring
-    c.add(scene.add.circle(0, 0, 2, 0x3a2a14));                              // hole
+    c.add(scene.add.circle(0, 0, 5, 0xc9812f).setStrokeStyle(1, 0x8a5620));  // dough ball
+    c.add(scene.add.circle(-1.4, -1.4, 2.4, 0xe6a856));                      // glaze sheen (upper-left)
+    c.add(scene.add.circle(-1.8, -1.8, 1, 0xf7d9a0));                        // hot-spot highlight
+    c.add(scene.add.circle(2.2, 1.6, 0.7, 0xfff2d8));                        // sugar speck
+    c.add(scene.add.circle(0.4, 2.4, 0.6, 0xfff2d8));                        // sugar speck
     this._c = c;
 
     scene.tweens.add({

@@ -260,6 +260,10 @@ export default class TitleScene extends Phaser.Scene {
   _launchGameplay() {
     this.scene.launch(SCENE_HUD);
     this.scene.launch(SCENE_DIALOGUE);
-    this.scene.start(SCENE_NEIGHBORHOOD);
+    // Pass an explicit empty payload. Phaser's scene.start(key) with no data
+    // does NOT clear the scene's previous init data, so a fresh game would
+    // otherwise inherit the last run's spawn point and boss-defeated flags —
+    // dropping the player at a friend's house with friends already recruited.
+    this.scene.start(SCENE_NEIGHBORHOOD, {});
   }
 }
