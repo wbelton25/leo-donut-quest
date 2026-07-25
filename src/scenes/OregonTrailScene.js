@@ -190,6 +190,20 @@ const AILMENT_KEYS         = Object.keys(AILMENTS);
 const AILMENT_CATCH_CHANCE = 0.20;   // per hard (non-easy) leg, a healthy friend might catch one
 const AILMENT_START_SEV    = 65;     // 0-100; how bad it starts. Care lowers it, PUSH raises it.
 
+// ── Supply mishaps (Oregon-Trail-style bad luck) ────────────────────────────────
+// A leg can go sideways and cost you supplies — a snack drops out, a bully swipes
+// some, a spare kit rolls into a ditch. `need` = which stash it takes from; `n` =
+// how many; `text(itemName)` = flavor. Only mishaps you can actually pay for fire.
+const SUPPLY_MISHAPS = [
+  { need: 'snack', n: 1, title: 'BUMP IN THE ROAD', text: i => `A ${i} bounced clean out of the pack on a pothole. Gone.` },
+  { need: 'snack', n: 2, title: 'SHAKEDOWN',        text: () => `A big kid outside the gas station shook the crew down and swiped some snacks.` },
+  { need: 'snack', n: 1, title: 'SNACK THIEF',      text: () => `A stray dog snatched a snack clean out of somebody's hand.` },
+  { need: 'snack', n: 1, title: 'RACCOON RAID',     text: () => `A raccoon raided the pack while nobody was looking. One snack: gone.` },
+  { need: 'kit',   n: 1, title: 'LOST A SPARE',     text: i => `The spare ${i} worked loose and rolled straight into a ditch. Bye.` },
+  { need: 'kit',   n: 1, title: 'BUTTERFINGERS',    text: i => `A ${i} kit bounced out of the saddlebag on a rough patch.` },
+];
+const SUPPLY_MISHAP_CHANCE = 0.16;   // per leg, IF you have the supply to lose
+
 // TERRAIN is rolled for each leg and PREVIEWED at the camp before it, so pace +
 // snack decisions become planning. `stam`/`bike` scale that leg's respective wear;
 // `time` scales its time cost. `color` tints the preview by how nasty it is.
@@ -419,6 +433,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     // already-ailing friend HEADED HOME (announce + drop). Then continue to the stop.
     const caught = this._lastLegSummary?.caught;
     const lostId = this._lastLegSummary?.lostId;
+    const mishap = this._lastLegSummary?.mishap;
     if (caught) {
       this._announceAilment(caught, () => this._proceedAfterLeg(leg));
     } else if (lostId) {
@@ -427,6 +442,8 @@ export default class OregonTrailScene extends Phaser.Scene {
         this._updateGroupHud();
         this._proceedAfterLeg(leg);
       });
+    } else if (mishap) {
+      this._announceMishap(mishap, () => { this._updateGroupHud(); this._proceedAfterLeg(leg); });
     } else {
       this._proceedAfterLeg(leg);
     }
@@ -487,12 +504,13 @@ export default class OregonTrailScene extends Phaser.Scene {
     if (this._pace === 'push') this._worsenAilments(7);
     else if (this._crew > 66)  this._healAilments(5);
 
-    // On a hard leg a HEALTHY friend can catch something; otherwise an already-
-    // ailing friend might head home (never both in one leg — one beat at a time).
+    // One bad beat per hard leg, in priority: a friend CATCHES an ailment, else an
+    // ailing friend HEADS HOME, else a SUPPLY MISHAP (dropped/stolen supplies).
     const caught = this._rollAilmentCatch();
     const lostId = caught ? null : this._rollCrewLoss();
+    const mishap = (caught || lostId) ? null : this._rollSupplyMishap();
 
-    return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr, lostId, caught };
+    return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr, lostId, caught, mishap };
   }
 
   // Present party members who are currently ailing.
@@ -511,6 +529,31 @@ export default class OregonTrailScene extends Phaser.Scene {
     for (const id of Object.keys(this._ailments)) {
       this._ailments[id].sev = Math.min(100, this._ailments[id].sev + amount);
     }
+  }
+
+  // Random bad luck that costs supplies. Removes the item(s) and returns the card
+  // text, or null (no mishap, or nothing left to lose). Best-first so a named drop
+  // matches what actually left the pack.
+  _rollSupplyMishap() {
+    if (Math.random() >= SUPPLY_MISHAP_CHANCE) return null;
+    const haveSnacks = this._snackTotal() > 0, haveKits = this._repairTotal() > 0;
+    const pool = SUPPLY_MISHAPS.filter(m => (m.need === 'snack' ? haveSnacks : haveKits));
+    if (pool.length === 0) return null;
+
+    const m     = pool[Math.floor(Math.random() * pool.length)];
+    const inv   = m.need === 'snack' ? this._snackInv : this._bikeInv;
+    const order = m.need === 'snack' ? SNACK_ORDER    : PART_ORDER;
+    const meta  = m.need === 'snack' ? SNACK_META     : PART_META;
+
+    const removed = [];
+    for (let k = 0; k < m.n; k++) {
+      const gotId = order.find(x => inv[x] > 0);
+      if (!gotId) break;
+      inv[gotId]--;
+      removed.push(meta[gotId][0]);
+    }
+    if (removed.length === 0) return null;
+    return { title: m.title, text: m.text(removed[0]) };
   }
 
   // A healthy present friend might catch something on a hard leg. Returns {id,type} or null.
@@ -638,6 +681,15 @@ export default class OregonTrailScene extends Phaser.Scene {
   }
 
   // Blocking notice when a decision costs a teammate.
+  // Bad luck cost you supplies — a quick "dang it" beat.
+  _announceMishap(mishap, done) {
+    this._eventCard.show({
+      title:       mishap.title,
+      description: `${mishap.text}  Restock at the next store if you can.`,
+      choices:     [{ text: 'Dang it.' }],
+    }, () => done());
+  }
+
   // A friend just caught an ailment — they're now at risk until nursed back.
   _announceAilment(caught, done) {
     const name = MEMBER_NAMES[caught.id] ?? caught.id.toUpperCase();
