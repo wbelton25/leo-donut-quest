@@ -856,13 +856,18 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const fartJustDown = Phaser.Input.Keyboard.JustDown(this._fartKey) ||
                          this._player.fartJustPressed;
     if (fartJustDown) {
-      this._abilities.execute('lightning_fart', this, this._player);
-      // A fart near a golfer spooks him into a wild, erratic spray of balls.
-      const FART_STARTLE_R2 = 90 * 90;
-      for (const o of this._obstacles) {
-        if (typeof o.startle !== 'function') continue;
-        const dx = o._x - this._player.x, dy = o._y - this._player.y;
-        if (dx * dx + dy * dy <= FART_STARTLE_R2) o.startle(this._player.x, this._player.y);
+      const farted = this._abilities.execute('lightning_fart', this, this._player);
+      // A golfer only panics if the fart ACTUALLY went off (not just an F-press on
+      // cooldown) AND he's inside its real blast radius — the same reach as the
+      // deer knockdown, not a looser range.
+      if (farted) {
+        const boosted = this._powerFartUntil && Date.now() < this._powerFartUntil;
+        const fartR2  = (boosted ? 130 : 80) ** 2;
+        for (const o of this._obstacles) {
+          if (typeof o.startle !== 'function') continue;
+          const dx = o._x - this._player.x, dy = o._y - this._player.y;
+          if (dx * dx + dy * dy <= fartR2) o.startle(this._player.x, this._player.y);
+        }
       }
     }
 
@@ -1414,11 +1419,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
     }
 
     const goLabel = missing > 0 ? 'RIDE NOW (more time, fewer friends)' : 'RIDE TO THE DONUTS!';
-    const btn1 = this.add.rectangle(cx, cy + 16, 260, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    const btn1 = this.add.rectangle(cx, cy + 16, 296, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btn1);
     objs.push(txt(this, cx, cy + 16, goLabel, { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
 
-    const btn2 = this.add.rectangle(cx, cy + 38, 260, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    const btn2 = this.add.rectangle(cx, cy + 38, 296, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btn2);
     objs.push(txt(this, cx, cy + 38, missing > 0 ? `KEEP LOOKING (find the other ${missing})` : 'KEEP EXPLORING',
       { fontSize: '8px', color: '#4fc3f7' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
@@ -1457,7 +1462,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (spares >= 1) {
       objs.push(txt(this, cx, cy - 24, 'BIKE BROKE!', { fontSize: '12px', color: '#ff8844' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
       objs.push(txt(this, cx, cy - 6, `${spares} SPARE BIKE${spares === 1 ? '' : 'S'} READY`, { fontSize: '8px', color: '#ffcc66' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
-      const btn = this.add.rectangle(cx, cy + 20, 170, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+      const btn = this.add.rectangle(cx, cy + 20, 232, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
       objs.push(btn);
       objs.push(txt(this, cx, cy + 20, 'HOP ON A SPARE & KEEP GOING', { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
       btn.on('pointerdown', () => {
@@ -1533,11 +1538,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
     objs.push(txt(this, cx, cy - 30, "IT'S 3:00 PM!", { fontSize: '12px', color: '#f5a623' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
     objs.push(txt(this, cx, cy - 10, 'LAST CHANCE TO DEPART', { fontSize: '8px', color: '#cccccc' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
 
-    const btn1 = this.add.rectangle(cx, cy + 12, 148, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    const btn1 = this.add.rectangle(cx, cy + 12, 208, 16, 0x1a3a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btn1);
     objs.push(txt(this, cx, cy + 12, 'DEPART WITH CURRENT CREW', { fontSize: '8px', color: '#88ff88' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
 
-    const btn2 = this.add.rectangle(cx, cy + 34, 90, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    const btn2 = this.add.rectangle(cx, cy + 34, 112, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btn2);
     objs.push(txt(this, cx, cy + 34, 'RESTART GAME', { fontSize: '8px', color: '#ff4444' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
 
@@ -1556,7 +1561,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const dismiss = () => objs.forEach(o => o.destroy());
 
     if (this._resources.time > 10) {
-      const btnR = this.add.rectangle(cx, cy - 4, 170, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+      const btnR = this.add.rectangle(cx, cy - 4, 200, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
       objs.push(btnR);
       objs.push(txt(this, cx, cy - 4, 'FIGHT AGAIN  (-10 MIN)', { fontSize: '8px', color: '#4fc3f7' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
       btnR.on('pointerdown', () => {
@@ -1569,7 +1574,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
       objs.push(txt(this, cx, cy - 4, 'NOT ENOUGH TIME TO RETRY', { fontSize: '8px', color: '#556677' }).setScrollFactor(0).setOrigin(0.5).setDepth(51));
     }
 
-    const btnS = this.add.rectangle(cx, cy + 18, 170, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
+    const btnS = this.add.rectangle(cx, cy + 18, 200, 16, 0x2a1a1a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btnS);
     objs.push(txt(this, cx, cy + 18, `CONTINUE WITHOUT ${name}`, { fontSize: '8px', color: '#aaaaaa' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
     btnS.on('pointerdown', dismiss);
