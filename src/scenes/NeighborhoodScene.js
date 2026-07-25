@@ -87,7 +87,7 @@ const CART_PATH_HALF = 1.1;
 
 // Hidden warp (#12): jump on this tile at the west end of Marquesas Ave to open a
 // one-time teleport menu. Marquesas Ave road is col 56-66, row 115-119.
-const TELEPORT_SPOT   = { col: 64, row: 117 };
+const TELEPORT_SPOT   = { col: 80, row: 117 };
 const TELEPORT_RADIUS = 22;   // px — how close Leo must be when he jumps
 // Preset warp destinations (tile coords). 'exit' resolves to the Act 2 exit.
 const TELEPORT_DESTS = [
