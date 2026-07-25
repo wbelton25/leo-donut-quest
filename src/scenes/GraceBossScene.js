@@ -72,7 +72,9 @@ const SQUIRT_SPEED    = 160;
 const NOODLE_DAMAGE   = 20;   // 1 heart
 const SQUIRT_DAMAGE   = 20;   // 1 heart
 const PUDDLE_DAMAGE   = 20;   // 1 heart
-const CONTACT_DAMAGE  = 40;   // 2 hearts — very dangerous, avoid Grace touching Leo
+const CONTACT_DAMAGE  = 20;   // 1 heart — like her other hits. Was 40 (2 hearts), which
+                              // made the FIRST boss deadlier than every later one (12-18)
+                              // and could end the fight in ~3 touches. Still avoid contact.
 
 const POOL_STUN_MS    = 1500; // ms Leo is stunned after falling in the pool
 const POOL_PUSH_DIST  = 40;   // px pushed away from pool edge on entry
