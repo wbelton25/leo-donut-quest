@@ -66,12 +66,24 @@ let HOUSE_GROUPS = [];
 let FRIEND_ZONES = [];
 
 // Drivable off-road pockets (2D) — [col, row, w, h] in tiles. Leo can ride here even
-// though they aren't roads: Runde Park (widened east to Windward) + the golf course
-// (extended south to Tega Cay Dr). Shared by collision, tree-gen, and the minimap.
+// though they aren't roads. The golf course is NOT here anymore: on the course you
+// may only ride the cart path (see CART_PATH_WP), so the fairway grass stays walled.
 const DRIVABLE_POCKETS = [
-  [19,  65, 26, 26],   // Runde Park
-  [220,  0, 70, 46],   // Tega Cay golf course
+  [19, 65, 26, 26],    // Runde Park
 ];
+
+// The golf course footprint — used to keep it clear of trees and to draw it on the
+// minimap. Driveability inside it comes ONLY from the cart path, not this box.
+const GOLF_ZONE = [220, 0, 70, 46];
+
+// Golf-cart path centreline (tile coords). A Catmull-Rom spline is fit through
+// these so the path curves smoothly; it's the only rideable surface on the course,
+// enters from the south road, and routes past the hidden golden donut (~258,12).
+const CART_PATH_WP = [
+  [240, 47], [244, 41], [251, 35], [244, 27], [251, 19], [258, 12], [264, 6], [267, 2],
+];
+// Half-width of the rideable corridor around the centreline, in tiles.
+const CART_PATH_HALF = 1.1;
 
 // Hidden warp (#12): jump on this tile at the west end of Marquesas Ave to open a
 // one-time teleport menu. Marquesas Ave road is col 56-66, row 115-119.
@@ -247,6 +259,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     // ── Lake Wylie ────────────────────────────────────────────────────────────
     this._buildLake();
+
+    // ── Cart path — computed BEFORE the walls so _isRoadChunk can keep it open ──
+    this._computeCartPath();
 
     // ── Collision group ───────────────────────────────────────────────────────
     this._walls = this.physics.add.staticGroup();
@@ -1569,24 +1584,47 @@ export default class NeighborhoodScene extends Phaser.Scene {
   // using the same texture samples the exact same pixel at any world coordinate.
   // This means overlapping road/ground sprites blend seamlessly at intersections
   // instead of showing a seam where their independent offsets don't match.
-  // A winding golf-cart path from the south road up through the course. Drawn
-  // with rounded joints (thick line + a disc at each waypoint) so it reads as a
-  // smooth paved path. Doubles as the "you can ride here" hint.
+  // Fit a smooth spline through the cart-path waypoints and rasterise it to the
+  // set of rideable tiles (the corridor). Runs before the walls are built so the
+  // path stays open while the rest of the course is walled off.
+  _computeCartPath() {
+    const pts = CART_PATH_WP.map(([c, r]) => new Phaser.Math.Vector2(c * T + T / 2, r * T + T / 2));
+    this._cartPathSpline = new Phaser.Curves.Spline(pts);
+
+    // Sample densely along the smooth curve; mark every tile within the corridor
+    // half-width of each sample. Set of "col,row" keys, checked by _isRoadChunk.
+    const tiles = new Set();
+    const samples = this._cartPathSpline.getPoints(240);
+    const halfPx = CART_PATH_HALF * T;
+    const rad = Math.ceil(CART_PATH_HALF);
+    for (const s of samples) {
+      const cc = Math.floor(s.x / T), rr = Math.floor(s.y / T);
+      for (let dc = -rad; dc <= rad; dc++) {
+        for (let dr = -rad; dr <= rad; dr++) {
+          const tc = cc + dc, tr = rr + dr;
+          const tx = tc * T + T / 2, ty = tr * T + T / 2;
+          if (Math.hypot(tx - s.x, ty - s.y) <= halfPx + T * 0.5) tiles.add(`${tc},${tr}`);
+        }
+      }
+    }
+    this._cartPathTiles = tiles;
+  }
+
+  // Draw the cart path: a smooth, wide tan ribbon with a darker edge, following
+  // the same spline the corridor was rasterised from.
   _buildGolfCartPath() {
-    const wp = [[240, 47], [238, 40], [247, 33], [236, 26], [249, 19], [259, 13], [251, 7], [263, 3]]
-      .map(([c, r]) => ({ x: c * T + T / 2, y: r * T + T / 2 }));
     const g = this.add.graphics().setDepth(1);
     const stroke = (width, color) => {
       g.lineStyle(width, color, 1);
-      g.beginPath();
-      g.moveTo(wp[0].x, wp[0].y);
-      for (let i = 1; i < wp.length; i++) g.lineTo(wp[i].x, wp[i].y);
-      g.strokePath();
+      this._cartPathSpline.draw(g, 128);
+      // Rounded caps at the two ends so it doesn't look chopped.
       g.fillStyle(color, 1);
-      wp.forEach(p => g.fillCircle(p.x, p.y, width / 2));   // rounded joints/caps
+      const a = this._cartPathSpline.getStartPoint(), b = this._cartPathSpline.getEndPoint();
+      g.fillCircle(a.x, a.y, width / 2);
+      g.fillCircle(b.x, b.y, width / 2);
     };
-    stroke(12, 0x8f7f52);   // darker edge
-    stroke(8,  0xd8c890);   // tan paved surface
+    stroke(30, 0x8f7f52);   // darker edge
+    stroke(22, 0xd8c890);   // tan paved surface
   }
 
   _ts(x, y, w, h, key, depth = 0) {
@@ -1637,6 +1675,16 @@ export default class NeighborhoodScene extends Phaser.Scene {
       if (c < pc + pw && c + step > pc && r < pr + ph && r + step > pr) return true;
     }
 
+    // Golf-cart path: the only rideable surface on the course. Any tile of this
+    // chunk landing on the corridor keeps the chunk open.
+    if (this._cartPathTiles) {
+      for (let cc = c; cc < c + step; cc++) {
+        for (let rr = r; rr < r + step; rr++) {
+          if (this._cartPathTiles.has(`${cc},${rr}`)) return true;
+        }
+      }
+    }
+
     for (const [rc, rr, rw, rh] of ROADS) {
       if (c < rc + rw && c + step > rc && r < rr + rh && r + step > rr) return true;
     }
@@ -1681,10 +1729,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
         if (c >= rc && c < rc + rw && r >= rr && r < rr + rh) return true;
       }
       if (c >= PARK_C && c < PARK_C + PARK_W && r >= PARK_R && r < PARK_R + PARK_H) return true;
-      // Keep the drivable pockets (park + golf fairways) clear of trees so they stay rideable.
+      // Keep the drivable pockets (park) and the whole golf course clear of trees.
       for (const [pc, pr, pw, ph] of DRIVABLE_POCKETS) {
         if (c >= pc && c < pc + pw && r >= pr && r < pr + ph) return true;
       }
+      { const [gc, gr, gw, gh] = GOLF_ZONE; if (c >= gc && c < gc + gw && r >= gr && r < gr + gh) return true; }
       if (c <= 10) return true;              // left water
       if (r >= 151) return true;             // south water
       if (c <= 110 && r >= 148) return true; // south water buffer
