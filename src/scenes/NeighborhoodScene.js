@@ -396,15 +396,21 @@ export default class NeighborhoodScene extends Phaser.Scene {
     const GC_C = 220, GC_R = 0, GC_W = 70, GC_H = 44;
     const gcPx = GC_C * T + (GC_W * T) / 2;
     const gcPy = GC_R * T + (GC_H * T) / 2;
+    // Manicured fairway fills the whole course (single seamless texture — no more
+    // patchy strips). Greens, a cart path, and flags are laid on top.
     this._ts(gcPx, gcPy, GC_W * T, GC_H * T, 'tex-golf');
-    // Fairway strips with darker rough grass + hole flag markers
-    for (let i = 0; i < 4; i++) {
-      const fwX = (GC_C + 5 + i * 15) * T + 5 * T;
-      const fwH = (GC_H - 4) * T;
-      this._ts(fwX, gcPy, 10 * T, fwH, 'tex-park');
-      // One hole flag per fairway
-      this._ts(fwX, gcPy - fwH / 4, T, T, TILE.GOLF_HOLE);
-    }
+
+    // Winding cart path up from the south road — also the visual HINT that the
+    // course is rideable (the surrounding grass is walled off, this isn't).
+    this._buildGolfCartPath();
+
+    // A handful of flagged putting greens scattered across the course.
+    [[232, 9], [258, 7], [279, 13], [244, 30], [271, 33]].forEach(([c, r]) => {
+      const gx = c * T + T / 2, gy = r * T + T / 2;
+      // Slightly lighter "green" disc under each flag.
+      this.add.circle(gx, gy + 4, 11, 0xbfe08a, 0.55).setDepth(1);
+      this._ts(gx, gy - T, T, T, TILE.GOLF_HOLE);
+    });
     txt(this, GC_C * T + 8, 4, 'TEGA CAY\nGOLF CLUB', { fontSize: '8px', color: '#88ff88' });
 
     // ── Houses ────────────────────────────────────────────────────────────────
@@ -1563,6 +1569,26 @@ export default class NeighborhoodScene extends Phaser.Scene {
   // using the same texture samples the exact same pixel at any world coordinate.
   // This means overlapping road/ground sprites blend seamlessly at intersections
   // instead of showing a seam where their independent offsets don't match.
+  // A winding golf-cart path from the south road up through the course. Drawn
+  // with rounded joints (thick line + a disc at each waypoint) so it reads as a
+  // smooth paved path. Doubles as the "you can ride here" hint.
+  _buildGolfCartPath() {
+    const wp = [[240, 47], [238, 40], [247, 33], [236, 26], [249, 19], [259, 13], [251, 7], [263, 3]]
+      .map(([c, r]) => ({ x: c * T + T / 2, y: r * T + T / 2 }));
+    const g = this.add.graphics().setDepth(1);
+    const stroke = (width, color) => {
+      g.lineStyle(width, color, 1);
+      g.beginPath();
+      g.moveTo(wp[0].x, wp[0].y);
+      for (let i = 1; i < wp.length; i++) g.lineTo(wp[i].x, wp[i].y);
+      g.strokePath();
+      g.fillStyle(color, 1);
+      wp.forEach(p => g.fillCircle(p.x, p.y, width / 2));   // rounded joints/caps
+    };
+    stroke(12, 0x8f7f52);   // darker edge
+    stroke(8,  0xd8c890);   // tan paved surface
+  }
+
   _ts(x, y, w, h, key, depth = 0) {
     let sp;
     if (typeof key === 'number') {
