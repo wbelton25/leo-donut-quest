@@ -1004,7 +1004,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     // Two buttons that open an item PICKER, so you choose exactly which snack / part to
     // spend (they restore different amounts) — not an auto-pick. Count = total in the pack.
     const stashBtn = (cx2, label, enabled, handler) => {
-      const btn = add(this.add.rectangle(cx2, y, 132, 16, enabled ? 0x1a3a2a : 0x1a1a22)
+      const btn = add(this.add.rectangle(cx2, y, 144, 16, enabled ? 0x1a3a2a : 0x1a1a22)
         .setStrokeStyle(1, enabled ? 0x4a8a5a : 0x2a2a33));
       add(txt(this, cx2, y, label, { fontSize: '8px', color: enabled ? '#aaf0c0' : '#556' }).setOrigin(0.5));
       if (enabled) {
@@ -1015,9 +1015,9 @@ export default class OregonTrailScene extends Phaser.Scene {
       }
     };
     const snacks = this._snackTotal(), kits = this._repairTotal();
-    stashBtn(BASE_WIDTH / 2 - 70, `EAT A SNACK (x${snacks})`, snacks > 0 && this._crew < 100,
+    stashBtn(BASE_WIDTH / 2 - 74, `EAT A SNACK (x${snacks})`, snacks > 0 && this._crew < 100,
       () => this._openSupplyPicker('snack'));
-    stashBtn(BASE_WIDTH / 2 + 70, `FIX A BIKE (x${kits})`, kits > 0 && this._bikes < 100,
+    stashBtn(BASE_WIDTH / 2 + 74, `FIX A BIKE (x${kits})`, kits > 0 && this._bikes < 100,
       () => this._openSupplyPicker('part'));
     y += 23;
 
