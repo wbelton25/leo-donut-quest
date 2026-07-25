@@ -149,4 +149,5 @@ export const DEFAULT_GAME_STATE = {
   crewWasWornOut: false,   // Act 2 crew hit "worn out" this run (SURVIVOR badge)
   arrivedAhead: false,     // reached the Donut House ahead of schedule (EARLY BIRD badge)
   introSeen: false,        // Leo's opening lines have played — once per new game
+  teleportUsed: false,     // the hidden Marquesas warp — one use per run
 };

@@ -73,6 +73,19 @@ const DRIVABLE_POCKETS = [
   [220,  0, 70, 46],   // Tega Cay golf course
 ];
 
+// Hidden warp (#12): jump on this tile at the west end of Marquesas Ave to open a
+// one-time teleport menu. Marquesas Ave road is col 56-66, row 115-119.
+const TELEPORT_SPOT   = { col: 58, row: 117 };
+const TELEPORT_RADIUS = 22;   // px — how close Leo must be when he jumps
+// Preset warp destinations (tile coords). 'exit' resolves to the Act 2 exit.
+const TELEPORT_DESTS = [
+  { label: "WARREN'S",    col: 128, row: 72 },
+  { label: "MJ'S",        col: 190, row: 67 },
+  { label: "CARSON'S",    col: 296, row: 76 },
+  { label: "JUSTIN'S",    col: 317, row: 122 },
+  { label: 'DONUT HOUSE', exit: true },
+];
+
 export default class NeighborhoodScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_NEIGHBORHOOD });
@@ -546,6 +559,9 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Potholes — hop over them (SPACE) for a bonus, or eat bike damage ─────────
     this._spawnPotholes();
 
+    // ── Hidden Marquesas warp (#12) ─────────────────────────────────────────────
+    this._setupTeleport();
+
     // Proximity prompt label (shown when near a friend's house)
     this._proximityPrompt = txt(this, 0, 0, 'SPACE: Talk', {
       fontSize: '8px', color: '#f5e642',
@@ -659,9 +675,132 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (gs && !gs.introSeen) {
       gs.introSeen = true;
       this.time.delayedCall(400, () => {
-        this.scene.get(SCENE_DIALOGUE)?.showScript('intro', () => {});
+        // Intro banter first, then the mission card so a new player knows the goal.
+        this.scene.get(SCENE_DIALOGUE)?.showScript('intro', () => this._showMissionCard());
       });
     }
+  }
+
+  // A short, dismissable "here's the goal" card shown once at the start of a new
+  // game, right after Leo's intro (#14 onboarding). Freezes the ride while it's up.
+  _showMissionCard() {
+    if (!this.scene.isActive()) return;
+    this._runPaused = true;
+    const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2;
+    const D = 60;
+    const objs = [];
+    const keep = o => { objs.push(o); return o; };
+
+    keep(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.82)
+      .setScrollFactor(0).setDepth(D).setInteractive());
+    keep(this.add.rectangle(cx, cy, 300, 156, 0x12101c, 0.98)
+      .setStrokeStyle(2, 0xf5a623).setScrollFactor(0).setDepth(D + 1));
+    keep(txt(this, cx, cy - 60, 'YOUR MISSION', { fontSize: '12px', color: '#f5a623' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(D + 2));
+
+    [
+      '1. Round up all 4 friends',
+      '2. Beat their siblings to free them',
+      '3. Ride out to the Donut House',
+      '4. Bring the donuts home!',
+    ].forEach((t, i) => keep(txt(this, cx - 132, cy - 34 + i * 18, t,
+      { fontSize: '8px', color: '#e8e0f0' }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(D + 2)));
+
+    const btn = keep(this.add.rectangle(cx, cy + 54, 120, 18, 0x2a2a4a)
+      .setScrollFactor(0).setDepth(D + 2).setInteractive({ useHandCursor: true }));
+    const lbl = keep(txt(this, cx, cy + 54, "LET'S GO!", { fontSize: '8px', color: '#ffffff' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+    btn.on('pointerover', () => { btn.setFillStyle(0x4444aa); lbl.setColor('#f5a623'); });
+    btn.on('pointerout',  () => { btn.setFillStyle(0x2a2a4a); lbl.setColor('#ffffff'); });
+
+    const spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    const dismiss = () => {
+      objs.forEach(o => o.destroy());
+      spaceKey.removeAllListeners();
+      this._runPaused = false;
+    };
+    btn.on('pointerdown', dismiss);
+    spaceKey.once('down', dismiss);
+  }
+
+  // ── Hidden Marquesas warp (#12) ────────────────────────────────────────────
+  _setupTeleport() {
+    this._teleportPt   = { x: TELEPORT_SPOT.col * T + T / 2, y: TELEPORT_SPOT.row * T + T / 2 };
+    this._teleportOpen = false;
+    const gs = this.game.registry.get('gameState') ?? {};
+    if (gs.teleportUsed) return;   // already spent this run — no shimmer, no trigger
+
+    // Subtle ground shimmer so a sharp-eyed player notices something's here.
+    const ring = this.add.circle(this._teleportPt.x, this._teleportPt.y, 8, 0x9b7bff, 0.18)
+      .setStrokeStyle(1, 0xb9a3ff, 0.35).setDepth(2);
+    this._teleportFX = ring;
+    this.tweens.add({
+      targets: ring, scale: { from: 0.8, to: 1.5 }, alpha: { from: 0.28, to: 0.06 },
+      yoyo: true, repeat: -1, duration: 1100, ease: 'Sine.InOut',
+    });
+  }
+
+  _openTeleportMenu() {
+    this._teleportOpen = true;
+    this._runPaused    = true;
+
+    // Bike-spin flourish on Leo.
+    const p = this._player;
+    const spinTarget = p._useSprite ? p : (p._visual ?? p);
+    this.tweens.add({ targets: spinTarget, angle: 360, duration: 500, ease: 'Cubic.Out',
+      onComplete: () => spinTarget.setAngle(0) });
+    FX.burst(this, p.x, p.y, { count: 14, colors: [0x9b7bff, 0xd7c6ff, 0xffffff],
+      minSpeed: 40, maxSpeed: 120, minSize: 1, maxSize: 3, duration: 500, depth: 8 });
+    FX.popText(this, p.x, p.y - 28, 'WARP!', { color: '#c6b3ff', fontSize: '12px', rise: 24, duration: 700 });
+    AudioManager.playSfx(this, 'sfx-bike-hit', { volume: 0.4 });
+
+    this.time.delayedCall(520, () => this._buildTeleportMenu());
+  }
+
+  _buildTeleportMenu() {
+    if (!this.scene.isActive()) return;
+    const cx = BASE_WIDTH / 2, cy = BASE_HEIGHT / 2, D = 60;
+    const rows = TELEPORT_DESTS.length + 1;         // + NEVER MIND
+    const panelH = 34 + rows * 20;
+    const objs = []; const keep = o => { objs.push(o); return o; };
+    const close = () => objs.forEach(o => o.destroy());
+
+    keep(this.add.rectangle(cx, cy, BASE_WIDTH, BASE_HEIGHT, 0x0a0618, 0.85).setScrollFactor(0).setDepth(D).setInteractive());
+    keep(this.add.rectangle(cx, cy, 200, panelH, 0x14102a, 0.98).setStrokeStyle(2, 0x9b7bff).setScrollFactor(0).setDepth(D + 1));
+    keep(txt(this, cx, cy - panelH / 2 + 14, 'WARP TO?', { fontSize: '10px', color: '#c6b3ff' }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 2));
+
+    let y = cy - panelH / 2 + 36;
+    const row = (label, color, hover, onPick) => {
+      const bg = keep(this.add.rectangle(cx, y, 176, 16, 0x201a3a).setScrollFactor(0).setDepth(D + 2).setInteractive({ useHandCursor: true }));
+      const lb = keep(txt(this, cx, y, label, { fontSize: '8px', color }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+      bg.on('pointerover', () => { bg.setFillStyle(0x3a2f6a); lb.setColor(hover); });
+      bg.on('pointerout',  () => { bg.setFillStyle(0x201a3a); lb.setColor(color); });
+      bg.on('pointerdown', onPick);
+      y += 20;
+    };
+    TELEPORT_DESTS.forEach(dest => row(dest.label, '#e8e0ff', '#ffffff', () => { close(); this._doTeleport(dest); }));
+    row('NEVER MIND', '#8878a8', '#bbaadd', () => { close(); this._teleportOpen = false; this._runPaused = false; });
+  }
+
+  _doTeleport(dest) {
+    const gs = this.game.registry.get('gameState') ?? {};
+    gs.teleportUsed = true;
+    this.game.registry.set('gameState', gs);
+    if (this._teleportFX) { this._teleportFX.destroy(); this._teleportFX = null; }
+
+    let tx, ty;
+    if (dest.exit && this._exitX != null) { tx = this._exitX; ty = this._exitY; }
+    else { tx = dest.col * T + T / 2; ty = dest.row * T + T / 2; }
+
+    this.cameras.main.fade(300, 10, 6, 24);
+    this.time.delayedCall(320, () => {
+      this._player.setPosition(tx, ty);
+      if (this._player.body) this._player.body.reset(tx, ty);
+      this.cameras.main.fadeIn(300, 10, 6, 24);
+      this._teleportOpen = false;
+      this._runPaused    = false;
+      this._autosave();
+    });
   }
 
   update(time, delta) {
@@ -705,6 +844,15 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     // ── Deliberate spare swap (R): trade a spare for a fresh, fast bike ──────────
     if (Phaser.Input.Keyboard.JustDown(this._spareKey)) this._trySwapSpare();
+
+    // ── Hidden warp: jump on the secret Marquesas tile → one-time teleport ──────
+    if (this._player.isJumping && !this._teleportOpen && !this._departurePlayed) {
+      const gs = this.game.registry.get('gameState') ?? {};
+      if (!gs.teleportUsed) {
+        const dx = this._player.x - this._teleportPt.x, dy = this._player.y - this._teleportPt.y;
+        if (dx * dx + dy * dy <= TELEPORT_RADIUS * TELEPORT_RADIUS) this._openTeleportMenu();
+      }
+    }
     this._updateSpareHint();
 
     // ── Act 1 clock drain (only while Leo is moving) ─────────────────────────────
