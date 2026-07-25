@@ -87,7 +87,7 @@ const CART_PATH_HALF = 1.1;
 
 // Hidden warp (#12): jump on this tile at the west end of Marquesas Ave to open a
 // one-time teleport menu. Marquesas Ave road is col 56-66, row 115-119.
-const TELEPORT_SPOT   = { col: 58, row: 117 };
+const TELEPORT_SPOT   = { col: 64, row: 117 };
 const TELEPORT_RADIUS = 22;   // px — how close Leo must be when he jumps
 // Preset warp destinations (tile coords). 'exit' resolves to the Act 2 exit.
 const TELEPORT_DESTS = [
@@ -746,8 +746,11 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   // ── Hidden Marquesas warp (#12) ────────────────────────────────────────────
   _setupTeleport() {
-    this._teleportPt   = { x: TELEPORT_SPOT.col * T + T / 2, y: TELEPORT_SPOT.row * T + T / 2 };
-    this._teleportOpen = false;
+    this._teleportPt    = { x: TELEPORT_SPOT.col * T + T / 2, y: TELEPORT_SPOT.row * T + T / 2 };
+    this._teleportOpen  = false;
+    // Re-armed only while Leo is OFF the spot, so he has to deliberately hop ONTO
+    // it, and NEVER MIND doesn't instantly re-open (he's still standing on it).
+    this._teleportArmed = true;
     const gs = this.game.registry.get('gameState') ?? {};
     if (gs.teleportUsed) return;   // already spent this run — no shimmer, no trigger
 
@@ -866,12 +869,16 @@ export default class NeighborhoodScene extends Phaser.Scene {
     // ── Deliberate spare swap (R): trade a spare for a fresh, fast bike ──────────
     if (Phaser.Input.Keyboard.JustDown(this._spareKey)) this._trySwapSpare();
 
-    // ── Hidden warp: jump on the secret Marquesas tile → one-time teleport ──────
-    if (this._player.isJumping && !this._teleportOpen && !this._departurePlayed) {
-      const gs = this.game.registry.get('gameState') ?? {};
-      if (!gs.teleportUsed) {
-        const dx = this._player.x - this._teleportPt.x, dy = this._player.y - this._teleportPt.y;
-        if (dx * dx + dy * dy <= TELEPORT_RADIUS * TELEPORT_RADIUS) this._openTeleportMenu();
+    // ── Hidden warp: hop the bike ONTO the secret Marquesas tile ────────────────
+    {
+      const dx = this._player.x - this._teleportPt.x, dy = this._player.y - this._teleportPt.y;
+      const onSpot = dx * dx + dy * dy <= TELEPORT_RADIUS * TELEPORT_RADIUS;
+      if (!onSpot) this._teleportArmed = true;   // leaving re-arms it for next time
+      if (onSpot && this._teleportArmed && this._player.isJumping &&
+          !this._teleportOpen && !this._departurePlayed &&
+          !(this.game.registry.get('gameState')?.teleportUsed)) {
+        this._teleportArmed = false;             // consume this hop; must leave & return to retry
+        this._openTeleportMenu();
       }
     }
     this._updateSpareHint();
