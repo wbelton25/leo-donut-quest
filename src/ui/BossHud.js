@@ -42,11 +42,15 @@ export function createHearts(scene, arenaW) {
 
   const update = (fraction) => {
     const e = Phaser.Math.Clamp(fraction, 0, 1) * 100;
-    const full = Math.floor(e / 20);
-    const half = (e % 20) >= 10;
     gfx.forEach((g, i) => {
       const x = arenaW - 120 + i * 23;
-      const state = i < full ? 'full' : (i === full && half ? 'half' : 'empty');
+      // Each heart owns a 20-point band. A heart shows 'half' for ANY positive
+      // energy in its band (not only >=10) so that the last sliver of health is
+      // always visible — otherwise energy 1..9 rendered as five empty hearts
+      // while Leo was still alive, which looked like "no health but not dying".
+      // Now all-empty happens exactly at energy 0, when isExhausted() kills him.
+      const band  = e - i * 20;
+      const state = band >= 20 ? 'full' : band > 0 ? 'half' : 'empty';
       drawHeart(g, x, 14, state);
     });
   };

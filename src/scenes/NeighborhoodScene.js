@@ -430,7 +430,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
     if (this._exitX !== null) {
       const em = this.add.rectangle(this._exitX, this._exitY, 20, 20, 0xf5e642, 0.85).setDepth(3);
       this.tweens.add({ targets: em, alpha: 0.15, yoyo: true, repeat: -1, duration: 500 });
-      txt(this, this._exitX, this._exitY - 18, 'ACT 2 →', { fontSize: '8px', color: '#f5e642' }).setOrigin(0.5).setDepth(3);
+      txt(this, this._exitX, this._exitY - 18, 'TO DONUT HOUSE →', { fontSize: '8px', color: '#f5e642' }).setOrigin(0.5).setDepth(3);
     }
 
     // Zone markers — flashing indicators so the player can see where to go
@@ -665,7 +665,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    if (this._runPaused) return;   // frozen behind the bike-broken overlay (no drain/autosave)
+    if (this._runPaused) {
+      // Skipping _player.update() stops input, but the Arcade body keeps its last
+      // velocity and would coast across the map behind the overlay ("bike keeps
+      // moving when a repair is mandatory"). Zero it so the ride is truly frozen.
+      if (this._player?.body) this._player.setVelocity(0, 0);
+      return;
+    }
     this._player.update();
     this._posBuffer.record();
     this._followers.forEach(f => f.update());
@@ -1563,6 +1569,18 @@ export default class NeighborhoodScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(51);
     this.add.rectangle(MM_X + 317 * T * sx, MM_Y + 122 * T * sy, 3, 3, 0x9b59b6)
       .setScrollFactor(0).setDepth(51);
+
+    // Act 2 exit — the objective. A pulsing gold star so the player can see
+    // where to head to leave town for the Donut House.
+    if (this._exitX != null && this._exitY != null) {
+      const ex = MM_X + this._exitX * sx, ey = MM_Y + this._exitY * sy;
+      const exitStar = this.add.star(ex, ey, 5, 2, 4, 0xf5e642)
+        .setScrollFactor(0).setDepth(53);
+      this.tweens.add({
+        targets: exitStar, scale: { from: 0.7, to: 1.35 },
+        yoyo: true, repeat: -1, duration: 650, ease: 'Sine.InOut',
+      });
+    }
 
     this._minimapDot = this.add.circle(0, 0, 2, 0xffffff).setScrollFactor(0).setDepth(52);
     this._mm = { x: MM_X, y: MM_Y, sx, sy };
