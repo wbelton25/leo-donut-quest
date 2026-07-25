@@ -105,6 +105,20 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
   init(data) {
     this._initData = data ?? {};
+    // Phaser REUSES the scene instance across restarts and boss returns, so any
+    // transient per-entry flags left true would carry over. Reset them here so a
+    // restart is truly fresh. The important ones are the friend "already met"
+    // flags: a stale one leaves that friend's house inactive after a restart, so
+    // you can't start their fight (recruited state is re-derived in create, so
+    // resetting these can't cause an unwanted re-fight).
+    this._dialoguePlayed       = false;
+    this._departurePlayed      = false;
+    this._departurePromptShown = false;
+    this._deadlineShown        = false;
+    this._bikeBrokenTriggered  = false;
+    this._gameOverTriggered    = false;
+    this._runPaused            = false;
+    ['warren', 'mj', 'carson', 'justin'].forEach(id => { this[`_${id}MetDialogueDone`] = false; });
   }
 
   create() {
@@ -1406,7 +1420,7 @@ export default class NeighborhoodScene extends Phaser.Scene {
 
     const btn2 = this.add.rectangle(cx, cy + 38, 260, 16, 0x1a1a3a).setScrollFactor(0).setDepth(51).setInteractive({ useHandCursor: true });
     objs.push(btn2);
-    objs.push(txt(this, cx, cy + 38, missing > 0 ? `KEEP LOOKING (find the other ${missing})` : 'KEEP EXPLORING ACT 1',
+    objs.push(txt(this, cx, cy + 38, missing > 0 ? `KEEP LOOKING (find the other ${missing})` : 'KEEP EXPLORING',
       { fontSize: '8px', color: '#4fc3f7' }).setScrollFactor(0).setOrigin(0.5).setDepth(52));
 
     const dismiss = () => {
