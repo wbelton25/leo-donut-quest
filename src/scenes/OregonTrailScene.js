@@ -920,12 +920,22 @@ export default class OregonTrailScene extends Phaser.Scene {
     const outcomeH = outcomeS ? measure(outcomeS) : 0;
     const nextH    = measure(nextS);
 
+    // Crew-loss telegraph (shown only when the crew is worn) — measured too, so it
+    // wraps within the card and the card grows to fit it instead of spilling over.
+    const showWarn = this._crew < CREW_LOSS_FLOOR && this._party.getParty().length > 0;
+    const warnMsg  = this._pace === 'easy'
+      ? 'Crew\'s worn out — EASY lets them recover.'
+      : 'WARNING: crew\'s worn out — a friend could drop off!';
+    const warnH    = showWarn ? measure(warnMsg) : 0;
+
     const cardH = 13 + 15
       + (recapS   ? recapH   + 3 : 0)
       + (outcomeS ? outcomeH + 3 : 0)
       + 5 + 15 + 15 + 18
       + nextH + 8
-      + 16 + 21 + 16 + 23 + 20;
+      + 16 + 21 + 16
+      + (showWarn ? warnH + 12 : 0)
+      + 23 + 20;
     const cardY = (BASE_HEIGHT - cardH) / 2;
 
     this._restStopCon = this.add.container(0, 0).setDepth(31);
@@ -993,12 +1003,11 @@ export default class OregonTrailScene extends Phaser.Scene {
       pushLocked ? '#ffaa66' : '#8899aa'); y += 16;
 
     // Crew-loss telegraph (#6): fair warning that riding hard on a worn-out crew
-    // can make a friend drop off. Only shows when the risk is actually live.
-    if (this._crew < CREW_LOSS_FLOOR && this._party.getParty().length > 0) {
-      line(y, this._pace === 'easy'
-        ? 'Crew\'s worn out — EASY lets them recover.'
-        : 'WARNING: crew\'s worn out — a friend could drop off!',
-        this._pace === 'easy' ? '#88cc88' : '#ff7755'); y += 15;
+    // can make a friend drop off. Wrapped within the card (measured above).
+    if (showWarn) {
+      // +12 (not +4): the next row's buttons are centre-anchored at y, so leave
+      // room for their top half to clear the wrapped, top-anchored warning text.
+      y += wrapLine(y, warnMsg, this._pace === 'easy' ? '#88cc88' : '#ff7755') + 12;
     }
 
     // Two buttons that open an item PICKER, so you choose exactly which snack / part to
