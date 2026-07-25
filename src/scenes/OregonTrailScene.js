@@ -174,10 +174,21 @@ const PACE_ORDER = ['easy', 'steady', 'push'];
 // PUSH needs a crew with some energy left — you can't sprint an exhausted crew. Below
 // this, PUSH is locked and you have to EASY (rest) first. That's the sprint/rest rhythm.
 const PUSH_MIN_CREW = 34;
-// Below this CREW level, a hard (non-easy) leg can make a friend drop off and
-// ride home. Set above PUSH_MIN_CREW so the danger zone is reachable: you can
-// still PUSH at 34-ish, and a big push from there lands you deep in the risk.
-const CREW_LOSS_FLOOR = 42;
+
+// ── Crew ailments (Oregon-Trail-style) ──────────────────────────────────────────
+// A friend catches something goofy on the road, then risks heading home until you
+// nurse them back — rest on EASY legs and feed snacks. A healthy friend won't leave;
+// only an ailing one can. Keeping the CREW bar high lowers the odds and speeds healing.
+const AILMENTS = {
+  scuffed_knee: { label: 'a scuffed knee', catch: n => `${n} biffed it on a pothole and scuffed a knee. Ow.` },
+  the_runs:     { label: 'the runs',       catch: n => `${n} crushed a gas-station burrito and instantly regretted it.` },
+  cooties:      { label: 'cooties',        catch: n => `A girl pedaled by and kissed ${n} on the cheek. COOTIES!` },
+  brain_freeze: { label: 'brain freeze',   catch: n => `${n} inhaled a slushie way too fast. Brain: frozen.` },
+  jelly_legs:   { label: 'jelly legs',     catch: n => `${n} pedaled so hard both legs turned to total jelly.` },
+};
+const AILMENT_KEYS         = Object.keys(AILMENTS);
+const AILMENT_CATCH_CHANCE = 0.20;   // per hard (non-easy) leg, a healthy friend might catch one
+const AILMENT_START_SEV    = 65;     // 0-100; how bad it starts. Care lowers it, PUSH raises it.
 
 // TERRAIN is rolled for each leg and PREVIEWED at the camp before it, so pace +
 // snack decisions become planning. `stam`/`bike` scale that leg's respective wear;
@@ -246,6 +257,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     // TIME is the master resource (this._resources.time / the clock).
     this._crew  = 100;   // crew energy/morale
     this._bikes = 100;   // fleet bike condition
+    this._ailments = {}; // memberId -> { type, sev }; present only while that friend is ailing
 
     // Terrain-reactive ride FX (1A) — built per leg, torn down at stops.
     this._terrainFX       = [];
@@ -403,10 +415,13 @@ export default class OregonTrailScene extends Phaser.Scene {
     // you down (burning more time), it doesn't end the run.
     if (!this._gameOverFlag && this._resources.isTimeUp()) { this._triggerLoss('time'); return; }
 
-    // A friend worn out by hard riding peels off before the next stop. Announce
-    // it first, then continue to the stop once the player dismisses the card.
+    // One beat per leg: either a friend just CAUGHT an ailment (announce it), or an
+    // already-ailing friend HEADED HOME (announce + drop). Then continue to the stop.
+    const caught = this._lastLegSummary?.caught;
     const lostId = this._lastLegSummary?.lostId;
-    if (lostId) {
+    if (caught) {
+      this._announceAilment(caught, () => this._proceedAfterLeg(leg));
+    } else if (lostId) {
       this._announceMemberLost(lostId, () => {
         this._dropMember(lostId);
         this._updateGroupHud();
@@ -450,6 +465,9 @@ export default class OregonTrailScene extends Phaser.Scene {
       const bikeGain = 5  + Math.round(Math.random() * 3);   // ~+5-8 BIKES
       this._crew  = Math.min(100, this._crew  + crewGain);
       this._bikes = Math.min(100, this._bikes + bikeGain);
+      // Resting is how you nurse the sick: a big chunk of healing, more when the
+      // crew is fresh enough to look after each other.
+      this._healAilments(28 + Math.round(this._crew / 12));
       return { recap: 'Took it easy — everyone caught their breath.', terrain: terr };
     }
 
@@ -464,27 +482,57 @@ export default class OregonTrailScene extends Phaser.Scene {
       this.game.registry.set('gameState', gs);
     }
 
-    // Crew-loss risk: this is the real cost of riding hard on an exhausted crew.
-    // Once the CREW bar is worn down, a hard leg can leave a friend unable to keep
-    // up, and they peel off and ride home. PUSH is far riskier than STEADY, so the
-    // lesson is the sprint/rest rhythm: PUSH when fresh, EASY to recover — don't
-    // grind a spent crew. Telegraphed on the camp board (see _buildRestStopUI).
-    const lostId = this._rollCrewLoss(pace);
+    // Ailments (the real crew-loss driver). PUSHing makes the sick worse; a still-
+    // fresh crew mends a little on its own.
+    if (this._pace === 'push') this._worsenAilments(7);
+    else if (this._crew > 66)  this._healAilments(5);
 
-    return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr, lostId };
+    // On a hard leg a HEALTHY friend can catch something; otherwise an already-
+    // ailing friend might head home (never both in one leg — one beat at a time).
+    const caught = this._rollAilmentCatch();
+    const lostId = caught ? null : this._rollCrewLoss();
+
+    return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr, lostId, caught };
   }
 
-  // Returns a member id to drop this leg, or null. Only fires once the crew is
-  // worn (below CREW_LOSS_FLOOR) and never on an EASY (rest) leg. Chance scales
-  // with pace and with how far below the floor the crew has fallen.
-  _rollCrewLoss(pace) {
-    if (this._pace === 'easy') return null;
-    const party = this._party.getParty();
-    if (party.length === 0 || this._crew >= CREW_LOSS_FLOOR) return null;
-    const paceRisk = this._pace === 'push' ? 0.55 : 0.20;   // PUSH ~2.5x riskier
-    const severity = 1 - this._crew / CREW_LOSS_FLOOR;        // 0 at floor → 1 at empty
-    if (Math.random() < paceRisk * severity) {
-      return party[Math.floor(Math.random() * party.length)];
+  // Present party members who are currently ailing.
+  _ailingIds() { return this._party.getParty().filter(id => this._ailments[id]); }
+
+  // Nurse ailing friends: lower every ailment's severity; cure it at 0.
+  _healAilments(amount) {
+    for (const id of Object.keys(this._ailments)) {
+      this._ailments[id].sev -= amount;
+      if (this._ailments[id].sev <= 0) delete this._ailments[id];
+    }
+  }
+
+  // Riding hard makes existing ailments worse.
+  _worsenAilments(amount) {
+    for (const id of Object.keys(this._ailments)) {
+      this._ailments[id].sev = Math.min(100, this._ailments[id].sev + amount);
+    }
+  }
+
+  // A healthy present friend might catch something on a hard leg. Returns {id,type} or null.
+  _rollAilmentCatch() {
+    const healthy = this._party.getParty().filter(id => !this._ailments[id]);
+    if (healthy.length === 0 || Math.random() >= AILMENT_CATCH_CHANCE) return null;
+    const id   = healthy[Math.floor(Math.random() * healthy.length)];
+    const type = AILMENT_KEYS[Math.floor(Math.random() * AILMENT_KEYS.length)];
+    this._ailments[id] = { type, sev: AILMENT_START_SEV };
+    return { id, type };
+  }
+
+  // Only an AILING friend can head home. Odds scale with how bad the ailment is,
+  // how spent the crew is (low CREW bar = worse), and the pace (PUSH worst, EASY best).
+  _rollCrewLoss() {
+    const ailing = this._ailingIds();
+    if (ailing.length === 0) return null;
+    const crewFactor = 1 - this._crew / 100;                                  // 0 fresh → 1 spent
+    const paceFactor = this._pace === 'push' ? 1.35 : this._pace === 'easy' ? 0.45 : 1.0;
+    for (const id of ailing) {
+      const sev = this._ailments[id].sev / 100;                              // 0..1
+      if (Math.random() < sev * (0.12 + 0.30 * crewFactor) * paceFactor) return id;
     }
     return null;
   }
@@ -590,11 +638,24 @@ export default class OregonTrailScene extends Phaser.Scene {
   }
 
   // Blocking notice when a decision costs a teammate.
+  // A friend just caught an ailment — they're now at risk until nursed back.
+  _announceAilment(caught, done) {
+    const name = MEMBER_NAMES[caught.id] ?? caught.id.toUpperCase();
+    this._eventCard.show({
+      title:       `${name} CAUGHT SOMETHING`,
+      description: `${AILMENTS[caught.type].catch(name)} Rest on EASY legs and feed snacks to nurse them back — push a sick crew and you could lose them.`,
+      choices:     [{ text: 'Uh oh...' }],
+    }, () => done());
+  }
+
   _announceMemberLost(id, done) {
     const name = MEMBER_NAMES[id] ?? id.toUpperCase();
+    // Reference the ailment that did them in, if we still have it (drop happens after).
+    const ail = this._ailments[id] ? AILMENTS[this._ailments[id].type].label : null;
+    const why = ail ? `${name}'s ${ail} got the best of them` : `${name} couldn't keep up`;
     this._eventCard.show({
       title:       `${name} HEADED HOME`,
-      description: `${name} split off and rode home. The rest of the crew keeps going without them.`,
+      description: `${why}, so they split off and rode home. The rest of the crew keeps going.`,
       choices:     [{ text: 'Ride on...' }],
     }, () => done());
   }
@@ -665,6 +726,7 @@ export default class OregonTrailScene extends Phaser.Scene {
     if (!this._snackInv[id] || this._snackInv[id] <= 0) return false;
     this._snackInv[id]--;
     this._crew = Math.min(100, this._crew + (SNACK_STAMINA[id] ?? 0));
+    this._healAilments(22);   // a good feed helps the sick recover too
     return true;
   }
 
@@ -748,6 +810,7 @@ export default class OregonTrailScene extends Phaser.Scene {
   _dropMember(id) {
     this._removeBiker(id);
     this._party.removeMember(id);
+    delete this._ailments[id];   // they took their ailment home with them
   }
 
   // ── Location scenes ────────────────────────────────────────────────────────
@@ -920,13 +983,14 @@ export default class OregonTrailScene extends Phaser.Scene {
     const outcomeH = outcomeS ? measure(outcomeS) : 0;
     const nextH    = measure(nextS);
 
-    // Crew-loss telegraph (shown only when the crew is worn) — measured too, so it
-    // wraps within the card and the card grows to fit it instead of spilling over.
-    const showWarn = this._crew < CREW_LOSS_FLOOR && this._party.getParty().length > 0;
-    const warnMsg  = this._pace === 'easy'
-      ? 'Crew\'s worn out — EASY lets them recover.'
-      : 'WARNING: crew\'s worn out — a friend could drop off!';
-    const warnH    = showWarn ? measure(warnMsg) : 0;
+    // Ailment status (the crew-loss telegraph): lists who's sick + the care hint.
+    // Measured too, so it wraps within the card and the card grows to fit it.
+    const ailing   = this._ailingIds();
+    const showWarn  = ailing.length > 0;
+    const warnMsg   = showWarn
+      ? `AILING: ${ailing.map(id => `${MEMBER_NAMES[id]} (${AILMENTS[this._ailments[id].type].label})`).join(', ')}.  Rest on EASY & feed snacks to nurse them back!`
+      : '';
+    const warnH     = showWarn ? measure(warnMsg) : 0;
 
     const cardH = 13 + 15
       + (recapS   ? recapH   + 3 : 0)
@@ -1002,12 +1066,11 @@ export default class OregonTrailScene extends Phaser.Scene {
     line(y, pushLocked ? 'Too tired to PUSH! Go EASY to rest.' : PACES[this._pace].blurb,
       pushLocked ? '#ffaa66' : '#8899aa'); y += 16;
 
-    // Crew-loss telegraph (#6): fair warning that riding hard on a worn-out crew
-    // can make a friend drop off. Wrapped within the card (measured above).
+    // Ailment telegraph: who's sick + how to nurse them. Wrapped within the card.
     if (showWarn) {
       // +12 (not +4): the next row's buttons are centre-anchored at y, so leave
       // room for their top half to clear the wrapped, top-anchored warning text.
-      y += wrapLine(y, warnMsg, this._pace === 'easy' ? '#88cc88' : '#ff7755') + 12;
+      y += wrapLine(y, warnMsg, '#ff9955') + 12;
     }
 
     // Two buttons that open an item PICKER, so you choose exactly which snack / part to
