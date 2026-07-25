@@ -5,58 +5,58 @@
     { "speaker": "Leo", "text": "Let's ride!", "portrait": "leo" }
   ],
   "warren_meet": [
-    { "speaker": "Warren", "text": "Leo! I heard you were going to Donut House!", "portrait": "warren", "requiresMember": null },
-    { "speaker": "Warren", "text": "I'm in. But Grace is out front and she's got a pool noodle...", "portrait": "warren", "requiresMember": null },
-    { "speaker": "Leo", "text": "We'll handle it. Together.", "portrait": "leo" }
+    { "speaker": "Warren", "text": "Leo! Bro, tell me it's true — we're actually hitting Donut House??", "portrait": "warren", "requiresMember": null },
+    { "speaker": "Warren", "text": "I'm in, no cap. One problem: Grace is guarding the door with a pool noodle and zero chill.", "portrait": "warren", "requiresMember": null },
+    { "speaker": "Leo", "text": "A pool noodle. Truly terrifying. We'll handle it, bro.", "portrait": "leo" }
   ],
   "warren_after_grace": [
-    { "speaker": "Warren", "text": "YES! She's down! I saw the whole thing from the window!", "portrait": "warren" },
-    { "speaker": "Leo", "text": "Your sister hits hard. Come on, let's go.", "portrait": "leo" },
-    { "speaker": "Warren", "text": "I've got my slingshot. Nobody's stopping us now.", "portrait": "warren" }
+    { "speaker": "Warren", "text": "SHE'S DOWN! Bro, I watched the whole thing from the window. Straight cinema.", "portrait": "warren" },
+    { "speaker": "Leo", "text": "Your sister swings that noodle like an actual weapon.", "portrait": "leo" },
+    { "speaker": "Warren", "text": "Slingshot's loaded. Nobody's stopping this crew now.", "portrait": "warren" }
   ],
   "warren_join": [
-    { "speaker": "Warren", "text": "That's what I'm talking about! Let's go get those donuts.", "portrait": "warren" },
-    { "speaker": "Warren", "text": "I've got my slingshot. Nobody's stopping us now.", "portrait": "warren" }
+    { "speaker": "Warren", "text": "THAT'S what I'm talking about, bro! Donut House, here we come.", "portrait": "warren" },
+    { "speaker": "Warren", "text": "Slingshot's loaded. Nobody's stopping us now.", "portrait": "warren" }
   ],
   "mj_meet": [
-    { "speaker": "MJ", "text": "Donut run?! Say no more. I'm so in.", "portrait": "mj", "requiresMember": null },
-    { "speaker": "MJ", "text": "My brother Max has been blocking the driveway all morning.", "portrait": "mj", "requiresMember": null },
-    { "speaker": "Leo", "text": "Guess we're going through him.", "portrait": "leo" }
+    { "speaker": "MJ", "text": "A donut run?? Bro, say less. I'm so in.", "portrait": "mj", "requiresMember": null },
+    { "speaker": "MJ", "text": "Only thing — my brother Max has been blocking the driveway all morning like it's his job.", "portrait": "mj", "requiresMember": null },
+    { "speaker": "Leo", "text": "Then we go through him. Simple.", "portrait": "leo" }
   ],
   "mj_join": [
-    { "speaker": "MJ", "text": "Ha! He never learns.", "portrait": "mj" },
-    { "speaker": "MJ", "text": "I'll push anything out of our way. Let's ride.", "portrait": "mj" }
+    { "speaker": "MJ", "text": "Ha! Bro never learns.", "portrait": "mj" },
+    { "speaker": "MJ", "text": "Anything in our way, I move it. Let's ride.", "portrait": "mj" }
   ],
   "carson_meet": [
-    { "speaker": "Carson", "text": "I saw you coming from two blocks away.", "portrait": "carson", "requiresMember": null },
-    { "speaker": "Carson", "text": "Donut House. I knew it. I'm ready.", "portrait": "carson", "requiresMember": null },
-    { "speaker": "Carson", "text": "Nora's around back by the pool. She's in a mood.", "portrait": "carson", "requiresMember": null }
+    { "speaker": "Carson", "text": "Saw you coming two blocks back, bro. I always know.", "portrait": "carson", "requiresMember": null },
+    { "speaker": "Carson", "text": "Donut House. Called it. I'm ready.", "portrait": "carson", "requiresMember": null },
+    { "speaker": "Carson", "text": "Heads up though — Nora's around back by the pool, and she is LOCKED in today.", "portrait": "carson", "requiresMember": null }
   ],
   "carson_join": [
-    { "speaker": "Carson", "text": "Didn't even see it coming. That's my whole thing, fr.", "portrait": "carson" },
-    { "speaker": "Carson", "text": "Stay close and stay quiet. I know the shortcuts.", "portrait": "carson" }
+    { "speaker": "Carson", "text": "Never even saw me coming. That's the whole thing, fr.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "Stay close, stay quiet. I know every shortcut, bro.", "portrait": "carson" }
   ],
   "carson_after_nora": [
-    { "speaker": "Carson", "text": "SHE'S DOWN! I've been waiting for that all summer.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "SHE'S DOWN! Bro, I've been waiting all summer for that one.", "portrait": "carson" },
     { "speaker": "Leo", "text": "How long was she hiding in those cabinets?!", "portrait": "leo" },
-    { "speaker": "Carson", "text": "Like... all day. She takes this very seriously.", "portrait": "carson" },
-    { "speaker": "Carson", "text": "Alright, I'm in. Let's go get those donuts.", "portrait": "carson" }
+    { "speaker": "Carson", "text": "All day. She takes this WAY too seriously, fr.", "portrait": "carson" },
+    { "speaker": "Carson", "text": "Anyway. I'm in. Let's go get glazed.", "portrait": "carson" }
   ],
   "justin_meet": [
-    { "speaker": "Justin", "text": "BRO. I've been waiting all week for a donut run.", "portrait": "justin", "requiresMember": null },
-    { "speaker": "Justin", "text": "Max is guarding the street with a bat. AND he's somehow electric?", "portrait": "justin", "requiresMember": null },
-    { "speaker": "Leo", "text": "That doesn't even make sense.", "portrait": "leo" },
-    { "speaker": "Justin", "text": "I know. Doesn't matter. Let's lock in.", "portrait": "justin", "requiresMember": null }
+    { "speaker": "Justin", "text": "BRO. BRO. I have been waiting ALL WEEK for a donut run.", "portrait": "justin", "requiresMember": null },
+    { "speaker": "Justin", "text": "Tiny thing: Max is guarding the street with a bat. Also he's electric now? Somehow??", "portrait": "justin", "requiresMember": null },
+    { "speaker": "Leo", "text": "That is not a real thing, dude.", "portrait": "leo" },
+    { "speaker": "Justin", "text": "I KNOW. Doesn't matter. Lock in, bro.", "portrait": "justin", "requiresMember": null }
   ],
   "justin_join": [
-    { "speaker": "Justin", "text": "YEAH! Full crew, no cap! Nobody's faster than us.", "portrait": "justin" },
+    { "speaker": "Justin", "text": "LET'S GOOO! Full crew, no cap. Nobody's faster than us, bro.", "portrait": "justin" },
     { "speaker": "Justin", "text": "I'll get us there in no time. Follow me!", "portrait": "justin" }
   ],
   "justin_after_max": [
-    { "speaker": "Justin", "text": "BRO. You just beat my electric brother with a FART.", "portrait": "justin" },
-    { "speaker": "Leo", "text": "Did NOT see that coming.", "portrait": "leo" },
-    { "speaker": "Justin", "text": "He's been doing that zap thing since he found those batteries.", "portrait": "justin" },
-    { "speaker": "Justin", "text": "OK. Full squad, locked in. Let's GO. Donuts won't wait.", "portrait": "justin" }
+    { "speaker": "Justin", "text": "BRO. You just beat my electric brother with a FART. That's actual cinema.", "portrait": "justin" },
+    { "speaker": "Leo", "text": "Did NOT plan that. It just sorta happened.", "portrait": "leo" },
+    { "speaker": "Justin", "text": "He's been zapping everything since he found those batteries. Menace behavior.", "portrait": "justin" },
+    { "speaker": "Justin", "text": "Whatever — full squad, locked in. Donuts are NOT waiting. LET'S GO.", "portrait": "justin" }
   ],
   "departure": [
     { "speaker": "Leo", "text": "Full squad. Donut House is 3 miles east. Let's move.", "portrait": "leo" },
