@@ -680,6 +680,13 @@ export default class NeighborhoodScene extends Phaser.Scene {
                          this._player.fartJustPressed;
     if (fartJustDown) {
       this._abilities.execute('lightning_fart', this, this._player);
+      // A fart near a golfer spooks him into a wild, erratic spray of balls.
+      const FART_STARTLE_R2 = 90 * 90;
+      for (const o of this._obstacles) {
+        if (typeof o.startle !== 'function') continue;
+        const dx = o._x - this._player.x, dy = o._y - this._player.y;
+        if (dx * dx + dy * dy <= FART_STARTLE_R2) o.startle(this._player.x, this._player.y);
+      }
     }
 
     // Update obstacles

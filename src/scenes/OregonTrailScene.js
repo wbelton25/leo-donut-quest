@@ -174,6 +174,10 @@ const PACE_ORDER = ['easy', 'steady', 'push'];
 // PUSH needs a crew with some energy left — you can't sprint an exhausted crew. Below
 // this, PUSH is locked and you have to EASY (rest) first. That's the sprint/rest rhythm.
 const PUSH_MIN_CREW = 34;
+// Below this CREW level, a hard (non-easy) leg can make a friend drop off and
+// ride home. Set above PUSH_MIN_CREW so the danger zone is reachable: you can
+// still PUSH at 34-ish, and a big push from there lands you deep in the risk.
+const CREW_LOSS_FLOOR = 42;
 
 // TERRAIN is rolled for each leg and PREVIEWED at the camp before it, so pace +
 // snack decisions become planning. `stam`/`bike` scale that leg's respective wear;
@@ -399,6 +403,23 @@ export default class OregonTrailScene extends Phaser.Scene {
     // you down (burning more time), it doesn't end the run.
     if (!this._gameOverFlag && this._resources.isTimeUp()) { this._triggerLoss('time'); return; }
 
+    // A friend worn out by hard riding peels off before the next stop. Announce
+    // it first, then continue to the stop once the player dismisses the card.
+    const lostId = this._lastLegSummary?.lostId;
+    if (lostId) {
+      this._announceMemberLost(lostId, () => {
+        this._dropMember(lostId);
+        this._updateGroupHud();
+        this._proceedAfterLeg(leg);
+      });
+    } else {
+      this._proceedAfterLeg(leg);
+    }
+  }
+
+  // Continue from a finished leg to its stop (arrival / checkpoint / plain camp).
+  // Split out of _arriveAtStop so a crew-loss card can play first.
+  _proceedAfterLeg(leg) {
     if (leg.stop === 'arrival') { this._triggerArrival(); return; }
 
     if (leg.stop === 'checkpoint') {
@@ -442,7 +463,30 @@ export default class OregonTrailScene extends Phaser.Scene {
       gs.crewWasWornOut = true;
       this.game.registry.set('gameState', gs);
     }
-    return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr };
+
+    // Crew-loss risk: this is the real cost of riding hard on an exhausted crew.
+    // Once the CREW bar is worn down, a hard leg can leave a friend unable to keep
+    // up, and they peel off and ride home. PUSH is far riskier than STEADY, so the
+    // lesson is the sprint/rest rhythm: PUSH when fresh, EASY to recover — don't
+    // grind a spent crew. Telegraphed on the camp board (see _buildRestStopUI).
+    const lostId = this._rollCrewLoss(pace);
+
+    return { recap: this._legRecap(terr, crewHit, bikeHit), terrain: terr, lostId };
+  }
+
+  // Returns a member id to drop this leg, or null. Only fires once the crew is
+  // worn (below CREW_LOSS_FLOOR) and never on an EASY (rest) leg. Chance scales
+  // with pace and with how far below the floor the crew has fallen.
+  _rollCrewLoss(pace) {
+    if (this._pace === 'easy') return null;
+    const party = this._party.getParty();
+    if (party.length === 0 || this._crew >= CREW_LOSS_FLOOR) return null;
+    const paceRisk = this._pace === 'push' ? 0.55 : 0.20;   // PUSH ~2.5x riskier
+    const severity = 1 - this._crew / CREW_LOSS_FLOOR;        // 0 at floor → 1 at empty
+    if (Math.random() < paceRisk * severity) {
+      return party[Math.floor(Math.random() * party.length)];
+    }
+    return null;
   }
 
   // One friendly sentence about how the leg went — no numbers. Pace-aware so the cause
@@ -947,6 +991,15 @@ export default class OregonTrailScene extends Phaser.Scene {
     y += 21;
     line(y, pushLocked ? 'Too tired to PUSH! Go EASY to rest.' : PACES[this._pace].blurb,
       pushLocked ? '#ffaa66' : '#8899aa'); y += 16;
+
+    // Crew-loss telegraph (#6): fair warning that riding hard on a worn-out crew
+    // can make a friend drop off. Only shows when the risk is actually live.
+    if (this._crew < CREW_LOSS_FLOOR && this._party.getParty().length > 0) {
+      line(y, this._pace === 'easy'
+        ? 'Crew\'s worn out — EASY lets them recover.'
+        : 'WARNING: crew\'s worn out — a friend could drop off!',
+        this._pace === 'easy' ? '#88cc88' : '#ff7755'); y += 15;
+    }
 
     // Two buttons that open an item PICKER, so you choose exactly which snack / part to
     // spend (they restore different amounts) — not an auto-pick. Count = total in the pack.

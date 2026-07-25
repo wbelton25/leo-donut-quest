@@ -82,7 +82,7 @@ export default class GolfBallSpawner {
     }
   }
 
-  _spawnBall() {
+  _spawnBall(dirX = this._dirX, dirY = this._dirY, speed = this._speed) {
     if (this._destroyed) return;
     let sprite;
     if (this._scene.textures.exists(BALL_KEY)) {
@@ -92,10 +92,38 @@ export default class GolfBallSpawner {
     }
     this._balls.push({
       sprite,
-      vx: this._dirX * this._speed,
-      vy: this._dirY * this._speed,
+      vx: dirX * speed,
+      vy: dirY * speed,
       hit: false,
     });
+  }
+
+  // Spooked by a nearby fart: the golfer shanks a wild burst of balls, aimed
+  // roughly at (px,py) but with a big random spread — erratic and hard to dodge.
+  // Called by NeighborhoodScene when Leo farts near this golfer.
+  startle(px, py) {
+    if (this._destroyed || this._startled) return;
+    this._startled = true;
+    // Brief immunity so a fart-spam can't chain infinite sprays.
+    this._scene.time.delayedCall(1400, () => { this._startled = false; });
+
+    if (this._golfer) {
+      this._golfer.play('golfer-swing');
+      this._golfer.once('animationcomplete-golfer-swing', () => {
+        if (this._golfer && this._golfer.active) this._golfer.play('golfer-idle');
+      });
+    }
+
+    const baseAng = Math.atan2(py - this._y, px - this._x);
+    const n = Phaser.Math.Between(3, 5);
+    for (let k = 0; k < n; k++) {
+      this._scene.time.delayedCall(k * 85, () => {
+        if (this._destroyed) return;
+        const ang   = baseAng + Phaser.Math.FloatBetween(-1.15, 1.15); // ~±66° spread
+        const speed = this._speed * Phaser.Math.FloatBetween(0.85, 1.35);
+        this._spawnBall(Math.cos(ang), Math.sin(ang), speed);
+      });
+    }
   }
 
   update(player) {
