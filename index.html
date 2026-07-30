@@ -4,6 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Leo's Donut Quest</title>
+    <!-- Route phones to the mobile arcade (Donut Rain), desktops to the full
+         adventure. Runs before the game module loads so there's no flash of the
+         wrong game. Override with ?mode=arcade / ?mode=classic (remembered). -->
+    <script>
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search);
+          var forced = p.get('mode');
+          if (forced) { try { localStorage.setItem('dq-mode', forced); } catch (e) {} }
+          var mode = forced;
+          if (!mode) { try { mode = localStorage.getItem('dq-mode'); } catch (e) {} }
+          if (mode === 'classic') return; // stay on the full game
+          var ua = navigator.userAgent || '';
+          var uaPhone = /Android.+Mobile|iPhone|iPod|Windows Phone|BlackBerry|Opera Mini|IEMobile|Mobile.+Firefox/i.test(ua);
+          var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+          var small = Math.min(screen.width, screen.height) <= 500;
+          if (mode === 'arcade' || uaPhone || (coarse && small)) {
+            location.replace('arcade.html' + location.search);
+          }
+        } catch (e) { /* detection must never break the page */ }
+      })();
+    </script>
     <!-- Press Start 2P: a pixel-perfect 8-bit font designed for games like this one -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
