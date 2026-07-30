@@ -569,7 +569,7 @@ export default class DonutRainScene extends Phaser.Scene {
       if (this._goToken !== tok || !this._topText) return;
       if (!rows) { this._topText.setText('world board offline'); return; }
       if (!rows.length) { this._topText.setText('be the first on the board!'); return; }
-      const lines = rows.map((r, i) => `${i + 1}. ${r.initials}  ${r.score}${r.isMe ? '  <YOU' : ''}`);
+      const lines = rows.map((r, i) => `${i + 1}. ${r.initials}  ${r.score}${r.isMe ? '  (YOU)' : ''}`);
       this._topText.setText(lines.join('\n'));
     });
   }
