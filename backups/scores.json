@@ -43,5 +43,20 @@
     "combo": 4,
     "holes": 13,
     "golden": 0
+  },
+  {
+    "id": 9,
+    "initials": "LBT",
+    "score": 351,
+    "grade": "C",
+    "donuts": 3,
+    "party_size": 0,
+    "client_id": "a389de1f4b8b41108247d2e922df8245",
+    "created_at": "2026-07-28T13:51:36.530863+00:00",
+    "time_points": 118,
+    "deer": 6,
+    "combo": 3,
+    "holes": 16,
+    "golden": 1
   }
 ]
