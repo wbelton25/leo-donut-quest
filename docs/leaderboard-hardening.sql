@@ -18,19 +18,19 @@ alter table public.scores drop constraint if exists scores_time_range;
 alter table public.scores add constraint scores_time_range check (time_points between 0 and 540);
 
 alter table public.scores drop constraint if exists scores_deer_range;
-alter table public.scores add constraint scores_deer_range check (deer between 0 and 80);
+alter table public.scores add constraint scores_deer_range check (deer between 0 and 300);
 
 alter table public.scores drop constraint if exists scores_combo_range;
-alter table public.scores add constraint scores_combo_range check (combo between 0 and 12);
+alter table public.scores add constraint scores_combo_range check (combo between 0 and 40);
 
 alter table public.scores drop constraint if exists scores_holes_range;
-alter table public.scores add constraint scores_holes_range check (holes between 0 and 60);
+alter table public.scores add constraint scores_holes_range check (holes between 0 and 99);
 
 alter table public.scores drop constraint if exists scores_golden_range;
 alter table public.scores add constraint scores_golden_range check (golden between 0 and 3);
 
 alter table public.scores drop constraint if exists scores_donuts_min;
-alter table public.scores add constraint scores_donuts_min check (donuts between 1 and 30);
+alter table public.scores add constraint scores_donuts_min check (donuts between 1 and 50);
 
 -- The important one: the total must equal the sum of its parts. This mirrors
 -- ScoreSystem.calculate() exactly. If the scoring formula changes in the game,

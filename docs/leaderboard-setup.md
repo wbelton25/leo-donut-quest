@@ -142,19 +142,19 @@ alter table public.scores drop constraint if exists scores_time_range;
 alter table public.scores add  constraint scores_time_range check (time_points between 0 and 540);
 
 alter table public.scores drop constraint if exists scores_deer_range;
-alter table public.scores add  constraint scores_deer_range check (deer between 0 and 80);
+alter table public.scores add  constraint scores_deer_range check (deer between 0 and 300);
 
 alter table public.scores drop constraint if exists scores_combo_range;
-alter table public.scores add  constraint scores_combo_range check (combo between 0 and 12);
+alter table public.scores add  constraint scores_combo_range check (combo between 0 and 40);
 
 alter table public.scores drop constraint if exists scores_holes_range;
-alter table public.scores add  constraint scores_holes_range check (holes between 0 and 60);
+alter table public.scores add  constraint scores_holes_range check (holes between 0 and 99);
 
 alter table public.scores drop constraint if exists scores_golden_range;
 alter table public.scores add  constraint scores_golden_range check (golden between 0 and 3);
 
 alter table public.scores drop constraint if exists scores_donuts_min;
-alter table public.scores add  constraint scores_donuts_min check (donuts between 1 and 30);
+alter table public.scores add  constraint scores_donuts_min check (donuts between 1 and 50);
 
 -- The important one: the total must actually equal its parts. Mirrors
 -- ScoreSystem.calculate() exactly — if you change the scoring formula in the
@@ -171,8 +171,12 @@ alter table public.scores add  constraint scores_math check (
 );
 ```
 
-With these in place the highest *possible* score is about 2,370, and reaching
-even that requires claiming a maxed-out run in every category at once.
+With these in place the highest *possible* score is about 4,410 (still under the
+5,000 `scores_score_range` ceiling), and reaching even that requires claiming a
+maxed-out run in every category at once. Caps were raised in 2026-07 after a real
+1,301 run exceeded the old combo/deer limits and got silently rejected; the game
+now also clamps every component to these same numbers (see `SCORE_CAPS` in
+`src/systems/ScoreSystem.js`) so an honest run can't be dropped.
 
 ## What this does and doesn't protect against
 

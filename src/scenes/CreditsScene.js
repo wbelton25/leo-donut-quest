@@ -186,7 +186,16 @@ export default class CreditsScene extends Phaser.Scene {
         holes: this._holes, golden: this._golden,
       },
     }).then((ok) => {
-      if (!ok || !this.scene?.isActive()) return;
+      if (!this.scene?.isActive()) return;
+      // Don't let a failed world-board write disappear silently — the local board
+      // still has the score, but say so instead of pretending nothing happened.
+      if (!ok) {
+        if (this._donuts >= 1) {
+          txt(this, BASE_WIDTH / 2, 241, 'WORLD BOARD UNAVAILABLE - SAVED LOCALLY',
+            { fontSize: '8px', color: '#ff8866' }).setOrigin(0.5);
+        }
+        return;
+      }
       return GlobalScores.rankFor(this._score).then((wr) => {
         if (!wr || !this.scene?.isActive()) return;
         txt(this, BASE_WIDTH / 2, 241,

@@ -11,17 +11,39 @@
 const STORAGE_KEY = 'leo-donut-scores';
 const MAX_ENTRIES = 5;
 
+// Per-component caps. These MUST match the world board's CHECK constraints in
+// docs/leaderboard-hardening.sql — a component over its cap makes Postgres reject
+// the whole insert, and GlobalScores.submit is fail-open, so an honest high score
+// vanishes silently. Clamping here guarantees the submitted components always sit
+// inside these bounds, so a legit run can never be dropped again. (Raised well
+// above real play in 2026-07 after a 1301 run with combo/deer over the old caps.)
+export const SCORE_CAPS = {
+  donuts:     50,
+  partySize:  4,
+  timePoints: 540,
+  deer:       300,
+  combo:      40,
+  holes:      99,
+  golden:     3,
+};
+
+const clampInt = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+
 export default class ScoreSystem {
-  // The integer pieces a score is built from. Split out so the world board can
-  // submit them alongside the total and have the database re-check the
-  // arithmetic — if these ever drifted from calculate(), honest runs would be
-  // rejected server-side, so both must read from here.
+  // The integer pieces a score is built from, clamped to the leaderboard caps.
+  // Split out so the world board can submit them alongside the total and have the
+  // database re-check the arithmetic — calculate(), breakdown(), and the submitted
+  // payload all read from here, so the displayed total always equals the sum the
+  // database recomputes.
   static components({ donuts = 0, party = [], time = 0, deer = 0, combo = 0, holes = 0, golden = 0 }) {
     return {
-      donuts,
-      partySize:  party.length,
-      timePoints: Math.max(0, Math.round(time * 2)),
-      deer, combo, holes, golden,
+      donuts:     clampInt(donuts, SCORE_CAPS.donuts),
+      partySize:  clampInt(party.length, SCORE_CAPS.partySize),
+      timePoints: clampInt(time * 2, SCORE_CAPS.timePoints),
+      deer:       clampInt(deer, SCORE_CAPS.deer),
+      combo:      clampInt(combo, SCORE_CAPS.combo),
+      holes:      clampInt(holes, SCORE_CAPS.holes),
+      golden:     clampInt(golden, SCORE_CAPS.golden),
     };
   }
 
@@ -38,17 +60,19 @@ export default class ScoreSystem {
          + (c.golden * 50);
   }
 
-  // Labeled point breakdown for the report card.
-  static breakdown({ donuts = 0, party = [], time = 0, deer = 0, combo = 0, holes = 0, golden = 0 }) {
+  // Labeled point breakdown for the report card. Reads clamped components so the
+  // rows always sum to the same total the world board receives.
+  static breakdown(stats) {
+    const c = ScoreSystem.components(stats);
     const rows = [
-      { label: 'DONUTS DELIVERED', detail: `${donuts} x 20`,             pts: donuts * 20 },
-      { label: 'CREW WHO MADE IT', detail: `${party.length} x 80`,       pts: party.length * 80 },
-      { label: 'TIME TO SPARE',    detail: `${Math.round(time)}%`,       pts: Math.max(0, Math.round(time * 2)) },
-      { label: 'DEER TOPPLED',     detail: `${deer} x 5`,                pts: deer * 5 },
-      { label: 'BEST FART COMBO',  detail: `${combo}x`,                  pts: combo * 15 },
-      { label: 'DONUT HOLES',      detail: `${holes} x 3`,               pts: holes * 3 },
+      { label: 'DONUTS DELIVERED', detail: `${c.donuts} x 20`,               pts: c.donuts * 20 },
+      { label: 'CREW WHO MADE IT', detail: `${c.partySize} x 80`,            pts: c.partySize * 80 },
+      { label: 'TIME TO SPARE',    detail: `${Math.round(stats?.time ?? 0)}%`, pts: c.timePoints },
+      { label: 'DEER TOPPLED',     detail: `${c.deer} x 5`,                  pts: c.deer * 5 },
+      { label: 'BEST FART COMBO',  detail: `${c.combo}x`,                    pts: c.combo * 15 },
+      { label: 'DONUT HOLES',      detail: `${c.holes} x 3`,                 pts: c.holes * 3 },
     ];
-    if (golden > 0) rows.push({ label: 'GOLDEN DONUTS', detail: `${golden} x 50`, pts: golden * 50 });
+    if (c.golden > 0) rows.push({ label: 'GOLDEN DONUTS', detail: `${c.golden} x 50`, pts: c.golden * 50 });
     return rows;
   }
 
