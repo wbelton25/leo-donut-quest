@@ -81,6 +81,13 @@ const POOL_PUSH_DIST  = 40;   // px pushed away from pool edge on entry
 
 const CONTACT_COOLDOWN = 1500; // ms
 
+// Global mercy invulnerability: after ANY hit, Leo can't be hurt again for this
+// long — by any source. Each hazard already has its own cooldown, but those are
+// independent, so a contact + puddle + squirt + noodle could all land in one
+// instant for 80 damage (4 hearts) with no reaction time. This caps it to one
+// heart per window and is the main reason Grace felt brutally hard.
+const DAMAGE_IFRAME = 800; // ms
+
 export default class GraceBossScene extends Phaser.Scene {
   constructor() {
     super({ key: SCENE_GRACE_BOSS });
@@ -138,6 +145,7 @@ export default class GraceBossScene extends Phaser.Scene {
     this._graceY       = 60;
     this._graceVx      = PATROL_SPEED;
     this._lastContact  = 0;
+    this._lastDamage   = 0;   // global mercy-invuln timestamp (see _damagePlayer)
     this._leoStunned   = false;
     this._fartReady    = true;
     this._fartCooldownMs = 4000;
@@ -677,6 +685,13 @@ export default class GraceBossScene extends Phaser.Scene {
   // ─── Damage player ──────────────────────────────────────────────────────────
 
   _damagePlayer(amount, source) {
+    // Global mercy window — absorb anything that lands during it (the caller still
+    // clears its projectile/contact, it just deals no damage). Prevents multiple
+    // hazards stacking into an instant multi-heart loss.
+    const now = Date.now();
+    if (now - (this._lastDamage || 0) < DAMAGE_IFRAME) return;
+    this._lastDamage = now;
+
     this._resources.applyChanges({ energy: -amount });
     this._updateHearts();
     const color = source === 'squirt' ? [0, 100, 255] : [255, 50, 50];
@@ -779,7 +794,9 @@ export default class GraceBossScene extends Phaser.Scene {
     if (now - this._deckHitCooldown < 1200) return;
     for (const p of this._puddles) {
       if (!p.obj.active) continue;
-      if (Math.abs(this._leoX - p.obj.x) < 14 && Math.abs(this._leoY - p.obj.y) < 10) {
+      // Hitbox matched to the 22x11 puddle sprite (was 28x20 — splashed you when
+      // you were merely near a puddle, not on it).
+      if (Math.abs(this._leoX - p.obj.x) < 10 && Math.abs(this._leoY - p.obj.y) < 6) {
         this._deckHitCooldown = now;
         this._damagePlayer(PUDDLE_DAMAGE, 'squirt');
         return;

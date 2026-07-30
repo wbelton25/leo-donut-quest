@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BASE_WIDTH, BASE_HEIGHT } from './constants.js';
+import { BASE_WIDTH, BASE_HEIGHT, DEV_MODE } from './constants.js';
 
 import BootScene from './scenes/BootScene.js';
 import PreloadScene from './scenes/PreloadScene.js';
@@ -89,4 +89,8 @@ const config = {
   ],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Dev-only handle for headless testing / debugging. Folded away in production
+// (DEV_MODE is false unless running the dev server or visiting with ?debug=1).
+if (DEV_MODE) window.__g = game;
