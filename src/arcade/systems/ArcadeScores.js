@@ -6,8 +6,26 @@
 // phase; when it lands, it wraps this rather than replacing it.
 
 const KEY = 'donut-rain-best';
+const INITIALS_KEY = 'donut-rain-initials';
 
 export default class ArcadeScores {
+  // The player's remembered initials for the world board (default 'AAA').
+  static initials() {
+    try {
+      const raw = (localStorage.getItem(INITIALS_KEY) || 'AAA').toUpperCase();
+      return raw.replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, 'A');
+    } catch (e) {
+      return 'AAA';
+    }
+  }
+
+  static setInitials(s) {
+    try {
+      const clean = String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, 'A');
+      localStorage.setItem(INITIALS_KEY, clean);
+    } catch (e) { /* storage disabled — initials just won't persist */ }
+  }
+
   // Highest score this device has recorded, or 0 if none / storage unavailable.
   static best() {
     try {

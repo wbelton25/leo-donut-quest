@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import FX from '../../systems/FX.js';
 import { PIXEL_FONT } from '../../constants.js';
 import ArcadeScores from '../systems/ArcadeScores.js';
+import ArcadeGlobalScores from '../systems/ArcadeGlobalScores.js';
 import ArcadeAudio from '../systems/ArcadeAudio.js';
 import FallingItem, { GOOD_KINDS, BAD_KINDS } from '../entities/FallingItem.js';
 import { K_LEO } from './BootArcadeScene.js';
@@ -152,7 +153,7 @@ export default class DonutRainScene extends Phaser.Scene {
   // Separating the two gestures means moving never accidentally fires the frenzy.
   _setupInput() {
     this.input.on('pointerdown', (p) => {
-      if (this.over) { this._maybeRestart(); return; }
+      if (this.over) { this._gameOverTap(p); return; }
       if (this._inMute(p)) { this._pOnMute = true; return; } // corner tap = mute, not move/frenzy
       this._pOnMute = false;
       this._pDownT = this.time.now; this._pDownX = p.x; this._pDownY = p.y; this._pMoved = false;
@@ -472,25 +473,105 @@ export default class DonutRainScene extends Phaser.Scene {
     const isRecord = ArcadeScores.submit(this.score);
     const best = ArcadeScores.best();
     const W = this._W, H = this._H;
+    const D = 41;
+    this._goToken = (this._goToken || 0) + 1; // stale-async guard across replays
 
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.62).setDepth(40);
-    this._txt(W / 2, H * 0.34, 'GAME OVER', { fontSize: '20px', color: '#ff6b6b' })
-      .setOrigin(0.5).setDepth(41);
-    this._txt(W / 2, H * 0.46, `SCORE\n${this.score}`, { fontSize: '14px', align: 'center' })
-      .setOrigin(0.5).setDepth(41).setLineSpacing(8);
-    this._txt(W / 2, H * 0.57, isRecord ? 'NEW BEST!' : `BEST ${best}`,
-      { fontSize: '10px', color: '#ffe6a0' }).setOrigin(0.5).setDepth(41);
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.74).setDepth(40);
+    this._txt(W / 2, H * 0.10, 'GAME OVER', { fontSize: '20px', color: '#ff6b6b' }).setOrigin(0.5, 0).setDepth(D);
+    this._txt(W / 2, H * 0.185, `SCORE ${this.score}`, { fontSize: '16px' }).setOrigin(0.5, 0).setDepth(D);
+    this._txt(W / 2, H * 0.24, isRecord ? 'NEW LOCAL BEST!' : `YOUR BEST ${best}`,
+      { fontSize: '9px', color: '#ffe6a0' }).setOrigin(0.5, 0).setDepth(D);
 
-    const tap = this._txt(W / 2, H * 0.7, 'TAP TO PLAY AGAIN', { fontSize: '10px', color: '#ffffff' })
-      .setOrigin(0.5).setDepth(41);
-    this.tweens.add({ targets: tap, alpha: 0.3, duration: 600, yoyo: true, repeat: -1 });
+    // ── Touch initials entry ──────────────────────────────────────────────
+    this._initials  = ArcadeScores.initials().split('');
+    this._submitted = false;
+    this._txt(W / 2, H * 0.31, 'YOUR INITIALS', { fontSize: '8px', color: '#88ccff' }).setOrigin(0.5, 0).setDepth(D);
+    this._initBoxRects = []; this._initBoxTexts = [];
+    const boxW = 40, gap = 16, by = H * 0.40;
+    const totalW = 3 * boxW + 2 * gap, startX = W / 2 - totalW / 2 + boxW / 2;
+    for (let i = 0; i < 3; i++) {
+      const bxi = startX + i * (boxW + gap);
+      this.add.rectangle(bxi, by, boxW, boxW, 0x1a2740).setStrokeStyle(2, 0x4488ff).setDepth(D);
+      this._initBoxTexts.push(this._txt(bxi, by, this._initials[i], { fontSize: '20px' }).setOrigin(0.5).setDepth(D + 1));
+      this._initBoxRects.push({ x: bxi, y: by, w: boxW, h: boxW });
+    }
+    this._txt(W / 2, by + boxW * 0.72, 'tap a letter to change', { fontSize: '8px', color: '#7788aa' })
+      .setOrigin(0.5, 0).setDepth(D);
 
-    // Guard so the killing tap doesn't instantly restart.
-    this._restartAt = this.time.now + 650;
+    // ── Submit button ─────────────────────────────────────────────────────
+    const sy = H * 0.565;
+    this._submitBg = this.add.rectangle(W / 2, sy, 190, 30, 0x2a6a2a).setStrokeStyle(2, 0x55cc55).setDepth(D);
+    this._submitLabel = this._txt(W / 2, sy, 'SUBMIT SCORE', { fontSize: '10px' }).setOrigin(0.5).setDepth(D + 1);
+    this._submitRect = { x: W / 2, y: sy, w: 190, h: 30 };
+
+    // ── World board result + top list ─────────────────────────────────────
+    this._resultText = this._txt(W / 2, H * 0.635, '', { fontSize: '10px', color: '#88ddff' }).setOrigin(0.5, 0).setDepth(D);
+    this._topText = this._txt(W / 2, H * 0.685, 'WORLD BOARD...', { fontSize: '9px', color: '#cfe6ff', align: 'center' })
+      .setOrigin(0.5, 0).setDepth(D).setLineSpacing(5);
+
+    // ── Play again ────────────────────────────────────────────────────────
+    const py = H * 0.90;
+    this.add.rectangle(W / 2, py, 190, 30, 0x333344).setStrokeStyle(2, 0x8899bb).setDepth(D);
+    const pa = this._txt(W / 2, py, 'PLAY AGAIN', { fontSize: '10px' }).setOrigin(0.5).setDepth(D + 1);
+    this.tweens.add({ targets: pa, alpha: 0.4, duration: 700, yoyo: true, repeat: -1 });
+    this._playAgainRect = { x: W / 2, y: py, w: 190, h: 30 };
+    this._playAgainAt = this.time.now + 400; // tiny guard vs an accidental tap
+
+    this._refreshTop(); // show the live top of the board right away
   }
 
-  _maybeRestart() {
-    if (this.over && this.time.now >= (this._restartAt || 0)) this.scene.restart();
+  _gameOverTap(p) {
+    for (let i = 0; i < 3; i++) {
+      if (this._inRect(p, this._initBoxRects?.[i])) { this._cycleLetter(i); return; }
+    }
+    if (!this._submitted && this._inRect(p, this._submitRect)) { this._submitScore(); return; }
+    if (this.time.now >= (this._playAgainAt || 0) && this._inRect(p, this._playAgainRect)) this.scene.restart();
+  }
+
+  _inRect(p, r) {
+    return !!r && p.x >= r.x - r.w / 2 && p.x <= r.x + r.w / 2 && p.y >= r.y - r.h / 2 && p.y <= r.y + r.h / 2;
+  }
+
+  _cycleLetter(i) {
+    const code = this._initials[i].charCodeAt(0);
+    this._initials[i] = String.fromCharCode(code >= 90 ? 65 : code + 1); // A..Z, wraps
+    this._initBoxTexts[i].setText(this._initials[i]);
+  }
+
+  _submitScore() {
+    this._submitted = true;
+    const tok = this._goToken;
+    const initials = this._initials.join('');
+    ArcadeScores.setInitials(initials);
+    this._submitLabel.setText('POSTING...');
+    this._submitBg.setFillStyle(0x444444).setStrokeStyle(2, 0x777777);
+
+    ArcadeGlobalScores.submit({ initials, score: this.score }).then((ok) => {
+      if (this._goToken !== tok) return;
+      if (!ok) {
+        this._submitLabel.setText('BOARD OFFLINE');
+        this._resultText.setText('COULD NOT REACH WORLD BOARD').setColor('#ff8866');
+        return;
+      }
+      this._submitLabel.setText('SUBMITTED!');
+      ArcadeGlobalScores.rankFor(this.score).then((rank) => {
+        if (this._goToken !== tok || rank == null) return;
+        this._resultText.setText(rank === 1 ? 'BEST IN THE WORLD!' : `#${rank} IN THE WORLD`)
+          .setColor(rank === 1 ? '#ffd23f' : '#88ddff');
+      });
+      this._refreshTop();
+    });
+  }
+
+  _refreshTop() {
+    const tok = this._goToken;
+    ArcadeGlobalScores.top(5).then((rows) => {
+      if (this._goToken !== tok || !this._topText) return;
+      if (!rows) { this._topText.setText('world board offline'); return; }
+      if (!rows.length) { this._topText.setText('be the first on the board!'); return; }
+      const lines = rows.map((r, i) => `${i + 1}. ${r.initials}  ${r.score}${r.isMe ? '  <YOU' : ''}`);
+      this._topText.setText(lines.join('\n'));
+    });
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
