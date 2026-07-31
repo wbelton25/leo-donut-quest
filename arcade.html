@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- Lock the viewport so a mis-tap can't pinch-zoom or scroll the game away. -->
+    <!-- viewport-fit=cover so the canvas can extend under the notch / home bar;
+         we keep game UI away from those edges. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Donut Rain</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,43 +15,46 @@
         padding: 0;
         box-sizing: border-box;
       }
+      /* Lock the page so Safari can't scroll, rubber-band, or hand the drag off
+         to a tab/back gesture. */
       html, body {
-        background-color: #000;
+        position: fixed;
+        inset: 0;
+        width: 100%;
         height: 100%;
         overflow: hidden;
-        /* Kill the tap-highlight and browser touch gestures so drags stay in-game. */
+        background: #000;
         -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
         touch-action: none;
         overscroll-behavior: none;
       }
-      body {
+      /* The game mounts here. 100dvh tracks the *visible* viewport, so the canvas
+         shrinks to fit when Safari's toolbar (top/bottom/compact) is showing —
+         nothing gets cut off. */
+      #game {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
         display: flex;
-        justify-content: center;
         align-items: center;
+        justify-content: center;
       }
       canvas {
+        display: block;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         -ms-interpolation-mode: nearest-neighbor;
         touch-action: none;
       }
-      /* Unobtrusive escape hatch to the full desktop adventure. */
-      #fullgame {
-        position: fixed;
-        bottom: 2px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10;
-        font-family: monospace;
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.45);
-        text-decoration: none;
-        padding: 2px 6px;
-      }
     </style>
   </head>
   <body>
-    <a id="fullgame" href="/?mode=classic">full game &#8599;</a>
+    <div id="game"></div>
     <script type="module" src="/src/arcade/main.js"></script>
   </body>
 </html>

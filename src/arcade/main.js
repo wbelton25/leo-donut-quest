@@ -23,8 +23,11 @@ const config = {
   backgroundColor: '#8ec7ff', // daytime sky — donuts rain from it
 
   // FIT (not INTEGER_FIT): phones come in every aspect ratio, so we scale to fit
-  // and letterbox rather than demanding whole-number multiples.
+  // and letterbox rather than demanding whole-number multiples. Parent is the
+  // #game div (sized to 100dvh), so we fit the *visible* viewport — not the taller
+  // area hidden behind Safari's toolbar.
   scale: {
+    parent: 'game',
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
@@ -38,6 +41,14 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+
+// Re-fit when the visible viewport changes — iOS Safari growing/shrinking its
+// toolbar fires visualViewport 'resize' (not always window 'resize'), so listen
+// to both plus orientation. Keeps the whole game on-screen with no bottom cutoff.
+const refit = () => game.scale.refresh();
+window.addEventListener('resize', refit);
+window.addEventListener('orientationchange', () => setTimeout(refit, 250));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', refit);
 
 // Exposed for headless smoke tests; harmless in production.
 if (typeof window !== 'undefined') window.__arcade = game;

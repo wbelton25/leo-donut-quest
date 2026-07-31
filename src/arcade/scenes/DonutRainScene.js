@@ -20,7 +20,8 @@ const BOSSES = [
 // ─── Tuning — every knob for the feel lives here ────────────────────────────
 const T = {
   leoScale:      1.7,
-  leoBottomGap:  86,    // px from bottom to Leo's feet
+  leoBottomGap:  178,   // px from bottom to Leo's feet — raised well up so your
+                        // thumb slides in the open zone BELOW him without covering him
   followRate:    14,    // Leo-follows-finger snappiness (higher = tighter)
 
   startInterval: 820,   // ms between spawns at t=0
@@ -114,35 +115,42 @@ export default class DonutRainScene extends Phaser.Scene {
     // so nothing rains down over the grass/road below him.
     this._killY = leoY + 10;
 
-    // ── HUD ──────────────────────────────────────────────────────────────
-    this.scoreText = this._txt(W / 2, 12, '0', { fontSize: '16px' }).setOrigin(0.5, 0);
-    this.bestText  = this._txt(W - 8, 14, `BEST ${ArcadeScores.best()}`, { fontSize: '8px', color: '#ffe6a0' })
+    // ── HUD (all top-anchored so the thumb never covers it) ────────────────
+    this.scoreText = this._txt(W / 2, 6, '0', { fontSize: '16px' }).setOrigin(0.5, 0);
+    this.bestText  = this._txt(W - 8, 8, `BEST ${ArcadeScores.best()}`, { fontSize: '8px', color: '#ffe6a0' })
       .setOrigin(1, 0);
-    this.comboText = this._txt(W / 2, 34, '', { fontSize: '10px', color: '#ffd23f' }).setOrigin(0.5, 0);
     this._heartWrap = this.add.container(0, 0).setDepth(30);
     this._renderHearts();
 
-    // ── Fart Meter (bottom status bar) — fills as you catch; tap to unleash ──
-    // Sits over the road: the area below Leo is always clear (items die at his
-    // line), so it never collides with the top HUD or falling items.
-    const bw = 200, bx = W / 2 - bw / 2, by = H - 15;
+    // ── Fart Meter (top) — fills as you catch; tap to unleash. Up here it stays
+    // visible and clear of your sliding thumb. ─────────────────────────────
+    const bw = 200, bx = W / 2 - bw / 2, by = 44;
     this._chargeBarW = bw; this._chargeBarX = bx;
-    this._chargeLabel = this._txt(W / 2, by - 12, 'FART METER', { fontSize: '8px', color: '#ffe6a0' }).setOrigin(0.5, 1);
+    this._chargeLabel = this._txt(W / 2, by - 11, 'FART METER', { fontSize: '8px', color: '#ffe6a0' }).setOrigin(0.5, 1);
     this.add.rectangle(W / 2, by, bw + 4, 12, 0x000000, 0.5).setDepth(29);
     this.add.rectangle(bx, by, bw, 8, 0x3a2a10).setOrigin(0, 0.5).setDepth(30);
     this._chargeFill = this.add.rectangle(bx, by, 0, 8, 0xffc43f).setOrigin(0, 0.5).setDepth(31);
 
-    // Mute toggle (top-left, below the hearts). Tapping it toggles sound without
-    // firing the frenzy — the input handler treats this corner specially.
-    this._muteBtn = this.add.container(22, 44).setDepth(32);
+    this.comboText = this._txt(W / 2, by + 8, '', { fontSize: '8px', color: '#ffd23f' }).setOrigin(0.5, 0);
+
+    // Mute toggle (top-left, in the gap left of the centered meter).
+    this._muteBtn = this.add.container(20, 34).setDepth(32);
     this._drawMuteIcon();
 
-    // ── Onboarding hint (fades out) ────────────────────────────────────────
-    const hint = this._txt(W / 2, H * 0.42, 'DRAG TO CATCH DONUTS\n\nDODGE THE JUNK', {
+    // ── Onboarding hints (fade out) ────────────────────────────────────────
+    const hint = this._txt(W / 2, H * 0.34, 'CATCH DONUTS\n\nDODGE THE JUNK', {
       fontSize: '10px', color: '#ffffff', align: 'center',
     }).setOrigin(0.5).setLineSpacing(8);
     hint.setStroke('#00000088', 4);
     this.tweens.add({ targets: hint, alpha: 0, delay: 2600, duration: 900, onComplete: () => hint.destroy() });
+
+    // Slide-zone hint sits in the open area below Leo, teaching you to steer down
+    // there instead of on top of him.
+    const slideHint = this._txt(W / 2, this._leoBaseY + 44, '< SLIDE TO MOVE >', {
+      fontSize: '9px', color: '#ffffff',
+    }).setOrigin(0.5).setDepth(11);
+    slideHint.setStroke('#00000088', 4).setAlpha(0.8);
+    this.tweens.add({ targets: slideHint, alpha: 0, delay: 3200, duration: 1000, onComplete: () => slideHint.destroy() });
 
     this._setupInput();
   }
@@ -587,7 +595,7 @@ export default class DonutRainScene extends Phaser.Scene {
     this._heartWrap.removeAll(true);
     for (let i = 0; i < T.hearts; i++) {
       const on = i < this.hearts;
-      const hx = 14 + i * 20, hy = 16;
+      const hx = 14 + i * 20, hy = 13;
       const col = on ? 0xff4d6d : 0x5a3a44;
       // Two lobes + a point — a tiny pixel heart.
       this._heartWrap.add(this.add.circle(hx - 3, hy - 2, 4, col));
@@ -597,16 +605,21 @@ export default class DonutRainScene extends Phaser.Scene {
   }
 
   _drawBackground(W, H) {
-    // Sky is the scene bg. Add distant hills, a ground strip, and a road for Leo.
-    this.add.rectangle(W / 2, H - 46, W, 92, 0x6ab04c).setDepth(0);          // grass
-    this.add.rectangle(W / 2, H - 30, W, 60, 0x6b6f76).setDepth(0);          // road
-    for (let y = H - 52; y < H; y += 26) {
-      this.add.rectangle(W / 2, y, 10, 4, 0xffe08a).setDepth(0);             // lane dashes
+    // Sky is the scene bg. The ground rises to meet the (raised) Leo, and the
+    // road below him doubles as the open slide zone for your thumb.
+    const leoY = H - T.leoBottomGap;
+    const horizon = leoY - 20;
+    const roadTop = leoY - 6;
+    this.add.rectangle(W / 2, (horizon + H) / 2, W, H - horizon, 0x6ab04c).setDepth(0); // grass
+    this.add.rectangle(W / 2, (roadTop + H) / 2, W, H - roadTop, 0x6b6f76).setDepth(0); // road / slide zone
+    for (let y = leoY + 18; y < H; y += 26) {
+      this.add.rectangle(W / 2, y, 10, 4, 0xffe08a).setDepth(0);                        // lane dashes
     }
-    this.add.circle(W * 0.2, H - 78, 40, 0x5aa03e).setDepth(0);             // bush
-    this.add.circle(W * 0.82, H - 74, 34, 0x5aa03e).setDepth(0);            // bush
-    this.add.circle(W * 0.78, 70, 26, 0xffffff, 0.85).setDepth(0);          // cloud
-    this.add.circle(W * 0.24, 110, 20, 0xffffff, 0.85).setDepth(0);         // cloud
+    this.add.circle(W * 0.15, horizon - 2, 30, 0x5aa03e).setDepth(0);                   // bush
+    this.add.circle(W * 0.86, horizon,     26, 0x5aa03e).setDepth(0);                   // bush
+    this.add.circle(W * 0.50, 60,  16, 0xffffff, 0.80).setDepth(0);                     // cloud
+    this.add.circle(W * 0.78, 92,  26, 0xffffff, 0.85).setDepth(0);                     // cloud
+    this.add.circle(W * 0.22, 130, 20, 0xffffff, 0.85).setDepth(0);                     // cloud
   }
 
   _txt(x, y, s, style = {}) {
