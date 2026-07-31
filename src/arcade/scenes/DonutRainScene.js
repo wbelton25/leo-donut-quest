@@ -20,8 +20,8 @@ const BOSSES = [
 // ─── Tuning — every knob for the feel lives here ────────────────────────────
 const T = {
   leoScale:      1.7,
-  leoBottomGap:  178,   // px from bottom to Leo's feet — raised well up so your
-                        // thumb slides in the open zone BELOW him without covering him
+  leoBottomGap:  132,   // px from bottom to Leo's feet — raised enough that your
+                        // thumb slides in the road zone below him without covering him
   followRate:    14,    // Leo-follows-finger snappiness (higher = tighter)
 
   startInterval: 820,   // ms between spawns at t=0
@@ -612,8 +612,8 @@ export default class DonutRainScene extends Phaser.Scene {
     const roadTop = leoY - 6;
     this.add.rectangle(W / 2, (horizon + H) / 2, W, H - horizon, 0x6ab04c).setDepth(0); // grass
     this.add.rectangle(W / 2, (roadTop + H) / 2, W, H - roadTop, 0x6b6f76).setDepth(0); // road / slide zone
-    for (let y = leoY + 18; y < H; y += 26) {
-      this.add.rectangle(W / 2, y, 10, 4, 0xffe08a).setDepth(0);                        // lane dashes
+    for (let y = leoY + 20; y < H; y += 30) {
+      this.add.rectangle(W / 2, y, 5, 16, 0xffe08a).setDepth(0);                        // lane dashes (vertical, road recedes upward)
     }
     this.add.circle(W * 0.15, horizon - 2, 30, 0x5aa03e).setDepth(0);                   // bush
     this.add.circle(W * 0.86, horizon,     26, 0x5aa03e).setDepth(0);                   // bush
