@@ -49,7 +49,6 @@ const T = {
   bossBurstMs:   430,   // gap between boss-thrown hazards
 
   recruitMs:     4200,  // recruit window before a friendly boss (grab the friend!)
-  recruitDropMs: 950,   // gap between friend-face drops in the recruit window
   weaponGrab:    15,    // points per boss weapon grabbed during a reversal round
   donutPenalty:  12,    // points lost for grabbing a donut during a reversal round
   grabToClear:   16,    // weapon grabs that send the boss packing early
@@ -104,6 +103,7 @@ export default class DonutRainScene extends Phaser.Scene {
     this._reversalActive = false;
     this._grabTally     = 0;     // boss weapons grabbed this reversal round
     this._friendBuddy   = null;  // the friend sprite that tags in beside Leo
+    this._infoOpen      = false; // rules overlay showing (pauses the game)
     this.targetX    = W / 2;
     this.charge      = 0;      // Fart Meter, 0..chargeMax
     this.frenzyUntil = 0;      // time.now < this = Fart Frenzy active
@@ -137,10 +137,16 @@ export default class DonutRainScene extends Phaser.Scene {
 
     // ── HUD (all top-anchored so the thumb never covers it) ────────────────
     this.scoreText = this._txt(W / 2, 6, '0', { fontSize: '16px' }).setOrigin(0.5, 0);
-    this.bestText  = this._txt(W - 8, 8, `BEST ${ArcadeScores.best()}`, { fontSize: '8px', color: '#ffe6a0' })
+    this.bestText  = this._txt(W - 8, 34, `BEST ${ArcadeScores.best()}`, { fontSize: '8px', color: '#ffe6a0' })
       .setOrigin(1, 0);
     this._heartWrap = this.add.container(0, 0).setDepth(30);
     this._renderHearts();
+
+    // Info / how-to-play button (top-right). Tapping it opens the rules overlay.
+    this._infoBtn = this.add.container(W - 15, 15).setDepth(32);
+    this._infoBtn.add(this.add.circle(0, 0, 11, 0x000000, 0.3));
+    this._infoBtn.add(this.add.circle(0, 0, 11, 0x000000, 0).setStrokeStyle(2, 0xffffff));
+    this._infoBtn.add(this._txt(0, 1, '?', { fontSize: '12px' }).setOrigin(0.5));
 
     // ── Fart Meter (top) — fills as you catch; tap to unleash. Up here it stays
     // visible and clear of your sliding thumb. ─────────────────────────────
@@ -173,6 +179,9 @@ export default class DonutRainScene extends Phaser.Scene {
     this.tweens.add({ targets: slideHint, alpha: 0, delay: 3200, duration: 1000, onComplete: () => slideHint.destroy() });
 
     this._setupInput();
+
+    // First-time players get the rules automatically; after that it's the ? button.
+    if (!ArcadeScores.seenRules()) this._openInfo();
   }
 
   // ── Input ─────────────────────────────────────────────────────────────────
@@ -181,18 +190,20 @@ export default class DonutRainScene extends Phaser.Scene {
   // Separating the two gestures means moving never accidentally fires the frenzy.
   _setupInput() {
     this.input.on('pointerdown', (p) => {
+      if (this._infoOpen) { this._closeInfo(); return; } // any tap dismisses the rules
       if (this.over) { this._gameOverTap(p); return; }
+      if (this._inInfo(p)) { this._openInfo(); return; }
       if (this._inMute(p)) { this._pOnMute = true; return; } // corner tap = mute, not move/frenzy
       this._pOnMute = false;
       this._pDownT = this.time.now; this._pDownX = p.x; this._pDownY = p.y; this._pMoved = false;
     });
     this.input.on('pointermove', (p) => {
-      if (this.over || this._pOnMute) return;
+      if (this.over || this._pOnMute || this._infoOpen) return;
       if (Math.hypot(p.x - this._pDownX, p.y - this._pDownY) > 10) this._pMoved = true;
       this.targetX = p.x;
     });
     this.input.on('pointerup', () => {
-      if (this.over) return;
+      if (this.over || this._infoOpen) return;
       if (this._pOnMute) { this._pOnMute = false; this._toggleMute(); return; }
       if (!this._pMoved && this.time.now - this._pDownT < 260) this._activateFrenzy();
     });
@@ -202,7 +213,56 @@ export default class DonutRainScene extends Phaser.Scene {
   }
 
   _inMute(p) { return p.x <= 44 && p.y >= 28 && p.y <= 62; }
+  _inInfo(p) { return p.x >= this._W - 34 && p.y <= 34; }
   _toggleMute() { this.audio.toggle(); this._drawMuteIcon(); }
+
+  // ── Rules overlay (pauses the game) ────────────────────────────────────────
+  _openInfo() {
+    if (this._infoOpen) return;
+    this._infoOpen = true;
+    this._infoPausedAt = this.time.now;
+    const W = this._W, H = this._H, D = 50;
+    const layer = this.add.container(0, 0).setDepth(D);
+    layer.add(this.add.rectangle(W / 2, H / 2, W, H, 0x0a1020, 0.92));
+    layer.add(this._txt(W / 2, H * 0.09, 'HOW TO PLAY', { fontSize: '16px', color: '#ffd23f' }).setOrigin(0.5, 0));
+    const body =
+      'SLIDE to move Leo — steer\n' +
+      'in the road below him.\n\n' +
+      'CATCH donuts for points.\n' +
+      'DODGE the junk (potholes,\n' +
+      'cars, deer, balls) or lose\n' +
+      'a heart.\n\n' +
+      'Fill the FART METER, then\n' +
+      'TAP to unleash a FART\n' +
+      'FRENZY — briefly invincible\n' +
+      'and donuts fly to you.\n\n' +
+      'BEFORE A BOSS: grab the\n' +
+      'friend who drops! Then the\n' +
+      "boss's stuff = points and\n" +
+      'donuts cost points (no\n' +
+      'life). Miss him = dodge it all.\n\n' +
+      'Climb the WORLD BOARD!';
+    layer.add(this._txt(W / 2, H * 0.17, body, { fontSize: '9px', color: '#ffffff', align: 'center' })
+      .setOrigin(0.5, 0).setLineSpacing(5));
+    const tap = this._txt(W / 2, H * 0.92, 'TAP TO PLAY', { fontSize: '12px', color: '#7ce0a0' }).setOrigin(0.5);
+    layer.add(tap);
+    this.tweens.add({ targets: tap, alpha: 0.3, duration: 600, yoyo: true, repeat: -1 });
+    this._infoLayer = layer;
+  }
+
+  _closeInfo() {
+    if (!this._infoOpen) return;
+    // Push active wall-clock deadlines forward by the paused span so nothing
+    // expired while the rules were up.
+    const d = this.time.now - (this._infoPausedAt || this.time.now);
+    if (this.bossUntil    > this._infoPausedAt) this.bossUntil    += d;
+    if (this._recruitUntil > this._infoPausedAt) this._recruitUntil += d;
+    if (this.invulnUntil  > this._infoPausedAt) this.invulnUntil  += d;
+    if (this.frenzyUntil  > this._infoPausedAt) this.frenzyUntil  += d;
+    this._infoLayer?.destroy(); this._infoLayer = null;
+    this._infoOpen = false;
+    ArcadeScores.setSeenRules();
+  }
 
   _drawMuteIcon() {
     const c = this._muteBtn;
@@ -220,7 +280,7 @@ export default class DonutRainScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    if (this.over) return;
+    if (this.over || this._infoOpen) return; // rules overlay pauses everything
     const dt = Math.min(delta, 50) / 1000; // clamp so a stutter can't teleport things
     this.elapsed += dt;
 
@@ -491,13 +551,15 @@ export default class DonutRainScene extends Phaser.Scene {
   _startRecruitWindow(boss) {
     this._recruitActive = true;
     this._recruitUntil = this.time.now + Math.max(2600, T.recruitMs - this._cycle() * 500);
-    this._recruitDropAcc = 0;
     const who = FRIEND_NAMES[boss.friend] || 'FRIEND';
     this._recruitCallout = this._txt(this._W / 2, 96, `${who} INCOMING!\nGRAB HIM!`, {
       fontSize: '12px', color: '#ffe86a', align: 'center',
     }).setOrigin(0.5, 0).setDepth(25).setLineSpacing(6);
     this._recruitCallout.setStroke('#000000', 4);
     FX.shake(this, 200, 0.006);
+
+    // One friend, one chance — miss it and you fight the boss solo.
+    this._spawn(friendKind(boss.friend));
   }
 
   _updateRecruit(time) {
@@ -505,13 +567,6 @@ export default class DonutRainScene extends Phaser.Scene {
       this._recruitActive = false;
       this._recruitCallout?.destroy(); this._recruitCallout = null;
       this._startBoss(this._pendingBoss, this._friendArmed);
-      return;
-    }
-    if (this._friendArmed) return; // already got them — no more drops
-    this._recruitDropAcc += this.game.loop.delta;
-    if (this._recruitDropAcc >= T.recruitDropMs) {
-      this._recruitDropAcc = 0;
-      this._spawn(friendKind(this._pendingBoss.friend));
     }
   }
 

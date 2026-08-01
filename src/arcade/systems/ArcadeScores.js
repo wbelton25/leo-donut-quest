@@ -26,6 +26,14 @@ export default class ArcadeScores {
     } catch (e) { /* storage disabled — initials just won't persist */ }
   }
 
+  // Whether the player has seen the how-to-play rules (auto-shown on first play).
+  static seenRules() {
+    try { return localStorage.getItem('donut-rain-seen-rules') === '1'; } catch (e) { return false; }
+  }
+  static setSeenRules() {
+    try { localStorage.setItem('donut-rain-seen-rules', '1'); } catch (e) { /* ignore */ }
+  }
+
   // Highest score this device has recorded, or 0 if none / storage unavailable.
   static best() {
     try {
