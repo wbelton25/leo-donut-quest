@@ -52,6 +52,7 @@ const T = {
   weaponGrab:    15,    // points per boss weapon grabbed during a reversal round
   donutPenalty:  12,    // points lost for grabbing a donut during a reversal round
   grabToClear:   16,    // weapon grabs that send the boss packing early
+  reversalWarnMs:1800,  // "FRIEND LEAVING!" warning window at the end of a reversal
 
   comboStep:     5,     // catches per +50% multiplier step
   comboMaxMult:  3,     // cap the combo multiplier (was unbounded → +450%)
@@ -103,6 +104,10 @@ export default class DonutRainScene extends Phaser.Scene {
     this._reversalActive = false;
     this._grabTally     = 0;     // boss weapons grabbed this reversal round
     this._friendBuddy   = null;  // the friend sprite that tags in beside Leo
+    this._reversalUI    = null;  // grab-time countdown bar
+    this._reversalFill  = null;
+    this._reversalLabel = null;
+    this._leaveWarned   = false; // fired the "FRIEND LEAVING!" warning yet
     this._infoOpen      = false; // rules overlay showing (pauses the game)
     this.targetX    = W / 2;
     this.charge      = 0;      // Fart Meter, 0..chargeMax
@@ -531,8 +536,29 @@ export default class DonutRainScene extends Phaser.Scene {
     if (this._recruitActive) this._updateRecruit(time);
 
     if (this.bossActive) {
-      // Keep the friend buddy bobbing beside Leo during a reversal round.
-      if (this._friendBuddy) this._friendBuddy.setPosition(this.leo.x - 24, this.leo.y - 22);
+      // Reversal round: keep the buddy beside Leo, tick down the grab-time bar,
+      // and warn hard in the final stretch so you stop grabbing before the
+      // weapons turn dangerous again.
+      if (this._reversalActive) {
+        if (this._friendBuddy) this._friendBuddy.setPosition(this.leo.x - 24, this.leo.y - 22);
+        const left = Math.max(0, this.bossUntil - time);
+        const ending = left <= T.reversalWarnMs;
+        if (this._reversalFill) {
+          this._reversalFill.width = this._reversalBarW * Phaser.Math.Clamp(left / T.bossDurationMs, 0, 1);
+          this._reversalFill.setFillStyle(ending ? 0xff5a5a : 0x7ce0a0);
+        }
+        if (this._reversalLabel) {
+          this._reversalLabel.setText(ending ? 'FRIEND LEAVING!' : 'GRAB TIME').setColor(ending ? '#ff8866' : '#7ce0a0');
+        }
+        if (ending) {
+          if (this._friendBuddy) this._friendBuddy.setAlpha(0.35 + 0.65 * Math.abs(Math.sin(time / 80)));
+          if (!this._leaveWarned) {
+            this._leaveWarned = true;
+            this.audio.ready();
+            FX.popText(this, this.leo.x, this.leo.y - 34, 'FRIEND LEAVING!', { color: '#ff8866', fontSize: '12px', depth: 26 });
+          }
+        }
+      }
       if (time >= this.bossUntil) { this._endBoss(); return; }
       // Rain this boss's signature weapon (with a few donuts mixed in).
       this.bossBurstAcc += this.game.loop.delta;
@@ -617,6 +643,19 @@ export default class DonutRainScene extends Phaser.Scene {
         : this.add.circle(this.leo.x - 24, this.leo.y - 22, 11, 0x7ce0a0).setDepth(11);
       msg = `${FRIEND_NAMES[fid]} TAGS IN!\nGRAB THE ${WEAPON_NAMES[boss.proj]}!`;
       color = '#7ce0a0';
+
+      // Grab-time countdown so you can see the round ending (weapons turn
+      // dangerous again the moment the friend leaves).
+      this._leaveWarned = false;
+      this._reversalBarW = 150;
+      const rbx = this._W / 2 - this._reversalBarW / 2, rby = 182;
+      this._reversalLabel = this._txt(this._W / 2, rby - 10, 'GRAB TIME', { fontSize: '8px', color: '#7ce0a0' }).setOrigin(0.5, 1);
+      this._reversalFill = this.add.rectangle(rbx, rby, this._reversalBarW, 6, 0x7ce0a0).setOrigin(0, 0.5);
+      this._reversalUI = this.add.container(0, 0).setDepth(24).add([
+        this.add.rectangle(this._W / 2, rby, this._reversalBarW + 4, 10, 0x000000, 0.5),
+        this.add.rectangle(rbx, rby, this._reversalBarW, 6, 0x333333).setOrigin(0, 0.5),
+        this._reversalFill, this._reversalLabel,
+      ]);
     } else {
       msg = `BOSS!\n${boss.name}`;
       color = '#ff6b6b';
@@ -636,6 +675,7 @@ export default class DonutRainScene extends Phaser.Scene {
     this.audio.playMusic('music-loop', 0.3);
 
     if (this._friendBuddy) { this._friendBuddy.destroy(); this._friendBuddy = null; }
+    if (this._reversalUI) { this._reversalUI.destroy(); this._reversalUI = null; this._reversalFill = null; this._reversalLabel = null; }
     if (this.boss) {
       const b = this.boss; this.boss = null;
       this.tweens.killTweensOf(b);
@@ -644,6 +684,16 @@ export default class DonutRainScene extends Phaser.Scene {
     }
 
     if (wasReversal) {
+      // The friend clears the field on the way out — sweep any in-air weapons so a
+      // leftover projectile can't suddenly hurt Leo, plus a brief grace window.
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        if (BOSS_WEAPONS.has(this.items[i].kind)) {
+          FX.burst(this, this.items[i].x, this.items[i].y, { count: 4, colors: [0x7ce0a0, 0xffffff],
+            minSpeed: 20, maxSpeed: 60, minSize: 1, maxSize: 2, duration: 260, depth: 20 });
+          this.items[i].destroy(); this.items.splice(i, 1);
+        }
+      }
+      this.invulnUntil = this.time.now + 900;
       FX.popText(this, this._W / 2, 140, `GRABBED ${grabbed}!`, { color: '#ffd23f', fontSize: '16px', depth: 25 });
     } else {
       // Survived solo — a small consolation shower of donuts.
@@ -665,6 +715,7 @@ export default class DonutRainScene extends Phaser.Scene {
     this._reversalActive = false;
     if (this._aura) { this._aura.destroy(); this._aura = null; }
     if (this._friendBuddy) { this._friendBuddy.destroy(); this._friendBuddy = null; }
+    if (this._reversalUI) { this._reversalUI.destroy(); this._reversalUI = null; this._reversalFill = null; }
     if (this._recruitCallout) { this._recruitCallout.destroy(); this._recruitCallout = null; }
     this.audio.stopMusic();
     this.audio.gameOver();
