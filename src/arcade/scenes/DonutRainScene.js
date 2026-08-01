@@ -4,18 +4,24 @@ import { PIXEL_FONT } from '../../constants.js';
 import ArcadeScores from '../systems/ArcadeScores.js';
 import ArcadeGlobalScores from '../systems/ArcadeGlobalScores.js';
 import ArcadeAudio from '../systems/ArcadeAudio.js';
-import FallingItem, { GOOD_KINDS, BAD_KINDS } from '../entities/FallingItem.js';
+import FallingItem, { GOOD_KINDS, BAD_KINDS, friendKind } from '../entities/FallingItem.js';
 import { K_LEO } from './BootArcadeScene.js';
 
 // Boss roster — invaders rotate through this in order, each raining their own
-// signature weapon (mirrors who throws what in the adventure).
+// signature weapon (mirrors who throws what in the adventure). `friend` is the
+// aligned buddy from the adventure: catch them in the recruit window and the
+// fight flips into a grab-fest. Edie has no friend — always a solo-survival boss.
 const BOSSES = [
-  { id: 'grace',     name: 'GRACE',        face: 'head-grace',     proj: 'noodle',     voice: 'sfx-girly-grace' },
-  { id: 'nora',      name: 'NORA',         face: 'head-nora',      proj: 'soccerball', voice: 'sfx-girly-nora' },
-  { id: 'max',       name: 'MAX',          face: 'head-max',       proj: 'football',   voice: 'sfx-coyote-max' },
-  { id: 'justinmax', name: 'JUSTIN & MAX', face: 'head-justinmax', proj: 'baseball',   voice: 'sfx-coyote-max' },
-  { id: 'edie',      name: 'EDIE',         face: 'head-edie',      proj: 'stuffie',    voice: 'sfx-girly-edie' },
+  { id: 'grace',     name: 'GRACE',        face: 'head-grace',     proj: 'noodle',     voice: 'sfx-girly-grace', friend: 'warren' },
+  { id: 'nora',      name: 'NORA',         face: 'head-nora',      proj: 'soccerball', voice: 'sfx-girly-nora',  friend: 'carson' },
+  { id: 'max',       name: 'MAX',          face: 'head-max',       proj: 'football',   voice: 'sfx-coyote-max',  friend: 'mj' },
+  { id: 'justinmax', name: 'JUSTIN & MAX', face: 'head-justinmax', proj: 'baseball',   voice: 'sfx-coyote-max',  friend: 'justin' },
+  { id: 'edie',      name: 'EDIE',         face: 'head-edie',      proj: 'stuffie',    voice: 'sfx-girly-edie',  friend: null },
 ];
+
+const FRIEND_NAMES  = { warren: 'WARREN', mj: 'MJ', carson: 'CARSON', justin: 'JUSTIN' };
+const WEAPON_NAMES  = { noodle: 'NOODLES', soccerball: 'SOCCER BALLS', football: 'FOOTBALLS', baseball: 'BASEBALLS', stuffie: 'STUFFIES' };
+const BOSS_WEAPONS  = new Set(['noodle', 'soccerball', 'football', 'baseball', 'stuffie']);
 
 // ─── Tuning — every knob for the feel lives here ────────────────────────────
 const T = {
@@ -41,6 +47,12 @@ const T = {
   bossEvery:     400,   // score gap between subsequent invaders
   bossDurationMs:6500,  // how long the onslaught lasts
   bossBurstMs:   430,   // gap between boss-thrown hazards
+
+  recruitMs:     4200,  // recruit window before a friendly boss (grab the friend!)
+  recruitDropMs: 950,   // gap between friend-face drops in the recruit window
+  weaponGrab:    15,    // points per boss weapon grabbed during a reversal round
+  donutPenalty:  12,    // points lost for grabbing a donut during a reversal round
+  grabToClear:   16,    // weapon grabs that send the boss packing early
 
   comboStep:     5,     // catches per +50% multiplier step
   comboMaxMult:  3,     // cap the combo multiplier (was unbounded → +450%)
@@ -84,6 +96,14 @@ export default class DonutRainScene extends Phaser.Scene {
     this.boss       = null;
     this.bossIndex  = 0;         // which boss invades next (cycles through BOSSES)
     this.bossProj   = 'pothole'; // current invader's signature weapon
+    this._recruitActive = false; // pre-boss window to grab the aligned friend
+    this._recruitUntil  = 0;
+    this._recruitDropAcc = 0;
+    this._pendingBoss   = null;  // boss queued behind the recruit window
+    this._friendArmed   = false; // caught the friend -> reversal grab-fest
+    this._reversalActive = false;
+    this._grabTally     = 0;     // boss weapons grabbed this reversal round
+    this._friendBuddy   = null;  // the friend sprite that tags in beside Leo
     this.targetX    = W / 2;
     this.charge      = 0;      // Fart Meter, 0..chargeMax
     this.frenzyUntil = 0;      // time.now < this = Fart Frenzy active
@@ -271,14 +291,17 @@ export default class DonutRainScene extends Phaser.Scene {
       const it = this.items[i];
       const alive = it.update(dt, this._killY);
       if (!alive) {
-        // A good item that fell past Leo breaks the combo (gentle — no life lost).
-        if (it.good && !it.collected && this.combo > 0) this._setCombo(0);
+        // A missed donut breaks the combo (gentle — no life). Friends are exempt.
+        if (it.good && !it.friendId && !it.collected && this.combo > 0) this._setCombo(0);
         this.items.splice(i, 1);
         continue;
       }
 
-      // Fart Frenzy vacuums good items toward Leo.
-      if (it.good && this._frenzyActive()) {
+      const reversal = this.bossActive && this._reversalActive;
+
+      // Fart Frenzy vacuums good donuts toward Leo — but not in a reversal round,
+      // where donuts are the thing to AVOID.
+      if (it.good && !reversal && this._frenzyActive()) {
         it.x += (lx - it.x) * T.frenzyMagnetK;
         it.y += (catchY - it.y) * T.frenzyMagnetK;
         it.container.x = it.x; it.container.y = it.y;
@@ -287,9 +310,20 @@ export default class DonutRainScene extends Phaser.Scene {
       const dx = it.x - lx;
       const dy = it.y - catchY;
       const dist = Math.hypot(dx, dy);
+      const inCatch = dist < it.r + T.catchR;
 
-      if (it.good) {
-        if (dist < it.r + T.catchR) { this._catch(it); it.destroy(); this.items.splice(i, 1); }
+      if (it.friendId) {
+        // Friend face — always catchable (only appears in the recruit window).
+        if (inCatch) { this._onFriendCaught(it); it.destroy(); this.items.splice(i, 1); }
+      } else if (reversal) {
+        // Grab-fest: the boss's weapon is treasure; donuts are the distraction.
+        if (BOSS_WEAPONS.has(it.kind)) {
+          if (inCatch) { this._grabWeapon(it); it.destroy(); this.items.splice(i, 1); }
+        } else if (it.good && inCatch) {
+          this._grabDistraction(it); it.destroy(); this.items.splice(i, 1);
+        }
+      } else if (it.good) {
+        if (inCatch) { this._catch(it); it.destroy(); this.items.splice(i, 1); }
       } else if (!this._frenzyActive() && this.time.now >= this.invulnUntil) {
         // Hazards pass harmlessly during the frenzy (Leo is invincible).
         if (dist < it.r + T.hurtR) { this._hit(it); it.destroy(); this.items.splice(i, 1); }
@@ -320,6 +354,31 @@ export default class DonutRainScene extends Phaser.Scene {
       color: gold ? '#ffd23f' : '#fff2d8', fontSize: gold ? '12px' : '10px', depth: 25,
     });
     if (gold) FX.shake(this, 160, 0.006);
+  }
+
+  // Reversal round: grab the boss's weapon for points (no damage).
+  _grabWeapon(it) {
+    this._setCombo(this.combo + 1);
+    const mult = Math.min(T.comboMaxMult, 1 + Math.floor(this.combo / T.comboStep) * 0.5);
+    const gain = Math.round(T.weaponGrab * mult);
+    this.score += gain;
+    this.scoreText.setText(String(this.score));
+    this.audio.catch(this.combo);
+    FX.pop(this, this.scoreText, 0.4, 140);
+    FX.burst(this, it.x, it.y, { count: 8, colors: [0x7ce0a0, 0xffe86a, 0xffffff],
+      minSpeed: 40, maxSpeed: 95, minSize: 1, maxSize: 2, duration: 380, depth: 20 });
+    FX.popText(this, it.x, it.y - 6, `+${gain}`, { color: '#7ce0a0', fontSize: '10px', depth: 25 });
+    // Grab enough and the boss gives up early.
+    if (++this._grabTally >= T.grabToClear) this.bossUntil = Math.min(this.bossUntil, this.time.now + 400);
+  }
+
+  // Reversal round: a donut is the distraction — costs points, never a life.
+  _grabDistraction(it) {
+    this._setCombo(0);
+    this.score = Math.max(0, this.score - T.donutPenalty);
+    this.scoreText.setText(String(this.score));
+    this.cameras.main.flash(80, 120, 120, 255);
+    FX.popText(this, it.x, it.y - 6, `-${T.donutPenalty}`, { color: '#ff8866', fontSize: '10px', depth: 25 });
   }
 
   _hit(it) {
@@ -396,14 +455,29 @@ export default class DonutRainScene extends Phaser.Scene {
   }
 
   // ── Boss invader beat ─────────────────────────────────────────────────────
+  _cycle() { return Math.floor(this.bossIndex / BOSSES.length); } // 0,1,2… escalation tier
+
   _updateBoss(time) {
-    if (!this.bossActive && this.score >= this.nextBossScore) this._startBoss();
+    // Kick off the next boss sequence at the score milestone.
+    if (!this.bossActive && !this._recruitActive && this.score >= this.nextBossScore) {
+      const boss = BOSSES[this.bossIndex % BOSSES.length];
+      this.bossIndex++;
+      this._pendingBoss = boss;
+      this._friendArmed = false;
+      if (boss.friend) this._startRecruitWindow(boss);
+      else this._startBoss(boss, false);   // Edie / friendless: straight to solo
+    }
+
+    if (this._recruitActive) this._updateRecruit(time);
 
     if (this.bossActive) {
+      // Keep the friend buddy bobbing beside Leo during a reversal round.
+      if (this._friendBuddy) this._friendBuddy.setPosition(this.leo.x - 24, this.leo.y - 22);
       if (time >= this.bossUntil) { this._endBoss(); return; }
-      // Rain this boss's signature weapon from around them in a hurried burst.
+      // Rain this boss's signature weapon (with a few donuts mixed in).
       this.bossBurstAcc += this.game.loop.delta;
-      if (this.bossBurstAcc >= T.bossBurstMs) {
+      const burst = Math.max(220, T.bossBurstMs - this._cycle() * 60); // faster each cycle
+      if (this.bossBurstAcc >= burst) {
         this.bossBurstAcc = 0;
         const bx = this.boss ? this.boss.x : this._W / 2;
         const spread = Phaser.Math.Between(-90, 90);
@@ -413,15 +487,55 @@ export default class DonutRainScene extends Phaser.Scene {
     }
   }
 
-  _startBoss() {
+  // ── Recruit window: grab the aligned friend before the boss lands ──────────
+  _startRecruitWindow(boss) {
+    this._recruitActive = true;
+    this._recruitUntil = this.time.now + Math.max(2600, T.recruitMs - this._cycle() * 500);
+    this._recruitDropAcc = 0;
+    const who = FRIEND_NAMES[boss.friend] || 'FRIEND';
+    this._recruitCallout = this._txt(this._W / 2, 96, `${who} INCOMING!\nGRAB HIM!`, {
+      fontSize: '12px', color: '#ffe86a', align: 'center',
+    }).setOrigin(0.5, 0).setDepth(25).setLineSpacing(6);
+    this._recruitCallout.setStroke('#000000', 4);
+    FX.shake(this, 200, 0.006);
+  }
+
+  _updateRecruit(time) {
+    if (time >= this._recruitUntil) {
+      this._recruitActive = false;
+      this._recruitCallout?.destroy(); this._recruitCallout = null;
+      this._startBoss(this._pendingBoss, this._friendArmed);
+      return;
+    }
+    if (this._friendArmed) return; // already got them — no more drops
+    this._recruitDropAcc += this.game.loop.delta;
+    if (this._recruitDropAcc >= T.recruitDropMs) {
+      this._recruitDropAcc = 0;
+      this._spawn(friendKind(this._pendingBoss.friend));
+    }
+  }
+
+  _onFriendCaught(it) {
+    this.audio.friendCatch();
+    this.score += it.points;
+    this.scoreText.setText(String(this.score));
+    FX.burst(this, it.x, it.y, { count: 18, colors: [0xffe86a, 0xffffff, 0x7ce0a0],
+      minSpeed: 50, maxSpeed: 150, minSize: 1, maxSize: 3, duration: 500, depth: 25 });
+    const armed = this._recruitActive && this._pendingBoss && it.friendId === this._pendingBoss.friend;
+    if (armed) {
+      this._friendArmed = true;
+      this._recruitCallout?.setText(`GOT ${FRIEND_NAMES[it.friendId]}!`).setColor('#7ce0a0');
+      FX.popText(this, this.leo.x, this.leo.y - 30, 'CREW READY!', { color: '#7ce0a0', fontSize: '12px', depth: 26 });
+    }
+  }
+
+  _startBoss(boss, armed) {
     this.bossActive = true;
     this.bossUntil = this.time.now + T.bossDurationMs;
     this.bossBurstAcc = 0;
-
-    // Next boss in the rotation brings their own face, weapon, and voice.
-    const boss = BOSSES[this.bossIndex % BOSSES.length];
-    this.bossIndex++;
     this.bossProj = boss.proj;
+    this._reversalActive = armed;
+    this._grabTally = 0;
 
     this.audio.playMusic('music-boss', 0.34);
     this.audio.bossVoice(boss.voice);
@@ -429,28 +543,44 @@ export default class DonutRainScene extends Phaser.Scene {
     const bx = this._W / 2;
     if (this.textures.exists(boss.face)) {
       this.boss = this.add.image(bx, -60, boss.face).setDepth(12);
-      // Normalize to ~72px tall regardless of source image size.
-      this.boss.setScale(72 / this.boss.height);
+      this.boss.setScale(72 / this.boss.height); // normalize to ~72px tall
     } else {
       this.boss = this.add.circle(bx, -60, 34, 0xd94f8a).setDepth(12);
     }
-    this.tweens.add({ targets: this.boss, y: 74, duration: 520, ease: 'Back.Out' });
+    // Sits below the top HUD (score + Fart Meter live up there now).
+    this.tweens.add({ targets: this.boss, y: 108, duration: 520, ease: 'Back.Out' });
     this.tweens.add({ targets: this.boss, angle: { from: -4, to: 4 },
       duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     FX.shake(this, 300, 0.01);
-    const warn = this._txt(this._W / 2, 120, `BOSS!\n${boss.name} INCOMING`, {
-      fontSize: '12px', color: '#ff6b6b', align: 'center',
-    }).setOrigin(0.5).setDepth(25).setLineSpacing(6);
+    let msg, color;
+    if (armed) {
+      // Friend tags in beside Leo; the weapons are now treasure.
+      const fid = boss.friend;
+      this._friendBuddy = this.textures.exists(`head-${fid}`)
+        ? this.add.image(this.leo.x - 24, this.leo.y - 22, `head-${fid}`).setDisplaySize(22, 22).setDepth(11)
+        : this.add.circle(this.leo.x - 24, this.leo.y - 22, 11, 0x7ce0a0).setDepth(11);
+      msg = `${FRIEND_NAMES[fid]} TAGS IN!\nGRAB THE ${WEAPON_NAMES[boss.proj]}!`;
+      color = '#7ce0a0';
+    } else {
+      msg = `BOSS!\n${boss.name}`;
+      color = '#ff6b6b';
+    }
+    const warn = this._txt(this._W / 2, 156, msg, { fontSize: '12px', color, align: 'center' })
+      .setOrigin(0.5).setDepth(25).setLineSpacing(6);
     warn.setStroke('#000000', 4);
-    this.tweens.add({ targets: warn, alpha: 0, delay: 1400, duration: 700, onComplete: () => warn.destroy() });
+    this.tweens.add({ targets: warn, alpha: 0, delay: 1500, duration: 700, onComplete: () => warn.destroy() });
   }
 
   _endBoss() {
+    const wasReversal = this._reversalActive;
+    const grabbed = this._grabTally;
     this.bossActive = false;
+    this._reversalActive = false;
     this.nextBossScore = this.score + T.bossEvery;
     this.audio.playMusic('music-loop', 0.3);
 
+    if (this._friendBuddy) { this._friendBuddy.destroy(); this._friendBuddy = null; }
     if (this.boss) {
       const b = this.boss; this.boss = null;
       this.tweens.killTweensOf(b);
@@ -458,12 +588,16 @@ export default class DonutRainScene extends Phaser.Scene {
         onComplete: () => b.destroy() });
     }
 
-    // Reward for surviving: a shower of good donuts.
-    FX.popText(this, this._W / 2, 140, 'SAFE!  BONUS!', { color: '#7ce0a0', fontSize: '14px', depth: 25 });
-    for (let k = 0; k < 8; k++) {
-      this.time.delayedCall(k * 150, () => {
-        if (!this.over) this._spawn(Math.random() < 0.25 ? 'golden' : 'donut');
-      });
+    if (wasReversal) {
+      FX.popText(this, this._W / 2, 140, `GRABBED ${grabbed}!`, { color: '#ffd23f', fontSize: '16px', depth: 25 });
+    } else {
+      // Survived solo — a small consolation shower of donuts.
+      FX.popText(this, this._W / 2, 140, 'SAFE!  BONUS!', { color: '#7ce0a0', fontSize: '14px', depth: 25 });
+      for (let k = 0; k < 8; k++) {
+        this.time.delayedCall(k * 150, () => {
+          if (!this.over) this._spawn(Math.random() < 0.25 ? 'golden' : 'donut');
+        });
+      }
     }
     this.spawnAcc = 0;
   }
@@ -472,7 +606,11 @@ export default class DonutRainScene extends Phaser.Scene {
   _gameOver() {
     this.over = true;
     this.frenzyUntil = 0;
+    this._recruitActive = false;
+    this._reversalActive = false;
     if (this._aura) { this._aura.destroy(); this._aura = null; }
+    if (this._friendBuddy) { this._friendBuddy.destroy(); this._friendBuddy = null; }
+    if (this._recruitCallout) { this._recruitCallout.destroy(); this._recruitCallout = null; }
     this.audio.stopMusic();
     this.audio.gameOver();
     this.items.forEach(it => it.destroy());

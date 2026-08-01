@@ -28,10 +28,16 @@ const KINDS = {
   football:  { good: false, r: 10, speed: 1.45, pattern: 'straight', draw: drawFootball }, // Max
   baseball:  { good: false, r: 7,  speed: 1.2,  pattern: 'wobble',   draw: drawBaseball }, // Justin & Max
   stuffie:   { good: false, r: 11, speed: 0.9,  pattern: 'drift',    draw: drawStuffie },  // Edie
+  // ── Friend faces — catch the right one before their sibling boss ───────────
+  'friend-warren': { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-warren'), friend: 'warren' },
+  'friend-mj':     { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-mj'),     friend: 'mj' },
+  'friend-carson': { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-carson'), friend: 'carson' },
+  'friend-justin': { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-justin'), friend: 'justin' },
 };
 
 export const GOOD_KINDS = ['hole', 'donut', 'golden'];
 export const BAD_KINDS  = ['pothole', 'golfball', 'deer', 'car'];
+export const friendKind = (id) => `friend-${id}`;
 
 export default class FallingItem {
   constructor(scene, x, y, kind, baseSpeed) {
@@ -42,6 +48,7 @@ export default class FallingItem {
     this.points  = cfg.points || 0;
     this.r       = cfg.r;
     this.pattern = cfg.pattern;
+    this.friendId = cfg.friend || null;
     this.collected = false;
     this.dead    = false;
 
@@ -161,6 +168,20 @@ function drawDeer(scene, c) {
 function spriteOr(scene, c, key, w, h, fallback) {
   if (scene.textures.exists(key)) c.add(scene.add.image(0, 0, key).setDisplaySize(w, h));
   else fallback(scene, c);
+}
+
+// Friend face pickup — the headshot inside a bright ring so it clearly reads as a
+// special "grab me!" item, not another donut.
+function drawFriend(headKey) {
+  return (scene, c) => {
+    c.add(scene.add.circle(0, 0, 15, 0xffe86a, 0.35));                 // glow
+    if (scene.textures.exists(headKey)) {
+      c.add(scene.add.image(0, 0, headKey).setDisplaySize(24, 24));
+    } else {
+      c.add(scene.add.circle(0, 0, 11, 0x66ccff).setStrokeStyle(2, 0xffffff));
+    }
+    c.add(scene.add.circle(0, 0, 15, 0x000000, 0).setStrokeStyle(2, 0xffe86a)); // ring
+  };
 }
 
 // Grace — pool noodle (tumbles end over end).

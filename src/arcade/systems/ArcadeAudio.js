@@ -72,6 +72,8 @@ export default class ArcadeAudio {
   }
   golden()   { [660, 880, 1320].forEach((f, i) => this._tone(f, 0.12, 'triangle', 0.17, null, i * 0.06)); }
   ready()    { [523, 784].forEach((f, i) => this._tone(f, 0.14, 'triangle', 0.2, null, i * 0.09)); }
+  // Recruited a friend — a bright 4-note fanfare so it clearly reads as special.
+  friendCatch() { [523, 659, 784, 1047].forEach((f, i) => this._tone(f, 0.13, 'square', 0.18, null, i * 0.07)); }
   gameOver() { [523, 415, 311, 233].forEach((f, i) => this._tone(f, 0.24, 'sawtooth', 0.18, null, i * 0.16)); }
 
   // ── Mute ──────────────────────────────────────────────────────────────────

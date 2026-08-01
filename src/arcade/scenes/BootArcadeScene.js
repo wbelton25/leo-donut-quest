@@ -36,6 +36,13 @@ export default class BootArcadeScene extends Phaser.Scene {
     this.load.image('sprite-football',    'assets/sprites/football.png');
     this.load.image('sprite-baseball',    'assets/sprites/baseball.png');
 
+    // Friend faces — catch the right one right before their sibling boss to turn
+    // that fight into a grab-fest bonus round.
+    this.load.image('head-warren', 'assets/sprites/warren_head.png');
+    this.load.image('head-mj',     'assets/sprites/mj_head.png');
+    this.load.image('head-carson', 'assets/sprites/carson_head.png');
+    this.load.image('head-justin', 'assets/sprites/justin_head.png');
+
     // Audio — reused from the adventure. A 404 just makes that one cue silent.
     this.load.audio('music-loop', 'assets/audio/music/music_level_loop.wav');
     this.load.audio('music-boss', 'assets/audio/music/music_boss.wav');
