@@ -39,6 +39,7 @@ const T = {
   rampTime:      75,    // seconds to reach full difficulty
 
   catchR:        24,    // catch radius for good items (generous)
+  friendCatchR:  12,    // catch radius for a friend (tight — you must line up under them)
   hurtR:         19,    // hit radius for hazards (tighter = fairer near-misses)
   hearts:        3,
   invulnMs:      900,   // i-frames after a hit
@@ -364,9 +365,9 @@ export default class DonutRainScene extends Phaser.Scene {
 
       const reversal = this.bossActive && this._reversalActive;
 
-      // Fart Frenzy vacuums good donuts toward Leo — but not in a reversal round,
-      // where donuts are the thing to AVOID.
-      if (it.good && !reversal && this._frenzyActive()) {
+      // Fart Frenzy vacuums good donuts toward Leo — but NOT the friend (that'd
+      // trivialize grabbing them) and not in a reversal round (donuts are to avoid).
+      if (it.good && !it.friendId && !reversal && this._frenzyActive()) {
         it.x += (lx - it.x) * T.frenzyMagnetK;
         it.y += (catchY - it.y) * T.frenzyMagnetK;
         it.container.x = it.x; it.container.y = it.y;
@@ -378,8 +379,9 @@ export default class DonutRainScene extends Phaser.Scene {
       const inCatch = dist < it.r + T.catchR;
 
       if (it.friendId) {
-        // Friend face — always catchable (only appears in the recruit window).
-        if (inCatch) { this._onFriendCaught(it); it.destroy(); this.items.splice(i, 1); }
+        // Friend face — tight catch, you must line up under them (only appears in
+        // the recruit window). No magnet help even during a frenzy.
+        if (dist < it.r + T.friendCatchR) { this._onFriendCaught(it); it.destroy(); this.items.splice(i, 1); }
       } else if (reversal) {
         // Grab-fest: the boss's weapon is treasure; donuts are the distraction.
         if (BOSS_WEAPONS.has(it.kind)) {

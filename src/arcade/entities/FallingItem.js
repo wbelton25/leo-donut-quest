@@ -28,11 +28,12 @@ const KINDS = {
   football:  { good: false, r: 10, speed: 1.45, pattern: 'straight', draw: drawFootball }, // Max
   baseball:  { good: false, r: 7,  speed: 1.2,  pattern: 'wobble',   draw: drawBaseball }, // Justin & Max
   stuffie:   { good: false, r: 11, speed: 0.9,  pattern: 'drift',    draw: drawStuffie },  // Edie
-  // ── Friend faces — catch the right one before their sibling boss ───────────
-  'friend-warren': { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-warren'), friend: 'warren' },
-  'friend-mj':     { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-mj'),     friend: 'mj' },
-  'friend-carson': { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-carson'), friend: 'carson' },
-  'friend-justin': { good: true, points: 20, r: 14, speed: 0.8, pattern: 'straight', draw: drawFriend('head-justin'), friend: 'justin' },
+  // ── Friend faces — catch the right one before their sibling boss. Fast +
+  //    weaving so grabbing them is a real skill check (and no frenzy magnet). ──
+  'friend-warren': { good: true, points: 20, r: 12, speed: 1.35, pattern: 'drift', draw: drawFriend('head-warren'), friend: 'warren' },
+  'friend-mj':     { good: true, points: 20, r: 12, speed: 1.35, pattern: 'drift', draw: drawFriend('head-mj'),     friend: 'mj' },
+  'friend-carson': { good: true, points: 20, r: 12, speed: 1.35, pattern: 'drift', draw: drawFriend('head-carson'), friend: 'carson' },
+  'friend-justin': { good: true, points: 20, r: 12, speed: 1.35, pattern: 'drift', draw: drawFriend('head-justin'), friend: 'justin' },
 };
 
 export const GOOD_KINDS = ['hole', 'donut', 'golden'];
