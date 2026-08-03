@@ -1,5 +1,20 @@
 [
   {
+    "id": 11,
+    "initials": "LEO",
+    "score": 1301,
+    "grade": "S",
+    "donuts": 3,
+    "party_size": 4,
+    "client_id": "manual-restore-1301",
+    "created_at": "2026-07-30T18:42:39.283154+00:00",
+    "time_points": 100,
+    "deer": 100,
+    "combo": 13,
+    "holes": 42,
+    "golden": 0
+  },
+  {
     "id": 7,
     "initials": "LEO",
     "score": 1179,
