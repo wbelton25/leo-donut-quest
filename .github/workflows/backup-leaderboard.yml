@@ -1,8 +1,14 @@
 name: Backup leaderboard
 
-# Two jobs in one: it keeps a version-controlled copy of the world board in the
-# repo, and the request itself resets Supabase's inactivity timer so the free
-# project doesn't pause.
+# Three jobs in one:
+#   1. Keep-alive WRITE — the important one. It UPDATEs a one-row `keepalive`
+#      table so Supabase sees a real database write. Anonymous REST *reads* (what
+#      this workflow used to rely on) do NOT count as activity on the free tier,
+#      so the project paused despite twice-weekly backups. A write should count.
+#      See docs/keepalive-setup.sql — run it once or this step will 404.
+#   2. Backup — keeps a version-controlled copy of the world board in the repo.
+#   3. Alert — if anything above fails, open/bump a GitHub issue so a pause is
+#      caught the same day instead of going silent for weeks.
 #
 # Runs Mon + Thu rather than weekly on purpose: the free tier pauses after
 # roughly a week idle, so a 7-day cadence sits right on the threshold and one
@@ -15,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  issues: write               # so the failure step can open/comment an alert
 
 concurrency:
   group: leaderboard-backup
@@ -42,6 +49,32 @@ jobs:
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      # THE keep-alive. A write, not a read: reads don't reset the free-tier
+      # inactivity clock (proven the hard way), a real UPDATE should.
+      - name: Keep-alive write
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          URL: ${{ steps.cfg.outputs.url }}
+          KEY: ${{ steps.cfg.outputs.key }}
+        run: |
+          ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          code=$(curl -sS -o /tmp/ka.out -w '%{http_code}' --retry 3 --retry-delay 5 -m 60 \
+            -X PATCH "${URL}/rest/v1/keepalive?id=eq.1" \
+            -H "apikey: ${KEY}" -H "Authorization: Bearer ${KEY}" \
+            -H "Content-Type: application/json" -H "Prefer: return=minimal" \
+            -d "{\"beat_at\":\"${ts}\"}") || true
+          echo "keep-alive PATCH -> HTTP ${code}"
+          if [ "$code" != "204" ] && [ "$code" != "200" ]; then
+            echo "::error::Keep-alive write failed (HTTP ${code})."
+            if [ "$code" = "404" ] || [ "$code" = "401" ] || [ "$code" = "400" ]; then
+              echo "The keepalive table/policy is missing — run docs/keepalive-setup.sql in the Supabase SQL editor."
+            elif [ "$code" = "000" ]; then
+              echo "Could not reach Supabase (host didn't resolve). The project is likely PAUSED — restore it at https://supabase.com/dashboard"
+            fi
+            echo "Response body:"; cat /tmp/ka.out 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Fetch scores
         if: steps.cfg.outputs.skip != 'true'
@@ -80,3 +113,32 @@ jobs:
           # and redeploy of the site.
           git commit -m "Leaderboard backup $(date -u +%Y-%m-%d) [skip ci]"
           git push
+
+      # Safety net: if any step above failed, make it loud. GitHub's own
+      # "run failed" email is easy to miss (a pause went unnoticed for two
+      # weeks once); a tracked issue is visible and notifies on create/comment.
+      - name: Alert on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="⚠️ Leaderboard keep-alive failed"
+          body=$(printf '%s\n' \
+            "The scheduled keep-alive/backup run failed." \
+            "" \
+            "Run: ${RUN_URL}" \
+            "" \
+            "Most likely the Supabase project is PAUSED again. Restore it in the" \
+            "dashboard (https://supabase.com/dashboard), then re-run this workflow" \
+            "from the Actions tab to confirm it's green. If the failure was a 404" \
+            "on the keep-alive write, the keepalive table is missing — run" \
+            "docs/keepalive-setup.sql in the Supabase SQL editor." )
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+            echo "Commented on existing alert issue #${existing}."
+          else
+            gh issue create --title "$title" --body "$body"
+            echo "Opened a new alert issue."
+          fi
